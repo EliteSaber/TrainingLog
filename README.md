@@ -14,12 +14,40 @@ WPF-заготовка (.NET 10) под будущее приложение жу
 ```
 TrainingLog.sln
 Directory.Build.props        общие свойства сборки (Nullable, ImplicitUsings, анализаторы)
-src/TrainingLog.Core/        net10.0 — доменная модель и интерфейсы, без зависимости от WPF
+src/TrainingLog.Core/        net10.0 — доменная модель, EF Core и репозитории
 src/TrainingLog/             net10.0-windows — WPF-приложение (MVVM, CommunityToolkit.Mvvm)
+tests/TrainingLog.Tests/     тесты xUnit
 .vscode/                     tasks.json, launch.json, extensions.json
 ```
 
 MVVM: `CommunityToolkit.Mvvm` 8.2.2 — свойства через `[ObservableProperty]`, команды через `[RelayCommand]`.
+
+Зависимости внедряются контейнером `Microsoft.Extensions.DependencyInjection`, сборка —
+в `App.OnStartup`. В `App.xaml` нет `StartupUri`: окно создаётся вручную, иначе в него
+не попадут зависимости.
+
+## Данные
+
+SQLite, файл `%LOCALAPPDATA%\TrainingLog\exercises.db`. Схема применяется миграциями EF Core.
+
+Дубликаты по регистру блокирует колонка `NameKey` с уникальным индексом: сравнение строк
+в SQLite складывает регистр только для ASCII, поэтому «жим» и «Жим» там разные значения.
+
+### Работа с миграциями
+
+Инструмент ставится один раз на машину:
+
+```powershell
+dotnet tool install --global dotnet-ef --version "10.*"
+```
+
+Добавить миграцию после изменения моделей EF:
+
+```powershell
+dotnet ef migrations add <Имя> --project src\TrainingLog.Core --startup-project src\TrainingLog.Core
+```
+
+Миграции лежат в `TrainingLog.Core\Migrations`.
 
 ## Visual Studio 2026
 
@@ -37,6 +65,7 @@ MVVM: `CommunityToolkit.Mvvm` 8.2.2 — свойства через `[Observable
 ```powershell
 dotnet restore TrainingLog.sln
 dotnet build   TrainingLog.sln -c Debug
+dotnet test    TrainingLog.sln
 dotnet run --project src\TrainingLog
 ```
 

@@ -481,8 +481,9 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-# opencode: local AI agent files, not part of the repository
+# opencode: local AI agent files and context, not part of the repository
 AGENTS.md
+PROJECT_CONTEXT.md
 .opencode/
 opencode.json
 opencode.jsonc

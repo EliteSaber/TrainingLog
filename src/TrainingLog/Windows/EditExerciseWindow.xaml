@@ -1,0 +1,47 @@
+<Window x:Class="TrainingLog.Windows.EditExerciseWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:TrainingLog.ViewModels"
+        d:DataContext="{d:DesignInstance Type=vm:EditExerciseViewModel}"
+        mc:Ignorable="d"
+        Title="Редактирование упражнения"
+        Width="380"
+        SizeToContent="Height"
+        MinWidth="320"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Название упражнения" />
+
+        <TextBox x:Name="NameBox"
+                 Grid.Row="1"
+                 Margin="0,8,0,0"
+                 Padding="4,3"
+                 VerticalContentAlignment="Center"
+                 Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+
+        <StackPanel Grid.Row="2"
+                    Margin="0,16,0,0"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <Button Padding="14,4"
+                    Command="{Binding AcceptCommand}"
+                    Content="Принять"
+                    IsDefault="True" />
+
+            <Button Margin="8,0,0,0"
+                    Padding="14,4"
+                    Content="Отменить"
+                    IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</Window>
