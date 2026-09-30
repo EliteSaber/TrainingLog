@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "TrainingLog",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/TrainingLog/bin/Debug/net10.0-windows/TrainingLog.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}
