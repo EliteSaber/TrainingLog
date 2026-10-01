@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:TrainingLog.ViewModels"
+        xmlns:helpers="clr-namespace:TrainingLog.Controls"
         xmlns:core="clr-namespace:TrainingLog.Core;assembly=TrainingLog.Core"
         d:DataContext="{d:DesignInstance Type=vm:EditExerciseViewModel}"
         mc:Ignorable="d"
@@ -20,8 +21,14 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <!--
+          Подпись кликабельна: клик по слову ставит фокус в NameBox. Background="Transparent"
+          нужен для попадания кликом, с null-фоном подпись ловит клик только по буквам.
+        -->
         <TextBlock Grid.Row="0"
-                   Text="Название упражнения" />
+                   Background="Transparent"
+                   Text="Название упражнения"
+                   helpers:ClickToFocus.Target="{Binding ElementName=NameBox}" />
 
         <!--
           Длинное название переносится по словам, а не уезжает в горизонтальную прокрутку:

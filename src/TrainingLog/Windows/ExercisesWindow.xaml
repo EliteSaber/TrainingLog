@@ -69,11 +69,20 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
+            <!--
+              Подпись ведёт себя как подпись: клик по слову ставит фокус в поле. У ClickToFocus
+              своё свойство с целью, потому что передачу фокуса по клику в WPF не делает никто,
+              а Background="Transparent" нужен для попадания кликом: с null-фоном подпись
+              ловит клик только по самим буквам.
+            -->
             <TextBlock Grid.Column="0"
+                       Background="Transparent"
                        VerticalAlignment="Center"
-                       Text="Поиск" />
+                       Text="Поиск"
+                       helpers:ClickToFocus.Target="{Binding ElementName=FilterBox}" />
 
-            <TextBox Grid.Column="1"
+            <TextBox x:Name="FilterBox"
+                     Grid.Column="1"
                      Margin="8,0,0,0"
                      Padding="4,3"
                      VerticalContentAlignment="Center"
