@@ -101,4 +101,41 @@ public sealed class ExerciseNameRulesTests
     {
         Assert.True(ExerciseNameRules.IsValidEdit("Тяга", "Приседание", Other));
     }
+
+    /// <summary>
+    /// Предел длины считается по обрезанному названию: хвостовые пробелы его не занимают.
+    /// Поле ввода с <c>MaxLength</c> считает сырые символы строже, но правило — источник
+    /// истины, и оно должно принимать название, которое в обрезанном виде в лимит укладывается.
+    /// </summary>
+    [Fact]
+    public void IsValid_НазваниеДлинойВПределСПробелами_Допустимо()
+    {
+        var name = new string('а', ExerciseNameRules.MaxNameLength);
+
+        Assert.True(ExerciseNameRules.IsValid($"  {name}  ", All));
+    }
+
+    [Fact]
+    public void IsValid_НазваниеДлиннееПредела_НеДопустимо()
+    {
+        var name = new string('а', ExerciseNameRules.MaxNameLength + 1);
+
+        Assert.False(ExerciseNameRules.IsValid(name, All));
+    }
+
+    [Fact]
+    public void IsValidEdit_НазваниеДлинойВПредел_Допустимо()
+    {
+        var name = new string('а', ExerciseNameRules.MaxNameLength);
+
+        Assert.True(ExerciseNameRules.IsValidEdit(name, "Приседание", Other));
+    }
+
+    [Fact]
+    public void IsValidEdit_НазваниеДлиннееПредела_НеДопустимо()
+    {
+        var name = new string('а', ExerciseNameRules.MaxNameLength + 1);
+
+        Assert.False(ExerciseNameRules.IsValidEdit(name, "Приседание", Other));
+    }
 }

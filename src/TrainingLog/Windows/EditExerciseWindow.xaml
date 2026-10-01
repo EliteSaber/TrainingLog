@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:TrainingLog.ViewModels"
+        xmlns:core="clr-namespace:TrainingLog.Core;assembly=TrainingLog.Core"
         d:DataContext="{d:DesignInstance Type=vm:EditExerciseViewModel}"
         mc:Ignorable="d"
         Title="Редактирование упражнения"
@@ -22,11 +23,24 @@
         <TextBlock Grid.Row="0"
                    Text="Название упражнения" />
 
+        <!--
+          Длинное название переносится по словам, а не уезжает в горизонтальную прокрутку:
+          AcceptsReturn="False" оставляет Enter подтверждением (кнопка IsDefault), а переводы
+          строк при вставке из буфера WPF вычищает сам, поэтому правила имени менять не пришлось.
+          MaxHeight обязателен рядом с Wrap: у переноса по умолчанию
+          VerticalScrollBarVisibility="Hidden", и без предела поле растёт бесконечно.
+          MaxLength ссылается на правило, а не на число в разметке.
+        -->
         <TextBox x:Name="NameBox"
                  Grid.Row="1"
                  Margin="0,8,0,0"
+                 AcceptsReturn="False"
+                 MaxHeight="96"
+                 MaxLength="{x:Static core:ExerciseNameRules.MaxNameLength}"
                  Padding="4,3"
+                 TextWrapping="Wrap"
                  VerticalContentAlignment="Center"
+                 VerticalScrollBarVisibility="Auto"
                  Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
 
         <StackPanel Grid.Row="2"

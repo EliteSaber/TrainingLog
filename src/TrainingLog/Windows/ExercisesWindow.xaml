@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:TrainingLog.ViewModels"
         xmlns:helpers="clr-namespace:TrainingLog.Controls"
+        xmlns:core="clr-namespace:TrainingLog.Core;assembly=TrainingLog.Core"
         xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
         d:DataContext="{d:DesignInstance Type=vm:ExercisesViewModel}"
         mc:Ignorable="d"
@@ -38,14 +39,25 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
+            <!--
+              Как и в окне правки: перенос по словам вместо горизонтальной прокрутки.
+              MaxHeight здесь ниже, чем в окне правки, — поле стоит над списком и не должно
+              сильно сдвигать его при вводе.
+            -->
             <TextBox Grid.Column="0"
+                     AcceptsReturn="False"
+                     MaxHeight="60"
+                     MaxLength="{x:Static core:ExerciseNameRules.MaxNameLength}"
                      Padding="4,3"
+                     TextWrapping="Wrap"
                      VerticalContentAlignment="Center"
+                     VerticalScrollBarVisibility="Auto"
                      Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" />
 
             <Button Grid.Column="1"
                     Margin="8,0,0,0"
                     Padding="14,4"
+                    VerticalAlignment="Center"
                     Command="{Binding AddCommand}"
                     Content="Добавить" />
         </Grid>

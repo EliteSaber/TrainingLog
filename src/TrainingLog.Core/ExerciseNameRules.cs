@@ -9,12 +9,23 @@ namespace TrainingLog.Core;
 public static class ExerciseNameRules
 {
     /// <summary>
+    /// Предел длины названия.
+    /// </summary>
+    /// <remarks>
+    /// Считается по обрезанному названию, поэтому хвостовые пробелы длину не занимают.
+    /// Поля ввода ссылаются на эту же константу через <c>x:Static</c>, поэтому правило
+    /// нельзя обойти вводом, а лимит нельзя разъехать между двумя формами.
+    /// </remarks>
+    public const int MaxNameLength = 100;
+
+    /// <summary>
     /// Проверяет, можно ли добавить упражнение с названием <paramref name="name"/>.
     /// </summary>
     /// <remarks>
-    /// Название допустимо, если оно непустое и не совпадает без учёта регистра ни с одним
-    /// другим упражнением справочника. Действует при добавлении; для правки есть
-    /// <see cref="IsValidEdit"/>, где сверх этого требуется, чтобы название изменилось.
+    /// Название допустимо, если оно непустое, не длиннее <see cref="MaxNameLength"/> и не
+    /// совпадает без учёта регистра ни с одним другим упражнением справочника. Действует при
+    /// добавлении; для правки есть <see cref="IsValidEdit"/>, где сверх этого требуется, чтобы
+    /// название изменилось.
     /// </remarks>
     /// <param name="name">Проверяемое название.</param>
     /// <param name="all">Упражнения, среди которых ищется совпадение.</param>
@@ -26,6 +37,11 @@ public static class ExerciseNameRules
         var candidate = name?.Trim();
 
         if (string.IsNullOrEmpty(candidate))
+        {
+            return false;
+        }
+
+        if (candidate.Length > MaxNameLength)
         {
             return false;
         }
@@ -53,6 +69,11 @@ public static class ExerciseNameRules
         var candidate = name?.Trim();
 
         if (string.IsNullOrEmpty(candidate))
+        {
+            return false;
+        }
+
+        if (candidate.Length > MaxNameLength)
         {
             return false;
         }
