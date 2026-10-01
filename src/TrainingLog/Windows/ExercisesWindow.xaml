@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:TrainingLog.ViewModels"
+        xmlns:helpers="clr-namespace:TrainingLog.Controls"
         xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
         d:DataContext="{d:DesignInstance Type=vm:ExercisesViewModel}"
         mc:Ignorable="d"
@@ -88,37 +89,50 @@
         </Border>
 
         <Grid Grid.Row="3">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ScrollViewer helpers:ScrollBarGutter.Left="2"
+                          VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Visible}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+                            <!--
+                              Границу рисует контейнер строки, а не шаблон данных: иначе она
+                              привязана к содержимому, а не к строке. Линия идёт вплотную под
+                              названием, отступ перед следующей строкой даёт Padding="0,4".
+                            -->
+                            <Border Margin="0,0,0,0"
+                                    Padding="0,4"
+                                    BorderBrush="#E0E0E0"
+                                    BorderThickness="0,0,0,1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
-                                <TextBlock Grid.Column="0"
-                                           Margin="4,0,8,0"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"
-                                           Text="{Binding Name}" />
+                                    <TextBlock Grid.Column="0"
+                                               Margin="4,0,8,0"
+                                               VerticalAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding Name}" />
 
-                                <Button Grid.Column="1"
-                                        Padding="8,2"
-                                        Command="{Binding DataContext.EditCommand,
-                                                          RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                        CommandParameter="{Binding}"
-                                        Content="Редактировать" />
+                                    <Button Grid.Column="1"
+                                            Padding="8,2"
+                                            VerticalAlignment="Center"
+                                            Command="{Binding DataContext.EditCommand,
+                                                              RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            Content="Редактировать" />
 
-                                <Button Grid.Column="2"
-                                        Margin="4,0,0,0"
-                                        Padding="8,2"
-                                        Click="OnDeleteClick"
-                                        CommandParameter="{Binding}"
-                                        Content="Удалить" />
-                            </Grid>
+                                    <Button Grid.Column="2"
+                                            Margin="4,0,0,0"
+                                            Padding="8,2"
+                                            VerticalAlignment="Center"
+                                            Click="OnDeleteClick"
+                                            CommandParameter="{Binding}"
+                                            Content="Удалить" />
+                                </Grid>
+                            </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
