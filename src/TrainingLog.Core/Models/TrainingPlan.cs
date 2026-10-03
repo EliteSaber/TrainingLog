@@ -1,19 +1,50 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+
 namespace TrainingLog.Core.Models;
+
 /// <summary>
 /// План тренировки: наименование и список упражнений из справочника.
 /// </summary>
-public sealed class TrainingPlan
+/// <remarks>
+/// Модель подписывается на свои изменения: <see cref="INotifyPropertyChanged"/> и
+/// <see cref="ObservableCollection{T}"/> — из BCL, зависимости от WPF у ядра не появляется.
+/// Нужно это потому, что строка списка планов переживает перечитывание из базы (иначе
+/// схлопывается раскрытый план), а пережившая строка берёт значения из той же модели. Без
+/// уведомлений сохранённая правка сохранялась бы в базе и молча не появлялась на экране.
+/// </remarks>
+public sealed class TrainingPlan : INotifyPropertyChanged
 {
+    /// <summary>
+    /// Изменилось наименование или что-то ещё, требующее обновить привязки.
+    /// </summary>
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     /// <summary>
     /// Идентификатор плана. Значение <c>0</c> означает, что запись ещё не сохранена
     /// и идентификатор будет присвоен хранилищем.
     /// </summary>
     public int Id { get; set; }
 
+    private string _name = string.Empty;
+
     /// <summary>
     /// Наименование плана.
     /// </summary>
-    public string Name { get; set; } = string.Empty;
+    public string Name
+    {
+        get => _name;
+        set
+        {
+            if (_name == value)
+            {
+                return;
+            }
+
+            _name = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Name)));
+        }
+    }
 
     /// <summary>
     /// Строки связи с упражнениями: состав плана и порядок выполнения.
@@ -22,8 +53,12 @@ public sealed class TrainingPlan
     /// Связь many-to-many хранится таблицей <c>PlanExercises</c>, и порядок упражнений — это
     /// её данные, поэтому у таблицы есть класс. Восьми править состав напрямую нельзя: вместо
     /// этого принято передавать план, у которого заполнено это свойство.
+    ///
+    /// Объявленный тип остаётся <see cref="ICollection{T}"/>, наблюдаемым делается только
+    /// экземпляр: этого хватает разметке, а весь код, который с планом работает, продолжает
+    /// видеть обычную коллекцию.
     /// </remarks>
-    public ICollection<PlanExercise> PlanExercises { get; } = [];
+    public ICollection<PlanExercise> PlanExercises { get; } = new ObservableCollection<PlanExercise>();
 
     /// <summary>
     /// Упражнения плана в порядке выполнения.

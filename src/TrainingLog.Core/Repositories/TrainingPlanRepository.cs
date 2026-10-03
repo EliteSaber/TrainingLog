@@ -17,12 +17,44 @@ public sealed class TrainingPlanRepository(IDbContextFactory<TrainingLogDbContex
         // Порядок выполнения лежит в строках связи, поэтому состав упорядочивается и при
         // выборке, а не только при показе: иначе показ зависел бы от того, как база вернула
         // строки.
-        return await context.TrainingPlans
+        var plans = await context.TrainingPlans
             .AsNoTracking()
             .Include(plan => plan.PlanExercises.OrderBy(link => link.Order))
                 .ThenInclude(link => link.Exercise)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        foreach (var plan in plans)
+        {
+            NormalizeOrder(plan);
+        }
+
+        return plans;
+    }
+
+    /// <summary>
+    /// Проставляет строкам связи номера с единицы без пропусков.
+    /// </summary>
+    /// <remarks>
+    /// Каскадное удаление упражнения убирает его строку связи, но номера у оставшихся не
+    /// трогает: в плане из двух упражнений после удаления первого у второго остаётся номер 2.
+    /// Чинить это записью в чужую таблицу не хочется — упражнения тогда должны знать про планы,
+    /// — поэтому плотность восстанавливается при чтении, а настоящей опорой порядка остаётся
+    /// последовательность строк, а не сами номера. В базе номера остаются неубывающими, а
+    /// плотными становятся при следующей записи плана: <see cref="ReplaceExercises"/> всё равно
+    /// перенумеровывает состав при каждом сохранении.
+    ///
+    /// Второй ключ сортировки — идентификатор упражнения: без него две строки с одинаковым
+    /// номером (тот же случай, что был до миграции) переставлялись бы произвольно.
+    /// </remarks>
+    private static void NormalizeOrder(TrainingPlan plan)
+    {
+        var order = 1;
+
+        foreach (var link in plan.PlanExercises.OrderBy(link => link.Order).ThenBy(link => link.ExerciseId))
+        {
+            link.Order = order++;
+        }
     }
 
     public async Task<AddTrainingPlanOutcome> AddAsync(TrainingPlan plan, CancellationToken cancellationToken = default)

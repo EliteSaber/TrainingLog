@@ -437,4 +437,95 @@ public sealed class TrainingPlanRepositoryTests
         Assert.Equal(2, all.Count);
         Assert.Equal("Приседание", Assert.Single(Assert.Single(all, p => p.Id == plan.Id).Exercises).Name);
     }
+
+    /// <summary>
+    /// Каскад удаляет строку связи упражнения, но номера у оставшихся не трогает: без
+    /// нормализации при чтении единственное упражнение плана показывалось бы как «2».
+    /// </summary>
+    [Fact]
+    public async Task GetAllAsync_ПослеУдаленияУпражнения_НомераПлотныеСЕдиницы()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = new Exercise { Name = "Приседание" };
+        var bench = new Exercise { Name = "Жим" };
+        await database.Repository.AddAsync(squat);
+        await database.Repository.AddAsync(bench);
+
+        var plan = new TrainingPlan { Name = "День" };
+        plan.AddExercise(squat);
+        plan.AddExercise(bench);
+        await database.PlanRepository.AddAsync(plan);
+
+        await database.Repository.DeleteAsync(squat.Id);
+
+        var stored = Assert.Single(await database.PlanRepository.GetAllAsync());
+        Assert.Equal([1], stored.PlanExercises.Select(link => link.Order));
+        Assert.Equal([bench.Name], stored.Exercises.Select(exercise => exercise.Name));
+    }
+
+    [Fact]
+    public async Task GetAllAsync_НомераСДырами_ПеренумеровываютсяБезСменыПорядка()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = new Exercise { Name = "Приседание" };
+        var bench = new Exercise { Name = "Жим" };
+        await database.Repository.AddAsync(squat);
+        await database.Repository.AddAsync(bench);
+
+        // Номера с дырами: так выглядит план, у которого переставили упражнения, но состав
+        // не менялся. Перенумерация обязана сохранить взаимный порядок.
+        var plan = new TrainingPlan { Name = "День" };
+        plan.PlanExercises.Add(new PlanExercise { Exercise = squat, Order = 5 });
+        plan.PlanExercises.Add(new PlanExercise { Exercise = bench, Order = 9 });
+        await database.PlanRepository.AddAsync(plan);
+
+        var stored = Assert.Single(await database.PlanRepository.GetAllAsync());
+
+        Assert.Equal([1, 2], stored.PlanExercises.OrderBy(link => link.Order).Select(link => link.Order));
+        Assert.Equal([squat.Name, bench.Name], stored.Exercises.Select(exercise => exercise.Name));
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ПлотныеНомера_НеМеняются()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = new Exercise { Name = "Приседание" };
+        await database.Repository.AddAsync(squat);
+
+        var plan = new TrainingPlan { Name = "День" };
+        plan.AddExercise(squat);
+        await database.PlanRepository.AddAsync(plan);
+
+        var stored = Assert.Single(await database.PlanRepository.GetAllAsync());
+
+        Assert.Equal([1], stored.PlanExercises.Select(link => link.Order));
+    }
+
+    [Fact]
+    public async Task GetAllAsync_Нормализация_ПланыНезависимы()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = new Exercise { Name = "Приседание" };
+        var bench = new Exercise { Name = "Жим" };
+        await database.Repository.AddAsync(squat);
+        await database.Repository.AddAsync(bench);
+
+        var first = new TrainingPlan { Name = "Ноги" };
+        first.AddExercise(squat);
+        await database.PlanRepository.AddAsync(first);
+
+        var second = new TrainingPlan { Name = "День" };
+        second.AddExercise(bench);
+        second.AddExercise(squat);
+        await database.PlanRepository.AddAsync(second);
+
+        var all = await database.PlanRepository.GetAllAsync();
+
+        Assert.Equal(
+            [1],
+            Assert.Single(all, plan => plan.Id == first.Id).PlanExercises.Select(link => link.Order));
+        Assert.Equal(
+            [1, 2],
+            Assert.Single(all, plan => plan.Id == second.Id).PlanExercises.Select(link => link.Order));
+    }
 }

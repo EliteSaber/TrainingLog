@@ -9,6 +9,9 @@ namespace TrainingLog.Core.Repositories;
 /// </summary>
 public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> contextFactory) : IExerciseRepository
 {
+    /// <inheritdoc />
+    public event EventHandler? Changed;
+
     public async Task<IReadOnlyList<Exercise>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -50,6 +53,8 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
             // или процесса успела вставить строку. Уникальный индекс — последний рубеж.
             return AddExerciseOutcome.DuplicateName;
         }
+
+        NotifyChanged();
 
         return AddExerciseOutcome.Added;
     }
@@ -93,9 +98,11 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
         }
 
         exercise.Name = name;
+
+        NotifyChanged();
+
         return UpdateExerciseOutcome.Updated;
     }
-
     public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -111,6 +118,8 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
 
         context.Exercises.Remove(stored);
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        NotifyChanged();
 
         return true;
     }
@@ -134,4 +143,9 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
                 cancellationToken)
             .ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Сообщает подписчикам, что справочник изменился. Вызывается только после успешной записи.
+    /// </summary>
+    private void NotifyChanged() => Changed?.Invoke(this, EventArgs.Empty);
 }

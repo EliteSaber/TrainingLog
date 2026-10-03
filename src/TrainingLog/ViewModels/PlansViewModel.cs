@@ -57,18 +57,113 @@ public sealed partial class PlansViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task LoadAsync()
+    private Task LoadAsync() => RefreshAsync();
+
+    /// <summary>
+    /// Перечитывает планы из базы, обновляя уже показанные объекты на месте.
+    /// </summary>
+    /// <remarks>
+    /// Объекты не заменяются: новый объект в списке — это новая строка <c>ItemsControl</c>,
+    /// а значит новый контейнер и закрытый <c>Expander</c>. Поэтому существующим планам
+    /// переносится наименование и состав, добавляются только новые планы, а исчезнувшие
+    /// (удалённые из другого окна) убираются.
+    /// </remarks>
+    private async Task RefreshAsync()
     {
         var plans = await _repository.GetAllAsync().ConfigureAwait(true);
 
-        _all.Clear();
+        var existing = _all.ToDictionary(plan => plan.Id);
+
         foreach (var plan in plans)
         {
-            _all.Add(plan);
+            if (existing.TryGetValue(plan.Id, out var shown))
+            {
+                CopyInto(shown, plan);
+            }
+            else
+            {
+                _all.Add(plan);
+            }
+        }
+
+        var actualIds = plans.Select(plan => plan.Id).ToHashSet();
+
+        foreach (var plan in _all.Where(plan => !actualIds.Contains(plan.Id)).ToList())
+        {
+            _all.Remove(plan);
         }
 
         OnPropertyChanged(nameof(IsEmpty));
         RebuildVisible();
+    }
+
+    /// <summary>
+    /// Переносит наименование и состав из перечитанного плана в тот, что уже показан.
+    /// </summary>
+    private static void CopyInto(TrainingPlan target, TrainingPlan source)
+    {
+        target.Name = source.Name;
+
+        // Порядок берётся из вычисляемого списка: он уже отсортирован по номеру,
+        // а AddExercise перенумерует строки связи с единицы и без пропусков.
+        target.PlanExercises.Clear();
+
+        foreach (var exercise in source.Exercises)
+        {
+            target.AddExercise(exercise);
+        }
+    }
+
+    /// <summary>
+    /// Приводит видимую коллекцию к целевому порядку, не пересоздавая её элементы.
+    /// </summary>
+    /// <remarks>
+    /// Смысл именно в <see cref="ObservableCollection{T}.Move"/>: контейнер строки переезжает
+    /// вместе с элементом, и состояние контейнера — у <c>Expander</c> это <c>IsExpanded</c> —
+    /// сохраняется. Вариант «очистить и добавить заново» выглядит проще, но убивает все
+    /// раскрытые планы, а <see cref="PlansViewModel"/> пересобирает список на каждый ввод в
+    /// поиск и на каждое переключение сортировки.
+    /// </remarks>
+    /// <param name="current">Видимая коллекция, которую приводят к целевому порядку.</param>
+    /// <param name="target">Порядок, который должен получиться.</param>
+    public static void SyncVisible<T>(ObservableCollection<T> current, IReadOnlyList<T> target)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(target);
+
+        // С конца, чтобы удаление не сдвигало ещё не просмотренные элементы.
+        for (var index = current.Count - 1; index >= 0; index--)
+        {
+            if (!target.Contains(current[index]))
+            {
+                current.RemoveAt(index);
+            }
+        }
+
+        for (var position = 0; position < target.Count; position++)
+        {
+            if (position >= current.Count)
+            {
+                current.Add(target[position]);
+                continue;
+            }
+
+            if (EqualityComparer<T>.Default.Equals(current[position], target[position]))
+            {
+                continue;
+            }
+
+            var actual = current.IndexOf(target[position]);
+
+            if (actual < 0)
+            {
+                current.Insert(position, target[position]);
+            }
+            else if (actual != position)
+            {
+                current.Move(actual, position);
+            }
+        }
     }
 
     [RelayCommand]
@@ -83,14 +178,13 @@ public sealed partial class PlansViewModel : ObservableObject
     {
         if (_windowService.ShowAddPlan())
         {
-            await LoadAsync().ConfigureAwait(true);
+            await RefreshAsync().ConfigureAwait(true);
         }
     }
 
     /// <summary>
-    /// Открывает модальное окно правки. После сохранения список перечитывается целиком:
-    /// изменился не только наименование, но и состав упражнений, а он у плана отдельным
-    /// объектом, и подменять его в строке рискованнее, чем перечитать.
+    /// Открывает модальное окно правки. После сохранения список перечитывается: изменились
+    /// наименование и состав упражнений, а у плана это отдельные данные.
     /// </summary>
     [RelayCommand]
     private async Task EditAsync(TrainingPlan? plan)
@@ -102,7 +196,7 @@ public sealed partial class PlansViewModel : ObservableObject
 
         if (_windowService.ShowEditPlan(plan))
         {
-            await LoadAsync().ConfigureAwait(true);
+            await RefreshAsync().ConfigureAwait(true);
         }
     }
 
@@ -142,11 +236,6 @@ public sealed partial class PlansViewModel : ObservableObject
             ? query.OrderByDescending(plan => plan.Name, StringComparer.Ordinal)
             : query.OrderBy(plan => plan.Name, StringComparer.Ordinal);
 
-        Visible.Clear();
-
-        foreach (var plan in query)
-        {
-            Visible.Add(plan);
-        }
+        SyncVisible(Visible, query.ToList());
     }
 }

@@ -279,4 +279,61 @@ public sealed class ExerciseRepositoryTests
             await context.SaveChangesAsync();
         });
     }
+
+    /// <summary>
+    /// Событие <see cref="IExerciseRepository.Changed"/> держит окно планов в курсе: без него
+    /// переименование и удаление упражнения остаются в соседнем окне незаметными.
+    /// </summary>
+    [Fact]
+    public async Task Changed_УспешныеЗаписи_ПоднимаютСобытие()
+    {
+        using var database = new TemporaryDatabase();
+        var changes = TrackChanges(database.Repository);
+
+        var exercise = new Exercise { Name = "Жим" };
+        await database.Repository.AddAsync(exercise);
+        await database.Repository.UpdateAsync(new Exercise { Id = exercise.Id, Name = "Жим лёжа" });
+        await database.Repository.DeleteAsync(exercise.Id);
+
+        Assert.Equal(3, changes.Count);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Changed_ПустоеНазвание_СобытияНет(string name)
+    {
+        using var database = new TemporaryDatabase();
+        var changes = TrackChanges(database.Repository);
+
+        await database.Repository.AddAsync(new Exercise { Name = name });
+
+        Assert.Empty(changes);
+    }
+
+    [Fact]
+    public async Task Changed_ДубликатИНеизвестныйИдентификатор_СобытияНет()
+    {
+        using var database = new TemporaryDatabase();
+        var exercise = new Exercise { Name = "Жим" };
+        await database.Repository.AddAsync(exercise);
+
+        var changes = TrackChanges(database.Repository);
+
+        await database.Repository.AddAsync(new Exercise { Name = "жим" });
+        await database.Repository.UpdateAsync(new Exercise { Id = exercise.Id, Name = "  " });
+        await database.Repository.UpdateAsync(new Exercise { Id = 4242, Name = "Тяга" });
+        await database.Repository.DeleteAsync(4242);
+
+        Assert.Empty(changes);
+    }
+
+    private static List<int> TrackChanges(IExerciseRepository repository)
+    {
+        var changes = new List<int>();
+
+        repository.Changed += (_, _) => changes.Add(changes.Count);
+
+        return changes;
+    }
 }
