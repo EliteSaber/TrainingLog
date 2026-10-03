@@ -26,6 +26,7 @@ internal sealed class TemporaryDatabase : IDisposable
 
         Factory = new TestContextFactory(options);
         Repository = new Core.Repositories.ExerciseRepository(Factory);
+        PlanRepository = new Core.Repositories.TrainingPlanRepository(Factory);
 
         // Миграции, а не EnsureCreated: так проверяется и итоговая схема,
         // и то, что цепочка миграций применима к пустой базе.
@@ -36,6 +37,8 @@ internal sealed class TemporaryDatabase : IDisposable
     public IDbContextFactory<TrainingLogDbContext> Factory { get; }
 
     public Core.Repositories.ExerciseRepository Repository { get; }
+
+    public Core.Repositories.TrainingPlanRepository PlanRepository { get; }
 
     public void Dispose()
     {

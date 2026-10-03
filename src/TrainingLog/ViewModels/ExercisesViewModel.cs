@@ -81,7 +81,7 @@ public sealed partial class ExercisesViewModel : ObservableObject
     /// Дубликат ищется по всему справочнику, а не по видимым строкам: при активном фильтре
     /// иначе можно было бы добавить «жим лёжа», когда он в базе уже есть, просто отфильтрован.
     /// </remarks>
-    private bool CanAdd() => ExerciseNameRules.IsValid(NewName, _all);
+    private bool CanAdd() => NameRules.IsValid(NewName, _all.Select(exercise => exercise.Name));
 
     [RelayCommand(CanExecute = nameof(CanAdd))]
     private async Task AddAsync()

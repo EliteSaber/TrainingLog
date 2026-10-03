@@ -47,7 +47,7 @@
             <TextBox Grid.Column="0"
                      AcceptsReturn="False"
                      MaxHeight="60"
-                     MaxLength="{x:Static core:ExerciseNameRules.MaxNameLength}"
+                     MaxLength="{x:Static core:NameRules.MaxNameLength}"
                      Padding="4,3"
                      TextWrapping="Wrap"
                      VerticalContentAlignment="Center"

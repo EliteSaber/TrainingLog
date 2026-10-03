@@ -45,7 +45,7 @@ public sealed partial class EditExerciseViewModel : ObservableObject
     /// упражнением. Сохранение без изменений и добавленные пробелы изменением не считаются,
     /// поэтому кнопка в таких случаях неактивна.
     /// </summary>
-    private bool CanAccept() => ExerciseNameRules.IsValidEdit(Name, _exercise.Name, _others);
+    private bool CanAccept() => NameRules.IsValidEdit(Name, _exercise.Name, _others.Select(exercise => exercise.Name));
 
     /// <summary>
     /// Загружает справочник для проверки дубликатов. Вызывается окном при загрузке.

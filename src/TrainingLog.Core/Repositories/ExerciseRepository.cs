@@ -9,17 +9,6 @@ namespace TrainingLog.Core.Repositories;
 /// </summary>
 public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> contextFactory) : IExerciseRepository
 {
-    /// <summary>
-    /// Приводит название к сравнимому виду для хранения в <c>NameKey</c>.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="string.ToUpperInvariant"/>, а не <see cref="string.ToUpper()"/>: вариант без
-    /// параметра зависит от локали машины, и одна база сравнивалась бы по-разному на разных
-    /// компьютерах. Сравнение строк в SQLite складывает регистр только для ASCII, поэтому
-    /// нормализация выполняется в .NET.
-    /// </remarks>
-    internal static string NormalizeName(string name) => name.ToUpperInvariant();
-
     public async Task<IReadOnlyList<Exercise>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -49,7 +38,7 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
 
         exercise.Name = name;
         context.Exercises.Add(exercise);
-        context.Entry(exercise).Property(TrainingLogDbContext.NameKeyPropertyName).CurrentValue = NormalizeName(name);
+        context.Entry(exercise).Property(TrainingLogDbContext.NameKeyPropertyName).CurrentValue = TrainingLogDbContext.NormalizeNameKey(name);
 
         try
         {
@@ -92,7 +81,7 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
         }
 
         stored.Name = name;
-        context.Entry(stored).Property(TrainingLogDbContext.NameKeyPropertyName).CurrentValue = NormalizeName(name);
+        context.Entry(stored).Property(TrainingLogDbContext.NameKeyPropertyName).CurrentValue = TrainingLogDbContext.NormalizeNameKey(name);
 
         try
         {
@@ -133,7 +122,7 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        var key = NormalizeName(name.Trim());
+        var key = TrainingLogDbContext.NormalizeNameKey(name.Trim());
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 

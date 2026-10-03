@@ -43,7 +43,7 @@
                  Margin="0,8,0,0"
                  AcceptsReturn="False"
                  MaxHeight="96"
-                 MaxLength="{x:Static core:ExerciseNameRules.MaxNameLength}"
+                 MaxLength="{x:Static core:NameRules.MaxNameLength}"
                  Padding="4,3"
                  TextWrapping="Wrap"
                  VerticalContentAlignment="Center"

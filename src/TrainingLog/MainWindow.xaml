@@ -14,6 +14,9 @@
                      DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
             <MenuItem Header="Упражнения"
                       Command="{Binding OpenExercisesCommand}" />
+
+            <MenuItem Header="Планы"
+                      Command="{Binding OpenPlansCommand}" />
         </ContextMenu>
     </Window.Resources>
 

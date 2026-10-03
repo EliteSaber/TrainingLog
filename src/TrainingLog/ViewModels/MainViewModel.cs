@@ -32,6 +32,12 @@ public partial class MainViewModel : ObservableObject
         _windowService.OpenExercises();
     }
 
+    [RelayCommand]
+    private void OpenPlans()
+    {
+        _windowService.OpenPlans();
+    }
+
     [ObservableProperty]
     private int _counter;
 }

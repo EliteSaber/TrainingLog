@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrainingLog.Core.Data;
+using TrainingLog.Core.Models;
 using TrainingLog.Core.Repositories;
 using TrainingLog.Services;
 using TrainingLog.ViewModels;
@@ -42,17 +43,34 @@ public partial class App : Application
             options.UseSqlite($"Data Source={SqliteDatabasePath.Resolve()}"));
 
         services.AddSingleton<IExerciseRepository, ExerciseRepository>();
+        services.AddSingleton<ITrainingPlanRepository, TrainingPlanRepository>();
 
-        // Окно упражнений единственное, поэтому состояние хоста переиспользуется, а сам сервис
-        // должен быть синглтоном. Окно редактирования, наоборот, создаётся заново на каждый
-        // вызов, внутри него то упражнение, которое правят.
+        // Окно упражнений и окно планов единственные, поэтому состояние хоста переиспользуется,
+        // а сам сервис должен быть синглтоном. Окна редактирования, наоборот, создаются заново
+        // на каждый вызов: внутри них то, что правят.
         services.AddSingleton<IWindowService>(provider => new WindowService(
             () => provider.GetRequiredService<ExercisesWindow>(),
             exercise => new EditExerciseWindow(
-                new EditExerciseViewModel(exercise, provider.GetRequiredService<IExerciseRepository>()))));
+                new EditExerciseViewModel(exercise, provider.GetRequiredService<IExerciseRepository>())),
+            () => provider.GetRequiredService<PlansWindow>(),
+            // Добавление и правка плана открывают одно окно, поэтому фабрики две: отличаются
+            // они планом и тем, новый он или уже сохранённый.
+            () => new EditPlanWindow(new EditPlanViewModel(
+                new TrainingPlan(),
+                isNew: true,
+                provider.GetRequiredService<ITrainingPlanRepository>(),
+                provider.GetRequiredService<IExerciseRepository>())),
+            plan => new EditPlanWindow(new EditPlanViewModel(
+                plan,
+                isNew: false,
+                provider.GetRequiredService<ITrainingPlanRepository>(),
+                provider.GetRequiredService<IExerciseRepository>()))));
 
         services.AddTransient<ExercisesViewModel>();
         services.AddTransient<ExercisesWindow>();
+
+        services.AddTransient<PlansViewModel>();
+        services.AddTransient<PlansWindow>();
 
         services.AddTransient<MainViewModel>();
         services.AddTransient<MainWindow>();
