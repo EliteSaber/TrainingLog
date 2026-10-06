@@ -4,11 +4,15 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:TrainingLog.ViewModels"
+        xmlns:helpers="clr-namespace:TrainingLog.Controls"
+        xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         mc:Ignorable="d"
         Title="{Binding Title}"
-        Height="450"
-        Width="800">
+        Height="560"
+        Width="900"
+        MinWidth="640"
+        MinHeight="360">
     <Window.Resources>
         <ContextMenu x:Key="SettingsMenu"
                      DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
@@ -18,9 +22,11 @@
             <MenuItem Header="Планы"
                       Command="{Binding OpenPlansCommand}" />
         </ContextMenu>
+
+        <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </Window.Resources>
 
-    <Grid Margin="24">
+    <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -29,19 +35,51 @@
 
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <TextBlock Grid.Column="0"
-                       FontSize="28"
+                       FontSize="24"
                        FontWeight="SemiBold"
+                       VerticalAlignment="Center"
                        Text="{Binding Title}" />
 
+            <!--
+              Сколько дней показывать — рядом с заголовком, а не внизу: это настройка показа,
+              а не действие над записью. Значение применяется кнопкой, поэтому поле не
+              меняет список само и список не перечитывается на каждый введённый символ.
+              Пустое или негодное поле гасит «Применить» — считать дни по мусору нельзя.
+            -->
+            <StackPanel Grid.Column="2"
+                        Margin="0,0,12,0"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           Text="Количество дней" />
+
+                <TextBox Width="52"
+                         Margin="8,0,0,0"
+                         Padding="4,3"
+                         HorizontalContentAlignment="Center"
+                         VerticalContentAlignment="Center"
+                         Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
+
+            <Button Grid.Column="3"
+                    Margin="0,0,12,0"
+                    Padding="14,4"
+                    VerticalAlignment="Center"
+                    Command="{Binding ApplyCommand}"
+                    Content="Применить" />
+
             <Button x:Name="SettingsButton"
-                    Grid.Column="1"
+                    Grid.Column="4"
                     Padding="8"
-                    VerticalAlignment="Top"
+                    VerticalAlignment="Center"
                     Focusable="False"
                     ToolTip="Параметры"
                     Click="OnSettingsButtonClick"
@@ -56,19 +94,149 @@
             </Button>
         </Grid>
 
-        <TextBlock Grid.Row="1"
-                   Margin="0,16,0,0"
-                   TextWrapping="Wrap"
-                   Text="{Binding Status}" />
+        <Grid Grid.Row="1"
+              Margin="0,16,0,0">
+            <!--
+          Дней может быть много, а столбцов в дне — сколько подходов, и это число ничем не
+          ограничено: ширина дня не зависит от ширины окна. Поэтому прокрутка по обеим
+          осям, иначе длинный день просто обрезался бы. Зазор слева от полосы — тот же
+          ScrollBarGutter, что в остальных списках.
+        -->
+        <ScrollViewer helpers:ScrollBarGutter.Left="2"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Days}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <!--
+                              Четыре строки дня: план, упражнения, вес, повторения. Дата одна
+                              на все строки — она задаёт день, а не упражнение.
 
-        <StackPanel Grid.Row="2"
-                    Orientation="Horizontal">
-            <Button Content="Increment"
-                    Padding="12,6"
-                    Command="{Binding IncrementCounterCommand}" />
-            <TextBlock Margin="12,0,0,0"
+                              Столбцы упражнений, весов и повторений — три горизонтальных
+                              списка, а не Grid с колонками: количество колонок у дня равно
+                              числу подходов всех упражнений и меняется от дня к дню, а
+                              динамические ColumnDefinition'ы разъезжались бы по ширине.
+                              Ширина ячейки фиксирована и задана моделью, поэтому вес стоит
+                              ровно над своим повторением, а столбцы совпадают.
+                            -->
+                            <Border Padding="0,10,0,10"
+                                    BorderBrush="#E0E0E0"
+                                    BorderThickness="0,0,0,1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!--
+                                      Дата одна на все четыре строки: она задаёт день, а не
+                                      упражнение. Ширину столбца задаёт содержимое — оно
+                                      одинаково у всех дней в одной и той же позиции, а
+                                      столбцы подписей общие для всех четырёх строк.
+                                    -->
+                                    <TextBlock Grid.Column="0"
+                                               Grid.RowSpan="4"
+                                               Margin="0,0,12,0"
+                                               VerticalAlignment="Top"
+                                               FontWeight="SemiBold"
+                                               Text="{Binding DateText}" />
+
+                                    <TextBlock Grid.Column="1"
+                                               Grid.ColumnSpan="2"
+                                               Grid.Row="0"
+                                               Margin="0,0,0,6"
+                                               FontWeight="SemiBold"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding PlanName}" />
+
+                                    <ItemsControl Grid.Column="2"
+                                                  Grid.Row="1"
+                                                  ItemsSource="{Binding Exercises}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Width="{Binding Width}"
+                                                           VerticalAlignment="Top"
+                                                           TextWrapping="Wrap"
+                                                           Text="{Binding Name}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <TextBlock Grid.Column="1"
+                                               Grid.Row="2"
+                                               Margin="0,2,12,0"
+                                               Text="Вес" />
+
+                                    <ItemsControl Grid.Column="2"
+                                                  Grid.Row="2"
+                                                  ItemsSource="{Binding Sets}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Width="{Binding CellWidth}"
+                                                           HorizontalAlignment="Center"
+                                                           Text="{Binding WeightText}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <TextBlock Grid.Column="1"
+                                               Grid.Row="3"
+                                               Margin="0,2,12,0"
+                                               Text="Повторения" />
+
+                                    <ItemsControl Grid.Column="2"
+                                                  Grid.Row="3"
+                                                  ItemsSource="{Binding Sets}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Width="{Binding CellWidth}"
+                                                           HorizontalAlignment="Center"
+                                                           Text="{Binding RepetitionText}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock HorizontalAlignment="Center"
                        VerticalAlignment="Center"
-                       Text="{Binding Counter}" />
-        </StackPanel>
+                       Foreground="Gray"
+                       IsHitTestVisible="False"
+                       Text="Записей пока нет"
+                       Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        </Grid>
+
+        <Button Grid.Row="2"
+                Margin="0,16,0,0"
+                HorizontalAlignment="Left"
+                Padding="14,4"
+                Command="{Binding AddDayCommand}"
+                Content="Добавить день" />
     </Grid>
 </Window>

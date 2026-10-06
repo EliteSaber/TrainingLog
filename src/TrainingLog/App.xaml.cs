@@ -44,6 +44,7 @@ public partial class App : Application
 
         services.AddSingleton<IExerciseRepository, ExerciseRepository>();
         services.AddSingleton<ITrainingPlanRepository, TrainingPlanRepository>();
+        services.AddSingleton<ITrainingSessionRepository, TrainingSessionRepository>();
 
         // Окно упражнений и окно планов единственные, поэтому состояние хоста переиспользуется,
         // а сам сервис должен быть синглтоном. Окна редактирования, наоборот, создаются заново
@@ -64,7 +65,12 @@ public partial class App : Application
                 plan,
                 isNew: false,
                 provider.GetRequiredService<ITrainingPlanRepository>(),
-                provider.GetRequiredService<IExerciseRepository>()))));
+                provider.GetRequiredService<IExerciseRepository>())),
+            // День тренировки — то же окно и на добавление, и на правку: какая это запись,
+            // модель узнаёт по дате, поэтому фабрика одна.
+            () => new AddDayWindow(new AddDayViewModel(
+                provider.GetRequiredService<ITrainingSessionRepository>(),
+                provider.GetRequiredService<ITrainingPlanRepository>()))));
 
         services.AddTransient<ExercisesViewModel>();
         services.AddTransient<ExercisesWindow>();

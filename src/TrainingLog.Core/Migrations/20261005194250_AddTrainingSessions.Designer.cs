@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TrainingLog.Core.Data;
 
@@ -10,9 +11,11 @@ using TrainingLog.Core.Data;
 namespace TrainingLog.Core.Migrations
 {
     [DbContext(typeof(TrainingLogDbContext))]
-    partial class TrainingLogDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261005194250_AddTrainingSessions")]
+    partial class AddTrainingSessions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");

@@ -1,19 +1,36 @@
 ﻿using System.Windows;
-using TrainingLog.Services;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog;
 
 /// <summary>
-/// Interaction logic for MainWindow.xaml
+/// Главное окно журнала тренировок: дни, количество показываемых дней и меню параметров.
 /// </summary>
 public partial class MainWindow : Window
 {
-    public MainWindow(IWindowService windowService)
+    public MainWindow(MainViewModel viewModel)
     {
+        ArgumentNullException.ThrowIfNull(viewModel);
+
         InitializeComponent();
 
-        DataContext = new MainViewModel(windowService);
+        DataContext = viewModel;
+
+        Loaded += OnLoaded;
+    }
+
+    /// <summary>
+    /// Дни читаются при загрузке окна, а не в конструкторе: чтение из базы асинхронно, и
+    /// до показа окна ждать нечего — список всё равно никто не увидит.
+    /// </summary>
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnLoaded;
+
+        if (DataContext is MainViewModel viewModel)
+        {
+            viewModel.LoadCommand.Execute(null);
+        }
     }
 
     /// <summary>

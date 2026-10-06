@@ -10,6 +10,11 @@ public interface ITrainingSessionRepository
     /// <summary>
     /// Возвращает записи журнала за период включительно, отсортированные по дате по убыванию.
     /// </summary>
+    /// <remarks>
+    /// Упражнения и подходы приходят вместе с записью и упорядочены по номеру выполнения:
+    /// строка дня показывает их слева направо именно в этом порядке, и догружать их отдельно
+    /// означало бы асинхронную загрузку на каждую строку.
+    /// </remarks>
     /// <param name="fromInclusive">Начало периода или <c>null</c>, если ограничение не задано.</param>
     /// <param name="toInclusive">Конец периода или <c>null</c>, если ограничение не задано.</param>
     /// <param name="cancellationToken">Токен отмены.</param>
@@ -19,17 +24,45 @@ public interface ITrainingSessionRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Сохраняет новую запись журнала и возвращает присвоенный идентификатор.
+    /// Возвращает запись за дату вместе с упражнениями и подходами либо <c>null</c>,
+    /// если записи нет.
     /// </summary>
-    Task<int> AddAsync(TrainingSession session, CancellationToken cancellationToken = default);
+    /// <remarks>
+    /// Нужна окну добавления дня: на ту же дату запись уже есть — значит открывается правка,
+    /// а не добавление.
+    /// </remarks>
+    /// <param name="targetDate">Дата записи.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    Task<TrainingSession?> GetByDateAsync(
+        DateOnly targetDate,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Обновляет существующую запись журнала.
+    /// Добавляет запись журнала. В переданный объект записывается присвоенный идентификатор.
     /// </summary>
-    Task UpdateAsync(TrainingSession session, CancellationToken cancellationToken = default);
+    /// <remarks>
+    /// Дата уникальна и проверяется базой: предварительная проверка может разойтись с
+    /// уникальным индексом, если запись на ту же дату добавили из другого окна.
+    /// </remarks>
+    Task<AddTrainingSessionOutcome> AddAsync(
+        TrainingSession session,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Удаляет запись журнала по идентификатору.
+    /// Переписывает запись журнала: дату, план, упражнения и подходы.
     /// </summary>
-    Task DeleteAsync(int id, CancellationToken cancellationToken = default);
+    /// <remarks>
+    /// Идентификатор записи не меняется, поэтому новый объект создавать не нужно: то же,
+    /// что делает правка плана. Упражнение или план, удалённые из справочников, пока окно
+    /// было открыто, молча выпадают из записи, а названия остаются — историю не переписываем.
+    /// </remarks>
+    Task<UpdateTrainingSessionOutcome> UpdateAsync(
+        TrainingSession session,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Удаляет запись журнала вместе с упражнениями и подходами. Возвращает <c>false</c>,
+    /// если записи нет.
+    /// </summary>
+    Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
 }
