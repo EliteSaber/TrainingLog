@@ -487,3 +487,6 @@ PROJECT_CONTEXT.md
 .opencode/
 opencode.json
 opencode.jsonc
+
+# Local notes: DB schema reference. The tracked artifact is docs/db-schema-er.md
+docs/db-schema.md
