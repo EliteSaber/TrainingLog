@@ -619,11 +619,14 @@ public async Task AddSetCommand_БезПлана_КомандаНеактивн�
     public async Task СменаДаты_ЧиститПодходыПрежнейЗаписи()
     {
         using var database = new TemporaryDatabase();
-        var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+        var stored = await CreatePlanAsync(database, "Прежний", "Приседание");
+        var next = await CreatePlanAsync(database, "Ноги", "Жим");
 
+        // Запись прежнего дня с другим планом: подтягивание по нему не сработает, и проверка
+        // останется чистой — поля очищаются от записей, а не наполняются прошлыми весами.
         var first = new DateOnly(2026, 10, 5);
-        var session = new TrainingSession { Date = first, PlanId = plan.Id, PlanName = plan.Name };
-        session.AddExercise(plan.Exercises[0]).AddSet(8, 60m);
+        var session = new TrainingSession { Date = first, PlanId = stored.Id, PlanName = stored.Name };
+        session.AddExercise(stored.Exercises[0]).AddSet(8, 60m);
         await database.SessionRepository.AddAsync(session);
 
         var viewModel = await CreateInitializedAsync(database);
@@ -636,7 +639,9 @@ public async Task AddSetCommand_БезПлана_КомандаНеактивн�
         // Плана у новой даты нет — упражнений нет, и подходы прежней записи в полях не остались.
         Assert.Empty(viewModel.Exercises);
 
-        viewModel.SelectedPlan = Assert.Single(viewModel.Plans);
+        viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Ноги");
+
+        await SettleAsync();
 
         Assert.Equal(string.Empty, Assert.Single(viewModel.Exercises[0].Sets).WeightText);
     }
@@ -905,12 +910,51 @@ public async Task СменаДатыНаДатуСЗаписью_Подтяги�
 private static AddDayViewModel CreateViewModel(TemporaryDatabase database) =>
         new(database.SessionRepository, database.PlanRepository);
 
-    private static async Task<AddDayViewModel> CreateInitializedAsync(TemporaryDatabase database)
+    private static AddDayViewModel CreateViewModel(TemporaryDatabase database, ITrainingSessionRepository sessions) =>
+        new(sessions, database.PlanRepository);
+
+    private static async Task<AddDayViewModel> CreateInitializedAsync(TemporaryDatabase database) =>
+        await CreateInitializedAsync(database, database.SessionRepository);
+
+    private static async Task<AddDayViewModel> CreateInitializedAsync(
+        TemporaryDatabase database,
+        ITrainingSessionRepository sessions)
     {
-        var viewModel = CreateViewModel(database);
+        var viewModel = CreateViewModel(database, sessions);
         await viewModel.InitializeCommand.ExecuteAsync(null);
 
         return viewModel;
+    }
+
+    /// <summary>
+    /// Доводит отложенное чтение до конца: команда возвращает управление сразу, а ответ
+    /// приходит позже, и без этого тест проверял бы состояние до того, как оно наступило.
+    /// </summary>
+    /// <remarks>
+    /// Ожидание по условию, а не по числу уступок: чтение из хранилища идёт через
+    /// <c>ConfigureAwait(true)</c> и возвращается в диспетчер, но <c>Task.Yield</c> в тесте
+    /// не связан с тем же циклом — их количество ничего не гарантирует. Настоящая пауза
+    /// (<c>Task.Delay</c>) ждёт реального времени и потому означает именно «прошло достаточно».
+    /// </remarks>
+    private static Task SettleAsync() => Task.Delay(50);
+
+    /// <summary>
+    /// Ждёт наступления условия, отдавая управление между проверками.
+    /// </summary>
+    /// <remarks>
+    /// Нужно там, где проверяется состояние при задержанном чтении: пока гейт не отпущен,
+    /// состояние не наступит никогда, и ждать надо именно его, а не фиксированное время.
+    /// </remarks>
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+
+        while (!condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "Условие не наступило");
+
+            await Task.Delay(1);
+        }
     }
 
     private static List<string?> TrackNotifications(AddDayViewModel viewModel)
@@ -954,6 +998,32 @@ private static AddDayViewModel CreateViewModel(TemporaryDatabase database) =>
         viewModel.SelectedPlan = plan;
         viewModel.Current!.Sets[0].WeightText = weight;
         viewModel.Current.Sets[0].RepetitionText = repetitions;
+
+        return viewModel;
+    }
+
+private static async Task<AddDayViewModel> CreateReadyWithPreviousDayAsync(TemporaryDatabase database)
+    {
+        var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+        var previous = new TrainingSession
+        {
+            Date = new DateOnly(2026, 10, 8),
+            PlanId = plan.Id,
+            PlanName = plan.Name,
+        };
+
+        previous.AddExercise(plan.Exercises[0]).AddSet(10, 60m);
+
+        await database.SessionRepository.AddAsync(previous);
+
+        var viewModel = await CreateInitializedAsync(database);
+
+        await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+        viewModel.SelectedPlan = plan;
+
+        await SettleAsync();
 
         return viewModel;
     }
@@ -1297,6 +1367,439 @@ public void Differs_ОдинаковоеЧислоРазнымФорматом_�
 
     Assert.Equal(saved.Exercises.Single().Sets.Single().Weight, current.Exercises.Single().Sets.Single().Weight);
     Assert.False(AddDayViewModel.Differs(saved, current));
+}
+
+/// <summary>
+/// Подтягивание прошлого дня. Веса становятся значениями, повторения — подсказкой: вес
+/// меняется реже, и молчаливая подстановка прошлых повторений записала бы в журнал то,
+/// чего в этот раз не делали.
+/// </summary>
+[Fact]
+public async Task ПодтягиваниеПрошлогоДня_ВесаЗначениямиПовторенияПодсказкой()
+{
+    using var database = new TemporaryDatabase();
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var day = new DateOnly(2026, 10, 10);
+    var previousDay = new DateOnly(2026, 10, 8);
+
+    var previous = new TrainingSession { Date = previousDay, PlanId = plan.Id, PlanName = plan.Name };
+    var legs = previous.AddExercise(plan.Exercises[0]);
+
+    legs.AddSet(10, 60m);
+    legs.AddSet(8, 70m);
+
+    await database.SessionRepository.AddAsync(previous);
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, day);
+
+    viewModel.SelectedPlan = plan;
+
+    // Подтягивание асинхронно, поэтому доводим его до конца: без этого тест проверял бы
+    // состояние сразу после постановки в очередь.
+    await SettleAsync();
+
+    var row = viewModel.Current!;
+
+    Assert.Equal(2, row.Sets.Count);
+
+    // Вес — значение: по нему сразу видно, что подходов было два, и сохранять можно не
+    // набирая ничего.
+    Assert.Equal(["60", "70"], row.Sets.Select(set => set.WeightText));
+
+    // Повторения — подсказка, а не введённое значение.
+    Assert.Equal(["10", "8"], row.Sets.Select(set => set.RepetitionPlaceholder));
+    Assert.Equal([string.Empty, string.Empty], row.Sets.Select(set => set.RepetitionText));
+
+    Assert.True(row.Sets.All(set => set.HasRepetitionPlaceholder));
+
+    // Дата источника показывается рядом с «Не сохранено» — по ней видно, откуда значения.
+    Assert.Equal("(на основе 08 октября 2026)", viewModel.PulledFromDateText);
+}
+
+/// <summary>
+/// Плейсхолдер пропадает, как только пользователь начал набирать: под введённым числом он
+/// только мешал бы.
+/// </summary>
+[Fact]
+public async Task Плейсхолдер_ГаснетПослеВвода()
+{
+    using var database = new TemporaryDatabase();
+    var viewModel = await CreateReadyWithPreviousDayAsync(database);
+
+    var set = viewModel.Current!.Sets[0];
+
+    Assert.True(set.HasRepetitionPlaceholder);
+
+    viewModel.Current!.Sets[0].RepetitionText = "12";
+
+    Assert.False(set.HasRepetitionPlaceholder);
+
+    // И обратно: стёр значение — вернулась и подсказка, как в html-поле.
+    viewModel.Current!.Sets[0].RepetitionText = string.Empty;
+
+    Assert.True(set.HasRepetitionPlaceholder);
+}
+
+/// <summary>
+/// Подсказка данными не считается: иначе пустой подход попал бы в запись, а надпись о
+/// несохранённом загорелась бы от того, чего пользователь не вводил.
+/// </summary>
+[Fact]
+    public void Плейсхолдер_ДаннымиНеСчитается()
+{
+    var set = new SetInputViewModel { RepetitionPlaceholder = "10" };
+
+    Assert.False(set.HasData);
+    Assert.True(set.HasRepetitionPlaceholder);
+    Assert.True(set.TryParseRepetitions(out var repetitions));
+    Assert.Equal(0, repetitions);
+}
+
+/// <summary>
+/// Нулевые повторения означают, что поле тогда просто не заполняли: подсказка «0» читалась
+/// бы как «делай ноль повторений». Вес нулевым быть может и по делу — подсказка про него есть.
+/// </summary>
+[Fact]
+public async Task Подтягивание_НулевыеПовторения_ПодсказкиНет()
+{
+    using var database = new TemporaryDatabase();
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var previous = new TrainingSession
+    {
+        Date = new DateOnly(2026, 10, 8),
+        PlanId = plan.Id,
+        PlanName = plan.Name,
+    };
+
+    // Повторения не заданы: вес есть, а повторений в записи нет.
+    previous.AddExercise(plan.Exercises[0]).AddSet(0, 60m);
+
+    await database.SessionRepository.AddAsync(previous);
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+    viewModel.SelectedPlan = plan;
+
+    await SettleAsync();
+
+    var set = Assert.Single(viewModel.Current!.Sets);
+
+    Assert.Equal("60", set.WeightText);
+    Assert.False(set.HasRepetitionPlaceholder);
+}
+
+/// <summary>
+/// Прошлой даты с этим планом нет — подтягивать нечего, и форма остаётся пустой. План мог
+/// быть и другим: сопоставляется он по идентификатору, а не по дате.
+/// </summary>
+[Theory]
+[InlineData(false)]
+[InlineData(true)]
+public async Task Подтягивание_ПрошлогоДняНет_ФормаПуста(bool другойПланВПрошломДне)
+{
+    using var database = new TemporaryDatabase();
+    var legs = await CreatePlanAsync(database, "Ноги", "Приседание");
+    var upper = await CreatePlanAsync(database, "Верх", "Жим");
+
+    if (другойПланВПрошломДне)
+    {
+        var previous = new TrainingSession
+        {
+            Date = new DateOnly(2026, 10, 8),
+            PlanId = upper.Id,
+            PlanName = upper.Name,
+        };
+
+        previous.AddExercise(upper.Exercises[0]).AddSet(10, 40m);
+
+        await database.SessionRepository.AddAsync(previous);
+    }
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+    viewModel.SelectedPlan = legs;
+
+    await SettleAsync();
+
+    var set = Assert.Single(viewModel.Current!.Sets);
+
+    Assert.Equal(string.Empty, set.WeightText);
+    Assert.False(set.HasRepetitionPlaceholder);
+    Assert.Equal(string.Empty, viewModel.PulledFromDateText);
+
+    // Пустая форма дневника не должна и выглядеть несохранённой: нечего ведь сохранять.
+    Assert.False(viewModel.HasUnsavedChanges);
+}
+
+/// <summary>
+/// Правка дня подтягиванием не затрагивается: за дату уже есть запись, и в полях её
+/// подходы — а не прошлые значения.
+/// </summary>
+[Fact]
+public async Task Подтягивание_ПравкаДняНеЗатрагивается()
+{
+    using var database = new TemporaryDatabase();
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var day = new DateOnly(2026, 10, 10);
+
+    // Прошлый день с тем же планом есть, но подтягиваться он не должен: день уже записан.
+    var previous = new TrainingSession { Date = new DateOnly(2026, 10, 8), PlanId = plan.Id, PlanName = plan.Name };
+    previous.AddExercise(plan.Exercises[0]).AddSet(10, 40m);
+
+    await database.SessionRepository.AddAsync(previous);
+
+    var stored = new TrainingSession { Date = day, PlanId = plan.Id, PlanName = plan.Name };
+    stored.AddExercise(plan.Exercises[0]).AddSet(6, 90m);
+
+    await database.SessionRepository.AddAsync(stored);
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, day);
+
+    await SettleAsync();
+
+    var set = Assert.Single(viewModel.Current!.Sets);
+
+    Assert.Equal("90", set.WeightText);
+    Assert.Equal("6", set.RepetitionText);
+    Assert.False(set.HasRepetitionPlaceholder);
+    Assert.Equal(string.Empty, viewModel.PulledFromDateText);
+}
+
+/// <summary>
+/// Упражнение, которого в прошлый раз не делали, остаётся с одним пустым полем: кнопки «+»
+/// и «−» работают с ним так же, иначе подход негде было бы набрать.
+/// </summary>
+[Fact]
+public async Task Подтягивание_УпражненияНетВПрошлыйРаз_ПустоеПоле()
+{
+    using var database = new TemporaryDatabase();
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание", "Жим");
+
+    var previous = new TrainingSession
+    {
+        Date = new DateOnly(2026, 10, 8),
+        PlanId = plan.Id,
+        PlanName = plan.Name,
+    };
+
+    previous.AddExercise(plan.Exercises[0]).AddSet(10, 60m);
+
+    await database.SessionRepository.AddAsync(previous);
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+    viewModel.SelectedPlan = plan;
+
+    await SettleAsync();
+
+    var bench = viewModel.Exercises.Single(row => row.Name == "Жим");
+    var set = Assert.Single(bench.Sets);
+
+    Assert.Equal(string.Empty, set.WeightText);
+    Assert.False(set.HasRepetitionPlaceholder);
+}
+
+/// <summary>
+/// Пока ответ в пути, ввод заблокирован: ответ придёт в уже заполненные поля и затрёт
+/// набранное. Проверяется на настоящей задержке — на быстром хранилище состояния не поймать.
+/// </summary>
+[Fact]
+public async Task Подтягивание_ВводЗаблокированПокаОтветВПути()
+{
+    using var database = new TemporaryDatabase();
+    await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var fake = new FakeSessionRepository(database.SessionRepository);
+    var viewModel = await CreateInitializedAsync(database, fake);
+
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+    Assert.False(viewModel.IsLoading);
+
+    viewModel.SelectedPlan = Assert.Single(viewModel.Plans);
+
+    await WaitUntilAsync(() => fake.Calls > 0);
+
+    Assert.True(viewModel.IsLoading);
+    Assert.False(viewModel.CanFill);
+
+    fake.Release();
+
+    await WaitUntilAsync(() => !viewModel.IsLoading);
+
+    Assert.True(viewModel.CanFill);
+}
+
+/// <summary>
+/// Счётчик, а не флаг. Планы переключают быстро: пока первое подтягивание не пришло, может
+/// начаться второе, и с флагом первое погасило бы индикатор при живом втором — ввод
+/// разрешился бы с недозаполненной формой.
+/// </summary>
+[Fact]
+public async Task Подтягивание_Пересечение_ИндикаторНеГаснетПослеПервого()
+{
+    using var database = new TemporaryDatabase();
+    await CreatePlanAsync(database, "Ноги", "Приседание");
+    await CreatePlanAsync(database, "Верх", "Жим");
+
+    // Задержано только первое чтение: удержать оба одинаково нельзя, иначе порядок их
+    // завершения не задан и проверять нечего.
+    var fake = new FakeSessionRepository(database.SessionRepository) { DelayOnlyCall = 1 };
+    var viewModel = await CreateInitializedAsync(database, fake);
+
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+    viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Ноги");
+
+    await WaitUntilAsync(() => fake.Calls >= 1);
+
+    viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Верх");
+
+    await WaitUntilAsync(() => fake.Calls >= 2);
+
+    // Второе прошло мгновенно, первое ещё в пути — индикатор обязан гореть.
+    await SettleAsync();
+
+    Assert.True(viewModel.IsLoading);
+    Assert.False(viewModel.CanFill);
+
+    fake.Release();
+
+    await WaitUntilAsync(() => !viewModel.IsLoading);
+
+    Assert.True(viewModel.CanFill);
+}
+
+/// <summary>
+/// Ответ на уже сменённый план выбрасывается целиком: подставить веса чужого плана хуже,
+/// чем не подставить ничего.
+/// </summary>
+[Fact]
+public async Task Подтягивание_ОтветНаСменённыйПланВыброшен()
+{
+    using var database = new TemporaryDatabase();
+    var legs = await CreatePlanAsync(database, "Ноги", "Приседание");
+    var upper = await CreatePlanAsync(database, "Верх", "Жим");
+
+    var previous = new TrainingSession { Date = new DateOnly(2026, 10, 8), PlanId = legs.Id, PlanName = legs.Name };
+    previous.AddExercise(legs.Exercises[0]).AddSet(10, 60m);
+
+    await database.SessionRepository.AddAsync(previous);
+
+    var fake = new FakeSessionRepository(database.SessionRepository) { DelayOnlyCall = 1 };
+    var viewModel = await CreateInitializedAsync(database, fake);
+
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+    viewModel.SelectedPlan = legs;
+
+    await WaitUntilAsync(() => fake.Calls >= 1);
+
+    // Переключаем план, пока первый ответ ещё в пути.
+    viewModel.SelectedPlan = upper;
+
+    fake.Release();
+
+    await SettleAsync();
+
+    // В форме упражнения нового плана, и весов чужого плана в них нет.
+    Assert.Equal("Жим", Assert.Single(viewModel.Exercises).Name);
+    Assert.Equal(string.Empty, Assert.Single(viewModel.Current!.Sets).WeightText);
+    Assert.Equal(string.Empty, viewModel.PulledFromDateText);
+}
+
+/// <summary>
+/// Пока идёт чтение, надпись «Не сохранено» не должна ни вспыхивать, ни загораться: форма
+/// пуста, и сравнивать не с чем. Проверяется список значений, дошедших до привязки, а не
+/// итоговое свойство — итоговое было бы верным и при вспышке по ходу.
+/// </summary>
+[Fact]
+public async Task Подтягивание_НадписьНеГоритПокаИдётЧтение()
+{
+    using var database = new TemporaryDatabase();
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var previous = new TrainingSession { Date = new DateOnly(2026, 10, 8), PlanId = plan.Id, PlanName = plan.Name };
+    previous.AddExercise(plan.Exercises[0]).AddSet(10, 60m);
+
+    await database.SessionRepository.AddAsync(previous);
+
+    var fake = new FakeSessionRepository(database.SessionRepository);
+    var viewModel = await CreateInitializedAsync(database, fake);
+
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+    var seen = new List<bool>();
+
+    viewModel.PropertyChanged += (_, args) =>
+    {
+        if (args.PropertyName == nameof(AddDayViewModel.HasUnsavedChanges))
+        {
+            seen.Add(viewModel.HasUnsavedChanges);
+        }
+    };
+
+    viewModel.SelectedPlan = plan;
+
+    await WaitUntilAsync(() => fake.Calls > 0);
+
+    Assert.DoesNotContain(true, seen);
+
+    fake.Release();
+
+    await SettleAsync();
+
+    // А после наполнения — загорается: подтянутые веса это данные, которых нет в базе.
+    Assert.Contains(true, seen);
+}
+
+/// <summary>
+/// Дата источника должна гаснуть при перестройке окна, а не только при подтягивании.
+/// Смена даты перестраивает окно напрямую, минуя сеттер плана, — и если за новую дату уже
+/// есть запись, подтягивание выходит сразу и своего уведомления не даёт. Без уведомления в
+/// перестройке дата прежнего источника осталась бы в скобках у полей чужой правки.
+/// </summary>
+[Fact]
+public async Task Подтягивание_СменаДатыУбираетДатуИсточника()
+{
+    using var database = new TemporaryDatabase();
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    // Прошлый день, из которого подтягиваются значения.
+    var previous = new TrainingSession { Date = new DateOnly(2026, 10, 8), PlanId = plan.Id, PlanName = plan.Name };
+    previous.AddExercise(plan.Exercises[0]).AddSet(10, 60m);
+
+    await database.SessionRepository.AddAsync(previous);
+
+    var viewModel = await CreateInitializedAsync(database);
+
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+    viewModel.SelectedPlan = plan;
+
+    await SettleAsync();
+
+    Assert.Equal("(на основе 08 октября 2026)", viewModel.PulledFromDateText);
+
+    // Запись за новую дату есть, план тот же: сеттер SelectedPlan не срабатывает, и
+    // подтягивание выходит сразу — уведомление может прийти только из перестройки.
+    var stored = new TrainingSession { Date = new DateOnly(2026, 10, 12), PlanId = plan.Id, PlanName = plan.Name };
+    stored.AddExercise(plan.Exercises[0]).AddSet(6, 90m);
+
+    await database.SessionRepository.AddAsync(stored);
+
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 12));
+
+    Assert.Equal("Правка дня", viewModel.Title);
+    Assert.Equal("90", Assert.Single(viewModel.Current!.Sets).WeightText);
+    Assert.Equal(string.Empty, viewModel.PulledFromDateText);
 }
 
 private static TrainingSession Session(string planName, params (string Exercise, int Repetitions, decimal Weight)[] sets)

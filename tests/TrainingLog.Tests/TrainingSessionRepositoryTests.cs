@@ -278,6 +278,133 @@ public sealed class TrainingSessionRepositoryTests
     }
 
     [Fact]
+    public async Task GetPreviousByPlanAsync_ОтдаётБлижайшуюПрошедшуюСТемЖеПланом()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = await AddExerciseAsync(database, "Приседание");
+        var plan = await AddPlanAsync(database, "Ноги", squat);
+        var other = await AddPlanAsync(database, "Верх", squat);
+
+        // Записи с тем же планом: подтягиваться должна ближайшая прошедшая, а не самая давняя.
+        await AddSessionWithSetsAsync(database, new DateOnly(2026, 10, 1), plan, 10, 40m);
+        await AddSessionWithSetsAsync(database, new DateOnly(2026, 10, 8), plan, 8, 60m);
+        await AddSessionWithSetsAsync(database, new DateOnly(2026, 10, 10), plan, 5, 80m);
+
+        // Запись с другим планом ближе по дате: она пропускается, план сопоставляется по
+        // идентификатору, а не по дате.
+        await AddSessionWithSetsAsync(database, new DateOnly(2026, 10, 9), other, 12, 20m);
+
+        var previous = await database.SessionRepository.GetPreviousByPlanAsync(plan.Id, new DateOnly(2026, 10, 10));
+
+        Assert.NotNull(previous);
+        Assert.Equal(new DateOnly(2026, 10, 8), previous.Date);
+        Assert.Equal(plan.Id, previous.PlanId);
+
+        var set = Assert.Single(Assert.Single(previous.Exercises).Sets);
+
+        Assert.Equal(8, set.Repetitions);
+        Assert.Equal(60m, set.Weight);
+    }
+
+    /// <summary>
+    /// Граница строго «раньше»: запись на ту же дату и все более поздние не берутся. Запись
+    /// на дату уникальна, так что при подтягивании к пустому дню это одно и то же — но
+    /// правило проверяется явно, иначе «раньше» незаметно превратилось бы в «не позже».
+    /// </summary>
+    [Fact]
+    public async Task GetPreviousByPlanAsync_ДатаИПозже_НеБерутся()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = await AddExerciseAsync(database, "Приседание");
+        var plan = await AddPlanAsync(database, "Ноги", squat);
+
+        var same = new DateOnly(2026, 10, 10);
+
+        await AddSessionWithSetsAsync(database, same, plan, 5, 80m);
+        await AddSessionWithSetsAsync(database, same.AddDays(1), plan, 5, 90m);
+
+        Assert.Null(await database.SessionRepository.GetPreviousByPlanAsync(plan.Id, same));
+
+        // На следующий день берётся запись самой граничной даты — то есть «раньше» нацело.
+        Assert.Equal(
+            same,
+            (await database.SessionRepository.GetPreviousByPlanAsync(plan.Id, same.AddDays(1)))!.Date);
+    }
+
+    [Fact]
+    public async Task GetPreviousByPlanAsync_ПрошлогоДняНет_ВозвращаетNull()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = await AddExerciseAsync(database, "Приседание");
+        var plan = await AddPlanAsync(database, "Ноги", squat);
+
+        Assert.Null(await database.SessionRepository.GetPreviousByPlanAsync(plan.Id, new DateOnly(2026, 10, 10)));
+
+        await AddSessionWithSetsAsync(database, new DateOnly(2026, 10, 10), plan, 5, 80m);
+
+        // Запись без плана источником быть не может: подтягивать нечего, и иначе в пустое
+        // упражнение попали бы веса чужой тренировки.
+        var withoutPlan = new TrainingSession { Date = new DateOnly(2026, 10, 9), PlanName = "День" };
+
+        await database.SessionRepository.AddAsync(withoutPlan);
+
+        Assert.Null(await database.SessionRepository.GetPreviousByPlanAsync(plan.Id, new DateOnly(2026, 10, 10)));
+    }
+
+    /// <summary>
+    /// Несохранённый план в журнале не встречается, и запрос по нулевому идентификатору вернул
+    /// бы первую запись без плана — то есть подставил бы веса чужой тренировки.
+    /// </summary>
+    [Fact]
+    public async Task GetPreviousByPlanAsync_ПланНеСохранён_ВозвращаетNull()
+    {
+        using var database = new TemporaryDatabase();
+
+        await AddSessionAsync(database, new DateOnly(2026, 10, 1));
+
+        Assert.Null(await database.SessionRepository.GetPreviousByPlanAsync(0, new DateOnly(2026, 10, 10)));
+    }
+
+    /// <summary>
+    /// Подходы приходят по порядку выполнения: окно дня показывает их слева направо именно
+    /// в этом порядке, и подтягивание обязано вести себя так же.
+    /// </summary>
+    [Fact]
+    public async Task GetPreviousByPlanAsync_ПодходыПоПорядку()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = await AddExerciseAsync(database, "Приседание");
+        var bench = await AddExerciseAsync(database, "Жим");
+        var plan = await AddPlanAsync(database, "Ноги", squat, bench);
+
+        var session = new TrainingSession
+        {
+            Date = new DateOnly(2026, 10, 8),
+            PlanId = plan.Id,
+            PlanName = plan.Name,
+        };
+
+        var legs = session.AddExercise(squat);
+
+        legs.AddSet(10, 40m);
+        legs.AddSet(8, 45m);
+
+        session.AddExercise(bench).AddSet(5, 60m);
+
+        await database.SessionRepository.AddAsync(session);
+
+        var previous = await database.SessionRepository.GetPreviousByPlanAsync(plan.Id, new DateOnly(2026, 10, 10));
+
+        Assert.Equal(
+            [(10, 40m), (8, 45m)],
+            previous!.Exercises
+                .Single(entry => entry.ExerciseId == squat.Id)
+                .Sets
+                .OrderBy(set => set.Order)
+                .Select(set => (set.Repetitions, set.Weight)));
+    }
+
+    [Fact]
     public async Task DeleteAsync_ЗаписиНет_ВозвращаетFalse()
     {
         using var database = new TemporaryDatabase();
@@ -320,5 +447,19 @@ public sealed class TrainingSessionRepositoryTests
         await database.SessionRepository.AddAsync(session);
 
         return session;
+    }
+
+    private static async Task AddSessionWithSetsAsync(
+        TemporaryDatabase database,
+        DateOnly date,
+        TrainingPlan plan,
+        int repetitions,
+        decimal weight)
+    {
+        var session = new TrainingSession { Date = date, PlanId = plan.Id, PlanName = plan.Name };
+
+        session.AddExercise(plan.Exercises[0]).AddSet(repetitions, weight);
+
+        await database.SessionRepository.AddAsync(session);
     }
 }

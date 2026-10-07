@@ -54,6 +54,31 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
             .ConfigureAwait(false);
     }
 
+    public async Task<TrainingSession?> GetPreviousByPlanAsync(
+        int planId,
+        DateOnly before,
+        CancellationToken cancellationToken = default)
+    {
+        // План без идентификатора ещё не сохранён, а значит и в журнале он быть не может:
+        // запрос по нулевому идентификатору вернул бы первую запись без плана.
+        if (planId <= 0)
+        {
+            return null;
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+        // Запись на дату уникальна, поэтому ближайшая прошедшая находится ровно одна, и взять
+        // её — дело FirstOrDefault после сортировки по убыванию. Порядок упражнений и подходов
+        // приходит тот же, что и при чтении дня, иначе полосы подходов разъехались бы по
+        // порядку, а он и есть содержание подхода.
+        return await Readable(context.TrainingSessions.AsNoTracking())
+            .Where(session => session.PlanId == planId && session.Date < before)
+            .OrderByDescending(session => session.Date)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<AddTrainingSessionOutcome> AddAsync(
         TrainingSession session,
         CancellationToken cancellationToken = default)

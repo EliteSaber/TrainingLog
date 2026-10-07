@@ -72,6 +72,27 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// </remarks>
     private bool _isApplyingSets;
 
+    /// <summary>
+    /// Сколько подтягиваний прошлого дня идёт прямо сейчас.
+    /// </summary>
+    /// <remarks>
+    /// Счётчик, а не флаг, и это не перестраховка. Планы меняют быстро: второе подтягивание
+    /// успевает начаться, пока первое ещё в пути, и с флагом более ранний <c>finally</c> погасил
+    /// бы индикатор при живом втором — ввод разрешился бы с недозаполненной формой. Обратный
+    /// порядок оставляет счётчик отрицательным только при ошибке в самом счётчике, а не при
+    /// гонке, так что окно не может остаться заблокированным навсегда.
+    /// </remarks>
+    private int _loadingCount;
+
+    /// <summary>
+    /// Дата записи, из которой подтянуты значения. Пусто — подтягивания не было.
+    /// </summary>
+    /// <remarks>
+    /// Обнуляется при каждой перестройке окна, а ставится после наполнения: пока форма
+    /// пересобирается, дата источника неверна в любом случае.
+    /// </remarks>
+    private DateOnly? _pulledFromDate;
+
     /// <param name="sessionRepository">Журнал тренировок.</param>
     /// <param name="planRepository">Планы тренировок: состав дня берётся из плана.</param>
     public AddDayViewModel(ITrainingSessionRepository sessionRepository, ITrainingPlanRepository planRepository)
@@ -159,6 +180,40 @@ public sealed partial class AddDayViewModel : ObservableObject
     public bool HasStatus => !string.IsNullOrEmpty(Status);
 
     /// <summary>
+    /// Идёт ли чтение из базы, и ввод в окно поэтому заблокирован.
+    /// </summary>
+    /// <remarks>
+    /// Пока подтягивается прошлый день, набирать нельзя: ответ придёт в уже заполненные поля
+    /// и затрёт набранное. Блокируется только область ввода, кнопки сохранения — теми же
+    /// <see cref="CanAccept"/>, что и всегда: на пустом дне, где подтягивание идёт, сохранять
+    /// нечего, и отдельное состояние только разошлось бы с правилом пригодности.
+    /// </remarks>
+    public bool IsLoading => _loadingCount > 0;
+
+    /// <summary>
+    /// Разрешён ли ввод: обратное <see cref="IsLoading"/>.
+    /// </summary>
+    /// <remarks>
+    /// Отдельное свойство, а не инверсия в разметке: <c>IsEnabled</c> двусторонним по
+    /// умолчанию не является, но конвертер «не наоборот» в разметке означал бы ещё одно
+    /// вычисляемое выражение, которое придётся дублировать при каждой правке.
+    /// </remarks>
+    public bool CanFill => !IsLoading;
+
+    /// <summary>
+    /// Дата, из которой подтянуты значения, в скобках: «(01.10.2026)». Пусто — подтягивания
+    /// не было, и в скобках показывать нечего.
+    /// </summary>
+    /// <remarks>
+    /// Формат даты задаёт <see cref="Dates"/>, а не эта строка: он общий со строкой
+    /// журнала, иначе одна и та же дата выглядела бы в двух местах по-разному. Рядом с
+    /// надписью «Не сохранено» она отвечает на вопрос, откуда взялись значения в полях, —
+    /// иначе подставленные веса выглядели бы как введённые вручную.
+    /// </remarks>
+    public string PulledFromDateText =>
+        _pulledFromDate is { } date ? $"(на основе {Dates.Format(date)})" : string.Empty;
+
+    /// <summary>
     /// Есть ли в окне то, чего нет в базе.
     /// </summary>
     /// <remarks>
@@ -220,9 +275,19 @@ public sealed partial class AddDayViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Смена плана пересобирает упражнения и наполняет их подходами заново.
+    /// Смена плана пересобирает упражнения, наполняет их подходами и подтягивает прошлый день.
     /// </summary>
-    partial void OnSelectedPlanChanged(TrainingPlan? value) => RebuildWindow();
+    /// <remarks>
+    /// Подтягивание идёт отдельной командой, а не внутри перестройки: перестройка обязана
+    /// быть синхронной (она же зовётся из <see cref="LoadDateAsync"/> посреди чтения), а чтение
+    /// из базы — асинхронно. Разведение по тем же границам, что и у смены даты.
+    /// </remarks>
+    partial void OnSelectedPlanChanged(TrainingPlan? value)
+    {
+        RebuildWindow();
+
+        LoadPreviousCommand.Execute(null);
+    }
 
     /// <summary>
     /// Подставляет ли подходы записи в строки упражнений.
@@ -328,6 +393,129 @@ public sealed partial class AddDayViewModel : ObservableObject
         session is null ? null : Plans.SingleOrDefault(plan => plan.Id == session.PlanId);
 
     /// <summary>
+    /// Подтягивает подходы и веса прошлого раза с тем же планом.
+    /// </summary>
+    /// <remarks>
+    /// Только при добавлении дня: за день, который уже записан, показываются подходы самой
+    /// записи, и подтягивание затерло бы их. На правке команда выходит сразу, до индикатора.
+    ///
+    /// Дата и план запоминаются **до** чтения, а проверяются после: планы переключают быстро,
+    /// и без проверки в окно попали бы веса того плана, который выбрали минуту назад. Тот же
+    /// приём, что в <see cref="LoadDateAsync"/> (ловушка 27).
+    ///
+    /// У команды нет <c>CanExecute</c>, и это осознанно: <c>ICommand.Execute</c> его проверяет,
+    /// и второй план во время загрузки просто не запустил бы чтение — форма осталась бы пустой.
+    /// Блокируется ввод, а не логика.
+    /// </remarks>
+    [RelayCommand]
+    private async Task LoadPreviousAsync()
+    {
+        if (_existing is not null || SelectedPlan is not { } plan)
+        {
+            return;
+        }
+
+        var requestedDay = Day;
+        var requestedPlanId = plan.Id;
+
+        _loadingCount++;
+        UpdateLoading();
+
+        try
+        {
+            var previous = await _sessionRepository
+                .GetPreviousByPlanAsync(requestedPlanId, requestedDay)
+                .ConfigureAwait(true);
+
+            // Ответ на сменённый план или сменённую дату выбрасывается целиком: подставить
+            // веса чужого плана хуже, чем не подставить ничего. Прошлой даты с этим планом
+            // могло и не быть — тогда форма остаётся пустой, как и была.
+            if (previous is null || Day != requestedDay || SelectedPlan?.Id != requestedPlanId)
+            {
+                return;
+            }
+
+            ApplyPreviousSets(previous);
+        }
+        finally
+        {
+            _loadingCount--;
+            UpdateLoading();
+
+            // Пересчёт и на отказе: пустой ответ и выброшенный ответ — тоже состояние формы,
+            // и надпись обязана прийти в согласованный вид.
+            Refresh();
+        }
+    }
+
+    /// <summary>
+    /// Подставляет подходы прошлого дня в поля упражнений плана.
+    /// </summary>
+    /// <remarks>
+    /// Веса становятся значениями, повторения — подсказками: подходы одного упражнения
+    /// отличаются повторениями гораздо чаще, чем весом, и молчаливая подстановка прошлого
+    /// числа записала бы в журнал то, чего в этот раз не делали.
+    ///
+    /// Наполнение идёт под <c>_isApplyingSets</c>: иначе надпись «Не сохранён» мигала бы на
+    /// каждом подходе по ходу заполнения. Дата источника ставится после наполнения, чтобы
+    /// уведомление ушло уже с готовым значением.
+    ///
+    /// Сопоставление упражнений — по идентификатору, как и в <see cref="ApplyExistingSets"/>:
+    /// упражнение могли переименовать, и совпавшее название ничего бы не значило.
+    /// </remarks>
+    private void ApplyPreviousSets(TrainingSession previous)
+    {
+        _isApplyingSets = true;
+
+        try
+        {
+            foreach (var row in Exercises)
+            {
+                var entry = previous.Exercises.SingleOrDefault(item => item.ExerciseId == row.Exercise.Id);
+
+                row.Sets.Clear();
+
+                if (entry is not null)
+                {
+                    foreach (var set in entry.Sets)
+                    {
+                        row.Sets.Add(ToSetInput(set, repetitionsAsPlaceholder: true));
+                    }
+                }
+
+                // Упражнение, которого в прошлый раз не делали, получает одно пустое поле —
+                // ровно как и без подтягивания: кнопки «+» и «−» с ним работают так же.
+                if (row.Sets.Count == 0)
+                {
+                    row.Sets.Add(new SetInputViewModel());
+                }
+            }
+        }
+        finally
+        {
+            _isApplyingSets = false;
+            _pulledFromDate = previous.Date;
+        }
+    }
+
+    /// <summary>
+    /// Сообщает о смене состояния чтения.
+    /// </summary>
+    /// <remarks>
+    /// Оба свойства уведомляются отсюда и только отсюда: они вычисляются от одного и того же
+    /// счётчика, и уведомления по одному из них разошлись бы с другим — ввод разрешился бы
+    /// при погасшем индикаторе или наоборот. Дата источника уведомляется здесь же, в
+    /// <c>finally</c>: подтягивание выходит раньше этой точки и на правке (где его вовсе не
+    /// надо), и без этого адреса у даты просто не осталось бы.
+    /// </remarks>
+    private void UpdateLoading()
+    {
+        OnPropertyChanged(nameof(IsLoading));
+        OnPropertyChanged(nameof(CanFill));
+        OnPropertyChanged(nameof(PulledFromDateText));
+    }
+
+    /// <summary>
     /// Заполняет подходы упражнений содержимым записи за дату либо очищает их.
     /// </summary>
     /// <remarks>
@@ -358,14 +546,7 @@ public sealed partial class AddDayViewModel : ObservableObject
             {
                 foreach (var set in entry.Sets)
                 {
-                    // Форматируется по текущей культуре: в русской раскладке десятичный
-                    // разделитель — запятая, и это ровно тот вид, в котором поле разбирается
-                    // обратно.
-                    row.Sets.Add(new SetInputViewModel
-                    {
-                        WeightText = set.Weight.ToString("0.##", CultureInfo.CurrentCulture),
-                        RepetitionText = set.Repetitions.ToString(CultureInfo.CurrentCulture),
-                    });
+                    row.Sets.Add(ToSetInput(set, repetitionsAsPlaceholder: false));
                 }
             }
 
@@ -378,6 +559,39 @@ public sealed partial class AddDayViewModel : ObservableObject
         }
 
         Refresh();
+    }
+
+    /// <summary>
+    /// Подход записи журнала в виде полей окна.
+    /// </summary>
+    /// <remarks>
+    /// Общее место и для правки дня, и для подтягивания прошлого дня: формат веса один, и
+    /// разошёлся бы он только в одном из двух путей — а разъехавшийся формат виден как
+    /// «60» в одном поле и «60,0» в другом.
+    ///
+    /// При <paramref name="repetitionsAsPlaceholder"/> повторения попадают в подсказку, а не
+    /// в поле: значение прошлого раза показывается, но не сохраняется.
+    /// </remarks>
+    /// <param name="set">Подход записи журнала.</param>
+    /// <param name="repetitionsAsPlaceholder">Показать ли повторения плейсхолдером.</param>
+    private static SetInputViewModel ToSetInput(TrainingSet set, bool repetitionsAsPlaceholder)
+    {
+        // Ноль повторений означает, что поле тогда просто не заполняли: подсказка «0» читалась
+        // бы как «делай ноль повторений», а не как «тогда не записали». Вес нулевым быть может
+        // и по делу — упражнение без дополнительного веса, — поэтому подсказка про него есть.
+        var repetitions = set.Repetitions > 0
+            ? set.Repetitions.ToString(CultureInfo.CurrentCulture)
+            : string.Empty;
+
+        return new SetInputViewModel
+        {
+            WeightText = set.Weight.ToString("0.##", CultureInfo.CurrentCulture),
+
+            // Форматируется по текущей культуре: в русской раскладке десятичный разделитель —
+            // запятая, и это ровно тот вид, в котором поле разбирается обратно.
+            RepetitionText = repetitionsAsPlaceholder ? string.Empty : repetitions,
+            RepetitionPlaceholder = repetitionsAsPlaceholder ? repetitions : string.Empty,
+        };
     }
 
     /// <summary>
@@ -420,9 +634,18 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// <see cref="BuildExercises"/> и <see cref="ApplyExistingSets"/> форма ещё пуста, и признак
     /// «есть несохранённое» на этот миг честно отвечает «отличается» — надпись вспыхивает.
     /// Тот же приём, что <c>_isApplyingChecks</c> в <c>EditPlanViewModel</c>.
+    ///
+    /// Дата источника обнуляется здесь же, а не в подтягивании: перестройка сама стирает
+    /// значения, и оставить дату, из которой они пришли, значило бы показать в скобках
+    /// прошлый день у пустых полей.
     /// </remarks>
     private void RebuildWindow()
     {
+        _pulledFromDate = null;
+
+        // Уведомления здесь не нужно: смена плана зовёт LoadPreviousCommand, а тот даже на
+        // правке (где выходит сразу) доводит дело до UpdateLoading. Смена даты перестраивает
+        // окно напрямую — но дата меняется только от выбора плана, а выбора не было.
         _isApplyingSets = true;
 
         try

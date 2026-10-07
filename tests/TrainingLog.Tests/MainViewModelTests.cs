@@ -221,6 +221,11 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
         Assert.Empty(row.Sets);
     }
 
+    /// <summary>
+    /// Дата строки журнала — словом месяц и с годом, плюс сокращение дня недели по текущей
+    /// культуре. Здесь важно, что строка собирает формат даты и подпись дня недели, — сам
+    /// формат проверяется тестом рядом, на всех двенадцати месяцах.
+    /// </summary>
     [Fact]
     public void DayRowViewModel_Дата_СоСокращённымДнёмНедели()
     {
@@ -229,9 +234,30 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
         var abbreviated = System.Globalization.CultureInfo.CurrentCulture
             .DateTimeFormat.GetAbbreviatedDayName(new DateOnly(2026, 10, 5).DayOfWeek);
 
-        Assert.Contains("05.10", row.DateText);
-        Assert.Contains(abbreviated, row.DateText);
+        Assert.Equal($"05 октября 2026 ({abbreviated})", row.DateText);
     }
+
+    /// <summary>
+    /// Формат даты приложения: «08 октября 2026».
+    /// </summary>
+    /// <remarks>
+    /// Месяцев двенадцать, и формы родительного падежа у них разные: «мая», «июня», «июля»
+    /// по аналогии с остальными не выводятся. Поэтому проверяются все, а не пара: ошибка
+    /// была бы в одном имени из двенадцати и заметила бы себя в журнале, а не в тесте.
+    /// Заодно проверяется ведущий ноль у дня и отсутствие точки в разделителях — ровно то,
+    /// ради чего формат собирается вручную вместо culture-шаблона.
+    /// </remarks>
+    [Theory]
+    [InlineData("08 октября 2026", 2026, 10, 8)]
+    [InlineData("01 января 2026", 2026, 1, 1)]
+    [InlineData("05 мая 2026", 2026, 5, 5)]
+    [InlineData("30 июня 2026", 2026, 6, 30)]
+    [InlineData("31 июля 2026", 2026, 7, 31)]
+    [InlineData("15 сентября 2026", 2026, 9, 15)]
+    [InlineData("28 февраля 2027", 2027, 2, 28)]
+    [InlineData("31 декабря 2026", 2026, 12, 31)]
+    public void Dates_Формат_МесяцСловом(string expected, int year, int month, int day) =>
+        Assert.Equal(expected, Dates.Format(new DateOnly(year, month, day)));
 
     private static TrainingSession Session(DateOnly date, string planName = "День") =>
         new() { Date = date, PlanName = planName };

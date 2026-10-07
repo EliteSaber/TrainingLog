@@ -32,17 +32,21 @@ public sealed class DayRowViewModel
     /// <summary>Дата тренировки.</summary>
     public DateOnly Date { get; }
 
-    /// <summary>
-    /// Дата сокращённым днём недели: «05.10 (вс)». Сокращение берётся у текущей культуры,
-    /// поэтому в русской раскладке это «вс», а в английской «Sun».
+/// <summary>
+    /// Дата с сокращённым днём недели: «08 октября 2026 (вс)».
     /// </summary>
     /// <remarks>
+    /// Формат даты общий с окном дня — <see cref="Dates"/>, иначе два места показали бы
+    /// дату по-разному. Сокращение дня недели, наоборот, берётся у текущей культуры: в
+    /// русской раскладке это «вс», в английской «Sun», и подпись имеет смысл на языке
+    /// пользователя.
+    ///
     /// Через <see cref="DateTimeFormatInfo.GetAbbreviatedDayName(DayOfWeek)"/>, а не через
     /// <c>DayOfWeek.ToString("ddd", ...)</c>: у перечисления параметр культуры не учитывается,
     /// и такое написание устарело — название дня всегда выходило бы английским.
     /// </remarks>
     public string DateText =>
-        $"{Date.ToString("dd.MM", CultureInfo.CurrentCulture)} "
+        $"{Dates.Format(Date)} "
         + $"({CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(Date.DayOfWeek)})";
 
     /// <summary>Название плана: копия названия на момент выполнения.</summary>

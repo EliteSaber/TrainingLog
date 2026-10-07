@@ -12,6 +12,9 @@ namespace TrainingLog.ViewModels;
 /// превращается в ноль ещё до того, как пользователь закончил. Разбор отложен до
 /// сохранения, а <see cref="IsValid"/> следит за ним на лету, чтобы «Сохранить» гасла
 /// на негодном тексте, а не падала при разборе.
+///
+/// Третье состояние поля повторений — <see cref="RepetitionPlaceholder"/>, подсказка из
+/// прошлого раза. Она рисуется, но не разбирается и не сохраняется.
 /// </remarks>
 public sealed partial class SetInputViewModel : ObservableObject
 {
@@ -31,7 +34,36 @@ public sealed partial class SetInputViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsValid))]
     [NotifyPropertyChangedFor(nameof(HasData))]
+    [NotifyPropertyChangedFor(nameof(HasRepetitionPlaceholder))]
     private string _repetitionText = string.Empty;
+
+    /// <summary>
+    /// Повторения прошлого раза — плейсхолдером, то есть подсказкой, а не значением.
+    /// </summary>
+    /// <remarks>
+    /// Вес подтягивается прошлым значением, а повторения — только подсказкой: подходы одного
+    /// упражнения отличаются повторениями гораздо чаще, чем весом, и молчаливая подстановка
+    /// прошлого числа записала бы в журнал то, чего в этот раз не делали.
+    ///
+    /// Плейсхолдер намеренно не участвует ни в <see cref="HasData"/>, ни в разборе: это
+    /// подсказка, а не введённое значение, и сохраняться она не должна. Пустое поле в таком
+    /// подходе разбирается как ноль — ровно как и без подсказки.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRepetitionPlaceholder))]
+    private string _repetitionPlaceholder = string.Empty;
+
+    /// <summary>
+    /// Показывать ли плейсхолдер повторений: подсказка есть, а поле ещё пусто.
+    /// </summary>
+    /// <remarks>
+    /// Гаснет по <see cref="RepetitionText"/>, а не по фокусу поля: как только пользователь
+    /// начал набирать, подсказка больше не нужна, и оставлять её под введённым числом незачем.
+    /// Уведомление поднято обоими полями — иначе смена подсказки при пересборке упражнения
+    /// не обновила бы плейсхолдер, а он и рисуется только этим признаком.
+    /// </remarks>
+    public bool HasRepetitionPlaceholder =>
+        RepetitionPlaceholder.Length > 0 && RepetitionText.Length == 0;
 
     /// <summary>
     /// Пригодны ли оба поля для сохранения.
@@ -42,6 +74,10 @@ public sealed partial class SetInputViewModel : ObservableObject
     /// Введён ли хоть один из двух значений. Пустой подход в день не попадает: иначе кнопка
     /// «Сохранить» была бы активна с пустым окном на руках.
     /// </summary>
+    /// <remarks>
+    /// Плейсхолдер <see cref="RepetitionPlaceholder"/> данными не считается: подсказка о
+    /// прошлом разе не должна ни включать подход в запись, ни гасить надпись о несохранённом.
+    /// </remarks>
     public bool HasData => !string.IsNullOrWhiteSpace(WeightText) || !string.IsNullOrWhiteSpace(RepetitionText);
 
     /// <summary>

@@ -175,8 +175,19 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
+        <!--
+          Пока из базы читается прошлый день, ввод заблокирован целиком: навигация по
+          упражнениям, поля веса и повторений и обе кнопки подхода. Ответ придёт в уже
+          заполненные поля и затрёт набранное, поэтому блокируется область целиком, а не
+          одни поля.
+
+          Кнопки сохранения не блокируются: на дне, где подтягивание вообще идёт, сохранять
+          нечего, и их гасит CanAccept — тот же самый. Отдельное состояние кнопок только
+          разошлось бы с правилом пригодности.
+        -->
         <Grid Grid.Row="2"
-              Margin="0,12,0,0">
+              Margin="0,12,0,0"
+              IsEnabled="{Binding CanFill}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="36" />
                 <ColumnDefinition Width="*" />
@@ -342,17 +353,38 @@
                                              Text="{Binding WeightText, UpdateSourceTrigger=PropertyChanged}" />
 
                                     <!--
-                                      Повторения — целое неотрицательное число, поэтому
+                                      Поле повторений — целое неотрицательное число, поэтому
                                       разделителей здесь не входит: только цифры.
+
+                                      Плейсхолдер подсказывает повторения прошлого раза и
+                                      рисуется ПОВЕРХ поля, а не под ним: фон у TextBox
+                                      непрозрачный, и подложка под ним была бы не видна. Блок
+                                      объявлен после TextBox именно поэтому — в Grid рисуется
+                                      последним объявленным. IsHitTestVisible=False обязателен:
+                                      без него надпись перехватывала бы нажатия, и в поле нельзя
+                                      было бы ни поставить каретку, ни вставить из буфера.
+
+                                      Цвет приглушённый системный, тот же, что у бледного
+                                      недоступного текста: в тёмной теме подсказка не станет
+                                      светлым пятном.
                                     -->
-                                    <TextBox Grid.Row="1"
-                                             Margin="0,4,0,0"
-                                             Width="84"
-                                             Padding="4,3"
-                                             HorizontalContentAlignment="Center"
-                                             helpers:AllowedCharsInput.Allowed="Digits"
-                                             ToolTip="Повторения"
-                                             Text="{Binding RepetitionText, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Grid Grid.Row="1"
+                                          Width="84"
+                                          Height="27"
+                                          Margin="0,4,0,0">
+                                        <TextBox Padding="4,3"
+                                                 HorizontalContentAlignment="Center"
+                                                 helpers:AllowedCharsInput.Allowed="Digits"
+                                                 ToolTip="Повторения"
+                                                 Text="{Binding RepetitionText, UpdateSourceTrigger=PropertyChanged}" />
+
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   IsHitTestVisible="False"
+                                                   Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                                                   Text="{Binding RepetitionPlaceholder}"
+                                                   Visibility="{Binding HasRepetitionPlaceholder, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </Grid>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -393,25 +425,51 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!--
+<!--
               Отказ по двум причинам: день не сохранился либо в поле ввели недопустимое.
               Второе приходит сюда событием AllowedCharsInput.Rejected из code-behind: правило
               одно на все поля, и объяснение отказа не изобретается у каждого окна отдельно.
+
+              Отказ и индикатор стоят в сетке, а не в горизонтальной панели: панель отдаёт
+              содержимому бесконечную ширину, и перенос строк у отказа перестал бы работать
+              (ловушка 29). Колонка * даёт отказу ширину, Auto — индикатору ровно его.
             -->
-            <TextBlock Grid.Row="0"
-                       Margin="0,0,0,8"
-                       TextWrapping="Wrap"
-                       Foreground="Firebrick"
-                       Visibility="{Binding HasStatus, Converter={StaticResource BooleanToVisibilityConverter}}"
-                       Text="{Binding Status}" />
+            <Grid Grid.Row="0"
+                  Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           TextWrapping="Wrap"
+                           Foreground="Firebrick"
+                           Visibility="{Binding HasStatus, Converter={StaticResource BooleanToVisibilityConverter}}"
+                           Text="{Binding Status}" />
+
+                <!--
+                  Индикатор чтения из базы — рядом с отказом, а не поверх области ввода.
+                  Оба сообщения одного рода и место у них одно: если повесить надпись поверх
+                  полей, она погасла бы вместе с ними, потому что отключается IsEnabled того
+                  же контейнера, и выглядела бы частью заблокированного содержимого, а не
+                  сообщением. Кроме того, на заблокированной области она лежала бы на
+                  бледном фоне рядом с бледными полями.
+
+                  Привязан CanFill, а не !IsLoading: разметка не должна повторять вычисления
+                  модели.
+                -->
+                <TextBlock Grid.Column="1"
+                           Margin="12,0,0,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                           Text="Загрузка…"
+                           Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            </Grid>
 
             <!--
               «Сохранить» слева, остальные две справа: частое действие — у левой руки, а кнопка
               закрытия рядом с отменой читается как «всё равно уходит». IsDefault у «Сохранить»
               единственный в окне: иначе Enter звал бы обе.
-
-              Надпись вплотную к «Сохранить»: она относится к тому, что сейчас не записано, а не
-              к закрытию окна. Цвет тот же, что у сообщения об отказе, — красный на белом.
             -->
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
@@ -420,23 +478,65 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0"
-                            VerticalAlignment="Center"
-                            Orientation="Horizontal">
-                    <Button Padding="14,4"
-                            Command="{Binding SaveCommand}"
-                            Content="Сохранить"
-                            IsDefault="True" />
+                <!--
+                  Кнопка в колонке Auto, а надпись — в колонке * между ней и правыми кнопками.
+                  Пока надпись стояла в одной колонке Auto с кнопкой, дефект был отложенным, а не
+                  настоящим: Auto-колонка не сжимается никогда, а колонка-распорка между двумя
+                  Auto спасает ровно до тех пор, пока запаса хватает. С датой источника надпись
+                  стала втрое длиннее — и на узком окне «Отменить» уходила за край (ловушка 38).
+                -->
+                <Button Grid.Column="0"
+                        Padding="14,4"
+                        VerticalAlignment="Center"
+                        Command="{Binding SaveCommand}"
+                        Content="Сохранить"
+                        IsDefault="True" />
 
-                    <TextBlock Margin="12,0,0,0"
-                               VerticalAlignment="Center"
-                               Foreground="Firebrick"
-                               Text="Не сохранено"
-                               Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                </StackPanel>
+                <!--
+                  Надпись стоит у «Сохранить», а не у кнопок закрытия: она относится к тому, что
+                  сейчас не записано, а не к закрытию окна. Цвет тот же, что у сообщения об
+                  отказе, — красный на белом.
 
+                  Дата источника — второй Run того же элемента, а не отдельный TextBlock с
+                  отступом: расстояние между словами задавал бы разметки, а текст живёт в
+                  модели, и два элемента разъехались бы при первой же правке формулировки.
+
+                  Отступ задан на самой надписи, а не на панели: в горизонтальной панели отступ
+                  контейнера отодвигает панель от края колонки, а элементы внутри по-прежнему
+                  стоят вплотную (ловушка 37).
+
+                  HorizontalAlignment не задан намеренно: центрированный элемент меряется под
+                  своё содержимое и колонкой не ограничивается, то есть перенос перестал бы
+                  работать и дефект вернулся бы (ловушка 29). Нужен Stretch — значение по
+                  умолчанию.
+
+                  Mode=OneWay обязателен на Run.Text: привязка без сеттера у источника
+                  двусторонняя по умолчанию и упала бы при создании окна — ловушка 31.
+                -->
+                <TextBlock Grid.Column="1"
+                           Margin="12,0,12,0"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Foreground="Firebrick"
+                           Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Run Text="Не сохранено" />
+                    <Run Text="{Binding PulledFromDateText, Mode=OneWay}" />
+                </TextBlock>
+
+                <!--
+                  Панель по центру по вертикали, а не на всю высоту строки. В горизонтальной
+                  ориентации StackPanel даёт каждому ребёнку полную высоту слота, а не его
+                  естественную, и вложенная кнопка с VerticalAlignment=Stretch (значение по
+                  умолчанию) за ней тянется. Пока строка была высотой в одну линию, слот и
+                  естественная высота совпадали и растяжения не было видно; с переносом надписи
+                  на две строки кнопки справа вытянулись по высоте.
+
+                  Кнопки внутри не трогаем: VerticalAlignment на панели уже решил задачу, и
+                  повторять его на каждой кнопке значило бы дублировать решение панели.
+                -->
                 <StackPanel Grid.Column="2"
-                            Orientation="Horizontal">
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
                     <Button Padding="14,4"
                             Command="{Binding SaveAndCloseCommand}"
                             Content="Сохранить и закрыть" />

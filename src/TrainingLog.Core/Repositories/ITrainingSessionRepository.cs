@@ -38,6 +38,27 @@ public interface ITrainingSessionRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Возвращает ближайшую запись строго раньше <paramref name="before"/> по указанному плану
+    /// вместе с упражнениями и подходами либо <c>null</c>, если такой записи нет.
+    /// </summary>
+    /// <remarks>
+    /// Нужна окну добавления дня: при выборе плана подходы и веса прошлого раза с тем же
+    /// планом подставляются в поля, а повторения показываются плейсхолдером. Записи без
+    /// плана или с другим планом пропускаются: подтягивать нечего.
+    ///
+    /// План сопоставляется по идентификатору, а не по названию — так же, как запись с датой
+    /// сопоставляется с планом в окне правки: планы переименовывают, и совпавшее название
+    /// ничего бы не значило.
+    /// </remarks>
+    /// <param name="planId">Идентификатор плана.</param>
+    /// <param name="before">Дата, строго раньше которой ищется запись.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    Task<TrainingSession?> GetPreviousByPlanAsync(
+        int planId,
+        DateOnly before,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Добавляет запись журнала. В переданный объект записывается присвоенный идентификатор.
     /// </summary>
     /// <remarks>
