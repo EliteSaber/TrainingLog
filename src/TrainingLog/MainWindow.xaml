@@ -53,6 +53,9 @@
               а не действие над записью. Значение применяется кнопкой, поэтому поле не
               меняет список само и список не перечитывается на каждый введённый символ.
               Пустое или негодное поле гасит «Применить» — считать дни по мусору нельзя.
+
+              AllowedCharsInput оставляет в поле только цифры, поэтому «мусор» здесь остаётся
+              пустым полем и значением за пределом MaxDaysCount — оба случая гасят кнопку.
             -->
             <StackPanel Grid.Column="2"
                         Margin="0,0,12,0"
@@ -61,13 +64,16 @@
                 <TextBlock VerticalAlignment="Center"
                            Text="Количество дней" />
 
-                <TextBox Width="52"
+                <TextBox x:Name="DaysCountBox"
+                         Width="52"
                          Margin="8,0,0,0"
                          Padding="4,3"
                          HorizontalContentAlignment="Center"
                          VerticalContentAlignment="Center"
+                         helpers:AllowedCharsInput.Allowed="Digits"
                          Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
             </StackPanel>
+
 
             <Button Grid.Column="3"
                     Margin="0,0,12,0"
@@ -238,5 +244,23 @@
                 Padding="14,4"
                 Command="{Binding AddDayCommand}"
                 Content="Добавить день" />
+
+        <!--
+          Подсказка об отказе по вводу — тот же контрол, что в окне дня: он нарисован поверх
+          содержимого окна и ничего не сдвигает, поэтому объяснение отказа не двигает элементы,
+          у которых размер задаётся содержимым. Вид, срок жизни и поведение при закрытии описаны
+          в самом StatusHint, правило позиционирования — в PopupPlacement (ловушки 34 и 32).
+
+          Стоит последним в корневой сетке и с Panel.ZIndex: порядок отрисовки в WPF задаётся
+          ZIndex среди соседей, а из шапки подсказка не смогла бы перекрыть ни список дней, ни
+          нижние кнопки.
+        -->
+        <helpers:StatusHint x:Name="InputHint"
+                            Panel.ZIndex="10"
+                            ClosedCommand="{Binding Hint.ClearCommand}"
+                            DismissCommand="{Binding Hint.DismissCommand}"
+                            IsOpen="{Binding Hint.IsVisible}"
+                            Target="{Binding ElementName=DaysCountBox}"
+                            Text="{Binding Hint.Text}" />
     </Grid>
 </Window>

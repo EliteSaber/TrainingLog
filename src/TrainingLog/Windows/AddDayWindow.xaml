@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:TrainingLog.ViewModels"
+        xmlns:helpers="clr-namespace:TrainingLog.Controls"
         xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
         d:DataContext="{d:DesignInstance Type=vm:AddDayViewModel}"
         mc:Ignorable="d"
@@ -325,20 +326,31 @@
                                       пока в поле не наведёшь мышь. Оттенок системный, а не
                                       зашитый, поэтому в тёмной теме он остаётся темнее
                                       фона окна, а не становится светлым пятном.
+
+                                      AllowedCharsInput отбрасывает всё, кроме цифр, точки и
+                                      запятой, — и при наборе, и при вставке из буфера. Разбор
+                                      в модели при этом остаётся: поле с двумя разделителями
+                                      («5,5.5») фильтр пропустит, а вот TryParse отвергнет.
                                     -->
                                     <TextBox Grid.Row="0"
                                              Width="84"
                                              Padding="4,3"
                                              HorizontalContentAlignment="Center"
                                              Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"
+                                             helpers:AllowedCharsInput.Allowed="DigitsWithSeparators"
                                              ToolTip="Вес, кг"
                                              Text="{Binding WeightText, UpdateSourceTrigger=PropertyChanged}" />
 
+                                    <!--
+                                      Повторения — целое неотрицательное число, поэтому
+                                      разделителей здесь не входит: только цифры.
+                                    -->
                                     <TextBox Grid.Row="1"
                                              Margin="0,4,0,0"
                                              Width="84"
                                              Padding="4,3"
                                              HorizontalContentAlignment="Center"
+                                             helpers:AllowedCharsInput.Allowed="Digits"
                                              ToolTip="Повторения"
                                              Text="{Binding RepetitionText, UpdateSourceTrigger=PropertyChanged}" />
                                 </Grid>
@@ -381,6 +393,11 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
+            <!--
+              Отказ по двум причинам: день не сохранился либо в поле ввели недопустимое.
+              Второе приходит сюда событием AllowedCharsInput.Rejected из code-behind: правило
+              одно на все поля, и объяснение отказа не изобретается у каждого окна отдельно.
+            -->
             <TextBlock Grid.Row="0"
                        Margin="0,0,0,8"
                        TextWrapping="Wrap"
@@ -430,6 +447,28 @@
                             IsCancel="True" />
                 </StackPanel>
             </Grid>
+
+            <!--
+              Отказ по вводу в полях подходов — та же всплывающая подсказка, что в главном окне:
+              один контрол на оба окна, поэтому вид и срок жизни не могут разойтись.
+
+              Нарисована поверх содержимого окна, а не в отдельном окне: второе окно WPF отнимает
+              у окна наведение и курсор (ловушка 34). В потоке разметки она ничего не занимает и
+              не сдвигает: подходы и кнопки остаются на своих местах. Отказов сохранения она не
+              касается — они остаются красной строкой над кнопками и живут до успешного
+              сохранения.
+
+              Target задаёт окно из code-behind по Source события отказа: полей подходов много и
+              они создаются по составу упражнения, имени у них в разметке нет, а вот отказавшее
+              поле событие знает. Panel.ZIndex поднимает подсказку над содержимым окна: порядок
+              отрисовки задаётся им среди соседей.
+            -->
+            <helpers:StatusHint x:Name="InputHint"
+                                Panel.ZIndex="10"
+                                ClosedCommand="{Binding Hint.ClearCommand}"
+                                DismissCommand="{Binding Hint.DismissCommand}"
+                                IsOpen="{Binding Hint.IsVisible}"
+                                Text="{Binding Hint.Text}" />
         </Grid>
     </Grid>
 </Window>

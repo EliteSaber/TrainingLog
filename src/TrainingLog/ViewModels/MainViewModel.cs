@@ -53,6 +53,16 @@ public sealed partial class MainViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ApplyCommand))]
     private int _daysCount = DefaultDaysCount;
 
+    /// <summary>
+    /// Подсказка об отказе по вводу в поле количества дней.
+    /// </summary>
+    /// <remarks>
+    /// Отказов о сохранении в главном окне нет, так что состояние целиком уходит в подсказку.
+    /// <see cref="HintState"/> общий с окном дня: правило, что показ и текст — разные состояния,
+    /// не должно повторяться в каждой модели представления.
+    /// </remarks>
+    public HintState Hint { get; } = new();
+
     /// <summary>Дни, показанные в окне: самый свежий сверху.</summary>
     public ObservableCollection<DayRowViewModel> Days { get; } = [];
 
