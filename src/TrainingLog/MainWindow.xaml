@@ -83,13 +83,20 @@
 
               AllowedCharsInput оставляет в поле только цифры, поэтому «мусор» здесь остаётся
               пустым полем и значением за пределом MaxDaysCount — оба случая гасят кнопку.
+
+              Подпись передаёт фокус полю по клику тем же поведением, что «Поиск» в справочнике
+              упражнений: ни TextBlock, ни Label в WPF этого не делают (ловушка 13).
+              Background="Transparent" обязателен — без фона подпись попадает под мышь только по
+              самим буквам, и клик по пробелу между словами не сработал бы.
             -->
             <StackPanel Grid.Column="2"
                         Margin="0,0,12,0"
                         VerticalAlignment="Center"
                         Orientation="Horizontal">
-                <TextBlock VerticalAlignment="Center"
-                           Text="Количество дней" />
+                <TextBlock Background="Transparent"
+                           VerticalAlignment="Center"
+                           Text="Количество дней"
+                           helpers:ClickToFocus.Target="{Binding ElementName=DaysCountBox}" />
 
                 <TextBox x:Name="DaysCountBox"
                          Width="52"
