@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using TrainingLog.Controls;
 using TrainingLog.ViewModels;
 
@@ -96,5 +98,69 @@ public partial class MainWindow : Window
         menu.PlacementTarget = SettingsButton;
         menu.IsOpen = true;
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// Двойной клик по строке дня открывает правку этой даты.
+    /// </summary>
+    /// <remarks>
+    /// Подписка на списке дней, а не на строке: <c>MouseDoubleClick</c> объявлен у
+    /// <see cref="Control"/>, а строка дня — <c>Border</c>, то есть <c>Decorator</c> без
+    /// <c>Control</c>; в разметке такое событие на <c>Border</c> и не поставилось бы. Список
+    /// дней — <c>ItemsControl</c>, то есть как раз <see cref="Control"/>.
+    ///
+    /// Строка находится по элементу под мышью штатным
+    /// <see cref="ItemsControl.ContainerFromElement(DependencyObject)"/>: под указателем может
+    /// оказаться <c>TextBlock</c> с названием упражнения или числом веса, и контейнер строки
+    /// поднимается от него внутри списка.
+    ///
+    /// Команда, а не прямой вызов окна: дабл-клик и пункт меню обязаны делать одно и то же,
+    /// и перечитывать журнал после правки должен один и тот же код.
+    /// </remarks>
+    private void OnDayDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not ItemsControl days)
+        {
+            return;
+        }
+
+        if (e.OriginalSource is DependencyObject source
+            && days.ContainerFromElement(source) is FrameworkElement { DataContext: DayRowViewModel day })
+        {
+            _viewModel.EditDayCommand.Execute(day);
+        }
+    }
+
+    /// <summary>
+    /// Кладёт строку дня в открываемое меню: модель главного окна и параметр команды.
+    /// </summary>
+    /// <remarks>
+    /// Из разметки это не выразить. У <c>ContextMenu</c> отдельное логическое дерево: внутрь
+    /// него не наследуется <c>DataContext</c> и не доходит поиск предка до окна — в отличие от
+    /// привязки <c>PlacementTarget.DataContext</c>, которая доступна и потому работает в меню
+    /// шестерёнки (ловушки 1 и 41). Здесь нужны оба значения сразу: команда — у модели
+    /// главного окна, параметр — сама строка дня.
+    ///
+    /// Событие <c>ContextMenuOpening</c> поднимается до показа меню, поэтому к моменту
+    /// вычисления привязок оба значения уже на месте.
+    /// </remarks>
+    private void OnDayContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (sender is not FrameworkElement element
+            || element.ContextMenu is not { } menu
+            || element.DataContext is not DayRowViewModel day)
+        {
+            return;
+        }
+
+        menu.DataContext = _viewModel;
+
+        foreach (var item in menu.Items)
+        {
+            if (item is MenuItem menuItem)
+            {
+                menuItem.CommandParameter = day;
+            }
+        }
     }
 }

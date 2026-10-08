@@ -107,6 +107,32 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Правка дня из строки журнала: дабл-клик по строке или пункт «Редактировать» меню.
+    /// </summary>
+    /// <remarks>
+    /// Строка передаётся целиком, а не датой: её кладёт в меню и дабл-клик, и оба обязаны
+    /// попасть в одну команду, — иначе правка дня была бы в двух местах сразу.
+    ///
+    /// Пустая строка возможна, если команда вызвана без параметра, и тогда она ничего не
+    /// открывает: правки несуществующего дня не бывает, а падать на <c>null</c> пользователю
+    /// не за что.
+    /// </remarks>
+    /// <param name="day">Строка журнала, день которой открывается на правку.</param>
+    [RelayCommand]
+    private async Task EditDayAsync(DayRowViewModel? day)
+    {
+        if (day is null)
+        {
+            return;
+        }
+
+        if (_windowService.ShowEditDay(day.Date))
+        {
+            await RefreshAsync().ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>
     /// Перечитывает журнал и пересобирает строки дней.
     /// </summary>
     /// <remarks>

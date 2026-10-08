@@ -95,13 +95,26 @@ public sealed partial class AddDayViewModel : ObservableObject
 
     /// <param name="sessionRepository">Журнал тренировок.</param>
     /// <param name="planRepository">Планы тренировок: состав дня берётся из плана.</param>
-    public AddDayViewModel(ITrainingSessionRepository sessionRepository, ITrainingPlanRepository planRepository)
+    /// <param name="day">
+    /// Дата, на которую открывается окно. <c>null</c> — день добавляется, то есть сегодня.
+    /// </param>
+    public AddDayViewModel(
+        ITrainingSessionRepository sessionRepository,
+        ITrainingPlanRepository planRepository,
+        DateOnly? day = null)
     {
         ArgumentNullException.ThrowIfNull(sessionRepository);
         ArgumentNullException.ThrowIfNull(planRepository);
 
         _sessionRepository = sessionRepository;
         _planRepository = planRepository;
+
+        // Дата кладётся в поле напрямую, а не через свойство Date. Сеттер зовёт LoadDateCommand,
+        // а планы в конструкторе ещё не загружены: это тот самый случай, из-за которого
+        // DatePicker при показе окна запускает лишнее чтение вхолостую (ловушка 27). Первое
+        // наполнение по-прежнему делает InitializeCommand — сначала планы, потом запись за эту
+        // дату, — поэтому чтений остаётся одно, а не два.
+        _date = day?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Today;
     }
 
     /// <summary>Планы для выбора, по алфавиту.</summary>
@@ -115,8 +128,12 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// <see cref="DateOnly"/> не привязывается; доменная дата получается через
     /// <see cref="Day"/>.
     /// </summary>
+    /// <remarks>
+    /// Начальное значение задаёт конструктор, и кладёт его в поле, минуя сеттер: см. замечание
+    /// там. Значение по умолчанию поэтому тоже в конструкторе, а не в инициализаторе поля.
+    /// </remarks>
     [ObservableProperty]
-    private DateTime? _date = DateTime.Today;
+    private DateTime? _date;
 
     /// <summary>Выбранный план.</summary>
     [ObservableProperty]

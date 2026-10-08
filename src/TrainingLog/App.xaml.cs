@@ -67,10 +67,12 @@ public partial class App : Application
                 provider.GetRequiredService<ITrainingPlanRepository>(),
                 provider.GetRequiredService<IExerciseRepository>())),
             // День тренировки — то же окно и на добавление, и на правку: какая это запись,
-            // модель узнаёт по дате, поэтому фабрика одна.
-            () => new AddDayWindow(new AddDayViewModel(
+            // модель узнаёт по дате, поэтому фабрика одна — она принимает дату, а null
+            // означает добавление сегодняшнего дня.
+            day => new AddDayWindow(new AddDayViewModel(
                 provider.GetRequiredService<ITrainingSessionRepository>(),
-                provider.GetRequiredService<ITrainingPlanRepository>()))));
+                provider.GetRequiredService<ITrainingPlanRepository>(),
+                day))));
 
         services.AddTransient<ExercisesViewModel>();
         services.AddTransient<ExercisesWindow>();

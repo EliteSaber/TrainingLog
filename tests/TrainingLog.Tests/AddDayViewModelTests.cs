@@ -907,8 +907,38 @@ public async Task СменаДатыНаДатуСЗаписью_Подтяги�
     Assert.Equal("70", Assert.Single(viewModel.Current!.Sets).WeightText);
 }
 
-private static AddDayViewModel CreateViewModel(TemporaryDatabase database) =>
+    /// <summary>
+    /// Окно, открытое на дату из строки журнала, сразу показывает запись за неё: план выбран,
+    /// подходы подтянуты, заголовок — «Правка дня».
+    /// </summary>
+    /// <remarks>
+    /// Дата приходит в конструктор и кладётся в поле, минуя сеттер: сеттер зовёт
+    /// <c>LoadDateCommand</c> до загрузки планов, и первое наполнение мигнуло бы «план удалён»
+    /// (ловушка 27). Проверяется именно результат первого наполнения — без единого щелчка по
+    /// упражнениям и без ручной смены даты.
+    /// </remarks>
+    [Fact]
+    public async Task ОкноНаДатуИзЖурнала_СразуПоказываетЗаписьЗаНей()
+    {
+        using var database = new TemporaryDatabase();
+        var day = new DateOnly(2026, 10, 5);
+        var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+        var session = new TrainingSession { Date = day, PlanId = plan.Id, PlanName = plan.Name };
+        session.AddExercise(plan.Exercises[0]).AddSet(8, 60m);
+        await database.SessionRepository.AddAsync(session);
+
+        var viewModel = new AddDayViewModel(database.SessionRepository, database.PlanRepository, day);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        Assert.Equal("Правка дня", viewModel.Title);
+        Assert.Equal("Приседание", Assert.Single(viewModel.Exercises).Name);
+        Assert.Equal("60", Assert.Single(viewModel.Current!.Sets).WeightText);
+    }
+
+    private static AddDayViewModel CreateViewModel(TemporaryDatabase database) =>
         new(database.SessionRepository, database.PlanRepository);
+
 
     private static AddDayViewModel CreateViewModel(TemporaryDatabase database, ITrainingSessionRepository sessions) =>
         new(sessions, database.PlanRepository);

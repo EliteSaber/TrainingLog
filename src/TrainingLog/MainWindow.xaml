@@ -23,11 +23,31 @@
                       Command="{Binding OpenPlansCommand}" />
         </ContextMenu>
 
+        <!--
+          Меню строки дня. DataContext задаётся не здесь, а при открытии, в
+          OnDayContextMenuOpening: у ContextMenu отдельное логическое дерево, и до окна
+          добраться из него нельзя (ловушка 41). Поэтому и команда, и её параметр приходят
+          сверху — из открывающего кода, а не привязкой.
+
+          Контекстное меню открывается само по правому клику в любом месте строки:
+          ContextMenuService находит меню у элемента под мышью и поднимается вверх, поэтому
+          клик по названию плана или по столбцу подхода попадает в меню дня.
+
+          Побочный эффект тот же, что у меню шестерёнки: пока меню открыто, окно не получает
+          наведения (ловушка 34). В строке дня наведения нет, так что это видно только по
+          курсору.
+        -->
+        <ContextMenu x:Key="DayContextMenu">
+            <MenuItem Header="Редактировать"
+                      Command="{Binding EditDayCommand}" />
+        </ContextMenu>
+
         <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </Window.Resources>
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -74,11 +94,21 @@
                          Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
             </StackPanel>
 
+            <!--
+              Enter применяет количество дней. IsDefault, а не горячая клавиша: в окне дня,
+              окне правки упражнения и окне правки плана Enter подтверждает кнопку именно
+              так, и KeyBinding в проекте занят под Ctrl+S. Оба механизма на одной кнопке
+              означали бы двойное выполнение.
 
+              До кнопки Enter доходит сам: фильтр цифр глотает в PreviewKeyDown только
+              пробел (AllowedCharsInput), а AcceptsReturn у поля не задан, то есть остаётся
+              False — Enter подтверждает, а не добавляет строку.
+            -->
             <Button Grid.Column="3"
                     Margin="0,0,12,0"
                     Padding="14,4"
                     VerticalAlignment="Center"
+                    IsDefault="True"
                     Command="{Binding ApplyCommand}"
                     Content="Применить" />
 
@@ -100,8 +130,29 @@
             </Button>
         </Grid>
 
-        <Grid Grid.Row="1"
-              Margin="0,16,0,0">
+        <!--
+          Линия над списком дней: отделяет список от шапки и идёт от края окна до края. Стоит
+          сразу над ScrollViewer, поэтому зазор 16 px остаётся над ней, а не после неё.
+
+          Высота задаётся самой рамкой: у Border без содержимого желаемый размер равен толщине
+          границы, то есть этой строке хватает высоты в 1 px без Height.
+
+          Отрицательные отступы по бокам снимают отступ корневой сетки (16 px), и Padding здесь
+          не нужен: возвращать отступ нечего, содержимого у линии нет. Отрицательные отступы
+          безопасны — обрезает только само окно, а корневая сетка содержимое не обрезает.
+
+          Сам отступ корневой сетки на детей намеренно не переносится: он один на всё окно, и
+          на него же опирается правило положения подсказки (PopupPlacement).
+
+          Тон и толщина — те же, что у разделителей в списках: #E0E0E0, 1 px.
+        -->
+        <Border Grid.Row="1"
+                Margin="-16,16,-16,0"
+                BorderBrush="#E0E0E0"
+                BorderThickness="0,1,0,0"
+                IsHitTestVisible="False" />
+
+        <Grid Grid.Row="2">
             <!--
           Дней может быть много, а столбцов в дне — сколько подходов, и это число ничем не
           ограничено: ширина дня не зависит от ширины окна. Поэтому прокрутка по обеим
@@ -111,7 +162,8 @@
         <ScrollViewer helpers:ScrollBarGutter.Left="2"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Days}">
+                <ItemsControl ItemsSource="{Binding Days}"
+                              MouseDoubleClick="OnDayDoubleClick">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <!--
@@ -133,10 +185,37 @@
                               модель (подходы упражнения на CellWidth), и по той же формуле она
                               считается для списков веса и повторений, а поэтому границы блока
                               совпадают с краями его столбцов.
+
+                              По блоку кликается целиком — дата, план, упражнения, вес и
+                              повторения, а также пустые места строки. Правый клик открывает
+                              меню с одним пунктом, двойной — правку дня. Дабл-клик подписан на
+                              список дней, а не на Border: у Border нет собственного события
+                              MouseDoubleClick (он есть у Control), и в разметке оно не
+                              ставится, а список дней — ItemsControl, то есть Control. Строка дня
+                              находится по элементу под мышью штатным ContainerFromElement.
+                              Подписка на Border тоже вышла бы не туда: клик мимо строк открыл бы
+                              правку не на том дне.
+
+                              Background="Transparent" обязателен: без фона Border ловит мышь
+                              только там, где что-то нарисовано, то есть пустые ячейки под датой
+                              и левее подписей пропускали бы нажатие насквозь, мимо строки.
+
+                              MinWidth — по другой причине: строка меряется бесконечной шириной
+                              (у скролла горизонтальная прокрутка), и без него шириной своего
+                              содержимого: правее последнего упражнения строки не было бы вовсе,
+                              и клик некуда было бы отнести. Ширина берётся у ближайшего
+                              ItemsControl — это ширина его содержимого, то есть вертикальная
+                              полоса и зазор ScrollBarGutter уже вычтены. От самого ScrollViewer
+                              брать нельзя: строка уехала бы под полосу, и список получил бы
+                              лишнюю горизонтальную прокрутку.
                             -->
-                            <Border Padding="0,10,0,10"
+                            <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    Background="Transparent"
+                                    Padding="0,10,0,10"
                                     BorderBrush="#E0E0E0"
-                                    BorderThickness="0,0,0,1">
+                                    BorderThickness="0,0,0,1"
+                                    ContextMenu="{StaticResource DayContextMenu}"
+                                    ContextMenuOpening="OnDayContextMenuOpening">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -390,7 +469,7 @@
                        Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
 
-        <Button Grid.Row="2"
+        <Button Grid.Row="3"
                 Margin="0,16,0,0"
                 HorizontalAlignment="Left"
                 Padding="14,4"

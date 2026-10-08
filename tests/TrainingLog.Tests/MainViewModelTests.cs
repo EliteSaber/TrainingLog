@@ -238,6 +238,70 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
     }
 
     /// <summary>
+    /// Правка дня из строки журнала открывает окно на дату этой строки: по дате модель сама
+    /// находит запись и открывается на правку.
+    /// </summary>
+    [Fact]
+    public async Task EditDayCommand_СтрокаДня_ОткрываетПравкуЭтойДаты()
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
+
+        var windowService = new FakeWindowService();
+        var viewModel = new MainViewModel(windowService, database.SessionRepository);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Days);
+
+        await viewModel.EditDayCommand.ExecuteAsync(row);
+
+        Assert.Equal(1, windowService.EditDayCalls);
+        Assert.Equal(new DateOnly(2026, 10, 5), windowService.LastEditDay);
+    }
+
+    /// <summary>
+    /// Правка дня, как и добавление, перечитывает журнал: пока окно открыто, день могли
+    /// поправить, и без перечитки строка осталась бы старой.
+    /// </summary>
+    [Fact]
+    public async Task EditDayCommand_ДеньПоправлен_СписокПеречитан()
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
+
+        var windowService = new FakeWindowService { EditDayResult = true };
+        var viewModel = new MainViewModel(windowService, database.SessionRepository);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        await database.SessionRepository.AddAsync(Session(new DateOnly(2026, 10, 6), "День 6"));
+
+        var row = Assert.Single(viewModel.Days);
+
+        await viewModel.EditDayCommand.ExecuteAsync(row);
+
+        Assert.Equal(["День 6", "День 5"], viewModel.Days.Select(day => day.PlanName));
+    }
+
+    /// <summary>
+    /// Команда без строки не открывает ничего: правки несуществующего дня не бывает, а падать
+    /// на <c>null</c> пользователю не за что.
+    /// </summary>
+    [Fact]
+    public async Task EditDayCommand_БезСтроки_НичегоНеОткрывает()
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
+
+        var windowService = new FakeWindowService { EditDayResult = true };
+        var viewModel = new MainViewModel(windowService, database.SessionRepository);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        await viewModel.EditDayCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, windowService.EditDayCalls);
+    }
+
+    /// <summary>
     /// Формат даты приложения: «08 октября 2026».
     /// </summary>
     /// <remarks>

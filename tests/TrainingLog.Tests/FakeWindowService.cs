@@ -26,6 +26,15 @@ internal sealed class FakeWindowService : IWindowService
     /// <summary>Сколько раз открывали окно добавления дня.</summary>
     public int AddDayCalls { get; private set; }
 
+    /// <summary>Что <c>ShowEditDay</c> вернёт вызывающему.</summary>
+    public bool EditDayResult { get; set; }
+
+    /// <summary>Сколько раз открывали окно правки дня.</summary>
+    public int EditDayCalls { get; private set; }
+
+    /// <summary>Дата последней правки дня: какую запись открыли на правку.</summary>
+    public DateOnly? LastEditDay { get; private set; }
+
     public void OpenExercises()
     {
     }
@@ -45,9 +54,17 @@ internal sealed class FakeWindowService : IWindowService
         AddDayCalls++;
 
         // Синхронная блокировка допустима только в тесте: вызывающий в приложении — команда
-        // MainViewModel, и она тоже синхронная по контракту IWindowService.
+        // MainViewModel, и она тоже синхронна по контракту IWindowService.
         OnAddDay?.Invoke().GetAwaiter().GetResult();
 
         return AddDayResult;
+    }
+
+    public bool ShowEditDay(DateOnly day)
+    {
+        EditDayCalls++;
+        LastEditDay = day;
+
+        return EditDayResult;
     }
 }

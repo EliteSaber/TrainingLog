@@ -13,7 +13,7 @@ public sealed class WindowService(
     Func<PlansWindow> plansWindowFactory,
     Func<EditPlanWindow> addPlanWindowFactory,
     Func<TrainingPlan, EditPlanWindow> editPlanWindowFactory,
-    Func<AddDayWindow> addDayWindowFactory) : IWindowService
+    Func<DateOnly?, AddDayWindow> dayWindowFactory) : IWindowService
 {
     private readonly SingleInstanceWindowHost<ExercisesWindow> _exercises = new(exercisesWindowFactory);
     private readonly SingleInstanceWindowHost<PlansWindow> _plans = new(plansWindowFactory);
@@ -60,9 +60,27 @@ public sealed class WindowService(
     /// диалога главное окно не узнало бы, что день записан. Ответ собирается из обоих
     /// состояний окна: закрыт кнопкой — <c>Accepted</c>, сохранён без закрытия — <c>Saved</c>.
     /// </remarks>
-    public bool ShowAddDay()
+    public bool ShowAddDay() => ShowDay(day: null);
+
+    /// <inheritdoc />
+    public bool ShowEditDay(DateOnly day) => ShowDay(day);
+
+    /// <summary>
+    /// Показывает окно дня: <paramref name="day"/> — это дата правки, <c>null</c> — добавление
+    /// дня, то есть сегодня.
+    /// </summary>
+    /// <remarks>
+    /// Окно одно на оба случая, поэтому и фабрика одна, принимающая дату: отличаются вызовы
+    /// датой, а не окном. За дату одна запись, и какая это запись — добавление или правка —
+    /// модель узнаёт сама при первом наполнении.
+    ///
+    /// Окно создаётся заново на каждый вызов, как и окна правки: внутри него набираются
+    /// подходы, и переиспользование экземпляра с прошлым содержимым выглядело бы как зависание.
+    /// Владелец — главное окно, из которого окно и вызывается.
+    /// </remarks>
+    private bool ShowDay(DateOnly? day)
     {
-        var window = addDayWindowFactory();
+        var window = dayWindowFactory(day);
 
         var owner = Application.Current?.MainWindow;
         window.Owner = owner;
