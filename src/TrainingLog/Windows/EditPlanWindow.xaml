@@ -15,6 +15,15 @@
         MinHeight="320"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <!--
+          Отступ списка справа, который снимается, пока вертикальная полоса на экране. Тот же
+          конвертер, что в главном окне и в окнах справочника и планов, но объявлен здесь своим
+          экземпляром: ресурсы окна живут в окне, и общий словарь приложения окну, открытому из
+          теста или из другого хоста, недоступен.
+        -->
+        <helpers:ScrollBarMarginConverter x:Key="ScrollBarMargin" />
+    </Window.Resources>
     <!--
       Окно общее для добавления и правки: различаются только заголовок и подпись кнопки,
       которые задаёт модель представления. Высота фиксированная, а списки прокручиваются:
@@ -82,10 +91,35 @@
                                FontWeight="SemiBold"
                                Text="Все упражнения" />
 
+                    <!--
+                      Списки прижаты к внутреннему краю своих рамок: полоса прокрутки живёт
+                      внутри ScrollViewer, и за пределы рамки она выходит только пересекая линию
+                      рамки, а это читается как оборванная полоса. Поэтому отрицательный отступ
+                      съедает Padding="4,5" вместе с рамкой в 1 px, а отступ списка живёт на
+                      контейнере строки и справа снимается, пока полоса на экране. Правая рамка
+                      вложена в левую, поэтому её полоса оказывается на 4 px дальше от внешней
+                      рамки — выровнять их можно было бы только выведя её за линию рамки, и
+                      этого не сделано.
+                    -->
                     <ScrollViewer Grid.Row="1"
+                                  Margin="0,0,-5,0"
                                   helpers:ScrollBarGutter.Left="2"
                                   VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding AllExercises}">
+                            <ItemsControl.ItemContainerStyle>
+                                <!--
+                                  Отступ живёт на контейнере, а не на содержимом скролла:
+                                  ScrollBarGutter владеет правым отступом содержимого и затирает
+                                  на нём привязку. Слева отступ всегда 5 px.
+                                -->
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Margin"
+                                            Value="{Binding ComputedVerticalScrollBarVisibility,
+                                                    RelativeSource={RelativeSource AncestorType=ScrollViewer},
+                                                    Converter={StaticResource ScrollBarMargin},
+                                                    ConverterParameter=5}" />
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <!--
@@ -158,10 +192,24 @@
                                    FontWeight="SemiBold"
                                    Text="Порядок в плане" />
 
+                        <!--
+                          Так же, как в левой колонке: полоса у внутреннего края своей рамки,
+                          отступ на контейнере и справа снимается, пока полоса на экране.
+                        -->
                         <ScrollViewer Grid.Row="1"
+                                      Margin="0,0,-5,0"
                                       helpers:ScrollBarGutter.Left="2"
                                       VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding SelectedExercises}">
+                                <ItemsControl.ItemContainerStyle>
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="Margin"
+                                                Value="{Binding ComputedVerticalScrollBarVisibility,
+                                                        RelativeSource={RelativeSource AncestorType=ScrollViewer},
+                                                        Converter={StaticResource ScrollBarMargin},
+                                                        ConverterParameter=5}" />
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Padding="0,4"

@@ -22,6 +22,14 @@
           или из другого хоста.
         -->
         <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+        <!--
+          Отступ списка справа, который снимается, пока вертикальная полоса на экране. Тот же
+          конвертер, что в главном окне, но объявлен здесь своим экземпляром: ресурсы окна живут
+          в окне (см. выше), и общий словарь окну, открытому из теста или из другого хоста,
+          недоступен.
+        -->
+        <helpers:ScrollBarMarginConverter x:Key="ScrollBarMargin" />
     </Window.Resources>
 
     <Grid Margin="12">
@@ -84,10 +92,35 @@
             </Button>
         </Border>
 
-        <Grid Grid.Row="3">
+        <!--
+          Область списка снимает с себя отступ корневой сетки по бокам: полоса прокрутки живёт
+          внутри ScrollViewer, и прижать её к краю окна иначе нечем. Отступ не пропал, а переехал
+          на контейнеры строк внутри скролла, поэтому карточки планов стоят на прежних местах —
+          и с полосой, и без неё.
+        -->
+        <Grid Grid.Row="3"
+              Margin="-12,0,-12,0">
             <ScrollViewer helpers:ScrollBarGutter.Left="2"
                           VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Visible}">
+                    <ItemsControl.ItemContainerStyle>
+                        <!--
+                          Отступ карточек живёт на контейнере, а не на содержимом скролла:
+                          ScrollBarGutter владеет правым отступом содержимого и затирает на нём
+                          привязку. Пока полоса на экране, правый отступ снимается и карточки
+                          подходят к полосе; без полосы он возвращается. Слева он всегда 12 px.
+
+                          На контейнере, а не в шаблоне ещё и по другой причине: у карточки свой
+                          отступ вниз, Margin="0,0,0,6", и в привязанном Margin он бы потерялся.
+                        -->
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="Margin"
+                                    Value="{Binding ComputedVerticalScrollBarVisibility,
+                                            RelativeSource={RelativeSource AncestorType=ScrollViewer},
+                                            Converter={StaticResource ScrollBarMargin},
+                                            ConverterParameter=12}" />
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <!--
