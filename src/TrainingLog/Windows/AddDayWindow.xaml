@@ -227,6 +227,23 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+
+                    <!--
+                      Строка примечания единственная со звёздочкой: вертикальный запас области
+                      ввода уходит в неё, и по раскрытию поле тянется вместе с окном. Раньше все
+                      три строки были Auto, и окно выше просто добавляло пустоту снизу — по
+                      ширине так не выходит, там колонка * ограничивает содержимое, а WrapPanel
+                      подходов переносится (ловушка 29). Здесь ограничение даёт строка.
+
+                      MinHeight — высота заголовка Expander с маркерами, и он не про удобство,
+                      а про индикацию: на ужатом окне строка сжимается в несколько пикселей,
+                      и вместе с ней исчез бы заголовок, то есть единственный след примечания.
+                      Само поле минимальной высоты не имеет и сжимается свободно.
+
+                      Свёрнутый Expander тоже растягивается, но рисует только заголовок, поэтому
+                      на закрытом поле картинка ровно та же: название и подходы остаются сверху.
+                    -->
+                    <RowDefinition Height="*" MinHeight="24" />
                 </Grid.RowDefinitions>
 
                 <!--
@@ -404,6 +421,200 @@
                               Style="{StaticResource Chevron}" />
                     </Button>
                 </Grid>
+
+                <!--
+                  Примечание принадлежит упражнению, а не подходу, поэтому поле стоит третьей
+                  строкой под подходами и привязано к текущему упражнению, а не к подходу.
+                  Скрыто по умолчанию: примечаний у упражнения обычно нет, и постоянно
+                  висящее поле съедало бы высоту области ввода у каждого упражнения.
+
+                  А до выбора плана скрыто вовсе: упражнений ещё нет, а показывать поле
+                  примечания там, где некому его заполнить, незачем. Показ привязан к
+                  HasCurrent, а не к Current: путь через Current не разрешается, пока Current
+                  равен null, и привязка отдаёт значение по умолчанию целевого свойства — а у
+                  Visibility это Visible (ловушка 43).
+
+                  Состояние раскрытия живёт в строке упражнения, поэтому у каждого упражнения
+                  оно своё и переключение «‹» и «›» не закрывает то, что открыто у соседнего.
+                  Mode=TwoWay задан явно: у Expander.IsExpanded он и так двусторонний по
+                  умолчанию, а полагаться на это молча — ровно тот случай, что разбирает
+                  ловушка 31.
+                -->
+                <Expander Grid.Row="2"
+                          Margin="0,10,0,0"
+                          HorizontalAlignment="Stretch"
+                          IsExpanded="{Binding Current.IsNotesExpanded, Mode=TwoWay}"
+                          Visibility="{Binding HasCurrent,
+                                               Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Expander.Header>
+                        <!--
+                          В шапке Expander нет ни одной кнопки: шапка — это сам ToggleButton,
+                          и кнопка внутри неё дёргала бы ещё и раскрытие (ловушка 15).
+
+                          Отступ задан на самих надписях, а не на панели: в горизонтальной
+                          панели отступ контейнера отодвигает панель от края колонки, а
+                          элементы внутри по-прежнему стоят вплотную (ловушка 37).
+
+                          Маркеров два, и это не украшение: примечание, введённое в это упражнение,
+                          и подсказка из прошлого дня — разные вещи, а в свёрнутом виде у них нет
+                          других следов. Подсказка бледная, введённое примечание — обычным цветом
+                          текста. У самого поля подсказки (ToolTip) нет: о поле и так говорит
+                          шапка, а большой ToolTip над полем закрывал бы его собой на всё время
+                          наведения. У маркера она есть — пустой кружок сам по себе ничего
+                          не значит, и наведение на него короткое.
+
+                          Видимость маркеров задана DataTrigger, а не конвертером: путь идёт
+                          через Current, который до выбора плана равен null, а ломаная
+                          привязка с конвертером отдаёт Visible — оба маркера загорались бы
+                          разом (ловушка 43). Тот же приём у плейсхолдера
+                          «Справочник упражнений пуст» в окне правки плана.
+                        -->
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Примечание" />
+
+                            <TextBlock Margin="6,0,0,0" Text="•">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Current.HasNote}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <!--
+                              Маркер живёт в рамке, а не в самом TextBlock, и это не украшение:
+                              у TextBlock содержимое объявлено как Inlines, поэтому свойство-элемент
+                              предка (ToolTip) попадает в ту коллекцию и роняет окно при
+                              создании — ловушка 44. У Border такой коллекции нет, и класс дефекта
+                              не вернётся, чем бы подсказка ни менялась.
+
+                              Прозрачная подложка у рамки обязательна: без неё пустая рамка мышь не
+                              ловит, и наводиться на подсказку пришлось бы почти в точку по
+                              глифу (ловушка 42). Видимость задана рамке, а не блоку: иначе у
+                              прозрачной рамки она бы осталась и рамка продолжала бы ловить мышь
+                              при скрытом маркере.
+
+                              Предел ширины обязателен и здесь: без него длинная строка уехала бы
+                              за край экрана — ровно тот дефект, из-за которого в проекте
+                              появились PopupPlacement и ResolveWidth (ловушка 35).
+
+                              Это второе окно, а такие в приложении отнимают у окна наведение
+                              (ловушка 34) — но на маркере это и до правки было, а блок стал
+                              лишь крупнее.
+                            -->
+                            <Border Margin="6,0,0,0" Background="Transparent">
+                                <TextBlock Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                                           Text="○" />
+
+                                <Border.ToolTip>
+                                    <StackPanel MaxWidth="320">
+                                        <TextBlock Margin="0,0,0,4"
+                                                   FontWeight="SemiBold"
+                                                   Text="Примечание прошлого дня" />
+
+                                        <TextBlock MaxHeight="240"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding Current.NotePlaceholder,
+                                                                  TargetNullValue=''}" />
+                                    </StackPanel>
+                                </Border.ToolTip>
+
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Current.HasNotePlaceholder}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
+                        </StackPanel>
+                    </Expander.Header>
+
+                    <!--
+                      Поле многострочное, и высоту ему задаёт строка *, а не содержимое:
+                      поэтому MaxHeight здесь не только не нужен, но и вреден — предел отменяет
+                      растяжение, и поле уперлось бы в него вместо того, чтобы идти за окном.
+                      Ограничивать рост нужно, когда высоту задаёт содержимое, то есть в строке
+                      Auto: у TextBox дефолт VerticalScrollBarVisibility="Hidden", и без Auto
+                      при переносе поле не прокручивало бы, а росло (ловушка 12). Здесь границу
+                      даёт строка *, а переполнение ловит VerticalScrollBarVisibility="Auto".
+                      Enter в поле вставляет строку, а не сохраняет день: AcceptsReturn=True
+                      перехватывает клавишу раньше кнопки IsDefault.
+
+                      Растягивается поле само, без VerticalAlignment: Expander по умолчанию
+                      Stretch, его ContentPresenter отдаёт остаток, и растягиваются оба
+                      вложенных уровня — сетка и поле.
+
+                      Ширину задаёт колонка * центральной области. HorizontalAlignment не задан
+                      намеренно: центрированный элемент меряется под своё содержимое, колонка
+                      его не ограничит, и перенос перестанет работать (ловушка 29).
+
+                      Плейсхолдер — тот же приём, что у повторений: блок объявлен после TextBox
+                      (в Grid рисуется последним объявленным, а подложка под непрозрачным полем
+                      была бы не видна) и с IsHitTestVisible=False, иначе надпись перехватывала
+                      бы нажатия и в поле нельзя было бы ни поставить каретку, ни вставить из
+                      буфера (ловушка 36). Отступы повторяют Padding поля, чтобы подсказка
+                      начиналась там же, где введённый текст.
+
+                      Обрезка подсказки обрезается по высоте и клипом, и обе вещи обязательны:
+                      MaxHeight ограничивает только разметку, а TextBlock текст за своим слотом
+                      всё равно рисует — без клипа длинная заметка уезжала вниз и ложилась на
+                      строку сообщений, а окно её срезало. Клип стоит на сетке, а не на самом
+                      блоке: слот блока равен его MaxHeight, и на низком поле текст всё равно
+                      ушёл бы мимо него.
+
+                      Трёх строк, как планировалось, не вышло: MaxLines в WPF у TextBlock нет
+                      (это Silverlight и WinRT), а TextTrimming объявляет конец многоточием
+                      только при TextWrapping="NoWrap", то есть в многострочном режиме
+                      безмолвенно не работает. Поэтому подсказка обрывается на границе, а
+                      объявляет этот обрыв полный текст в подсказке у маркера «○».
+
+                      Рабочей прокрутки у подсказки быть не может: слой не принимает мышь
+                      (см. IsHitTestVisible выше), поэтому полоса была бы декоративной.
+
+                      Видимость — тоже DataTrigger, а не конвертер: путь через Current при
+                      невыбранном упражнении ломается и оставляет Visible (ловушка 43).
+                    -->
+                    <Grid ClipToBounds="True" Margin="0,6,0,0">
+                        <TextBox AcceptsReturn="True"
+                                 Padding="4,3"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Text="{Binding Current.NoteText,
+                                                TargetNullValue='',
+                                                UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Margin="5,4,0,0"
+                                   MaxHeight="66"
+                                   VerticalAlignment="Top"
+                                   ClipToBounds="True"
+                                   IsHitTestVisible="False"
+                                   Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding Current.NotePlaceholder, TargetNullValue=''}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Current.HasNotePlaceholder}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Expander>
             </Grid>
 
             <Button Grid.Column="2"

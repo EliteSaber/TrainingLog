@@ -1832,6 +1832,404 @@ public async Task Подтягивание_СменаДатыУбираетДа�
     Assert.Equal(string.Empty, viewModel.PulledFromDateText);
 }
 
+/// <summary>
+/// Примечание доезжает до базы и читается обратно. Упражнения записи это не проверяет:
+/// колонка Notes принадлежит упражнению, и потерялась бы молча — упражнение в записи есть,
+/// а текста нет.
+/// </summary>
+[Fact]
+public async Task Примечание_СохраняетсяИЧитаетсяОбратно()
+{
+    using var database = new TemporaryDatabase();
+    var day = new DateOnly(2026, 10, 5);
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var viewModel = await CreateReadyToSaveAsync(database, day, plan);
+
+    viewModel.Current!.NoteText = "колени побаливали";
+
+    await viewModel.SaveAndCloseCommand.ExecuteAsync(null);
+
+    Assert.True(viewModel.Accepted);
+
+    var stored = await database.SessionRepository.GetByDateAsync(day);
+
+    Assert.Equal("колени побаливали", Assert.Single(stored!.Exercises).Notes);
+}
+
+/// <summary>
+/// Примечание без единого подхода упражнение в запись отправляет само по себе: молча выбросить
+/// набранный текст при сохранении хуже, чем показать в журнале лишнее упражнение.
+/// </summary>
+[Fact]
+public async Task ПримечаниеБезПодходов_УпражнениеПопадаетВЗапись()
+{
+    using var database = new TemporaryDatabase();
+    var day = new DateOnly(2026, 10, 5);
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, day);
+
+    viewModel.SelectedPlan = plan;
+
+    // Ни подходов, ни примечания — сохранять нечего.
+    Assert.False(viewModel.SaveAndCloseCommand.CanExecute(null));
+
+    viewModel.Current!.NoteText = "не делал, спина";
+
+    Assert.True(viewModel.SaveAndCloseCommand.CanExecute(null));
+
+    await viewModel.SaveAndCloseCommand.ExecuteAsync(null);
+
+    var stored = await database.SessionRepository.GetByDateAsync(day);
+    var entry = Assert.Single(stored!.Exercises);
+
+    Assert.Equal("не делал, спина", entry.Notes);
+    Assert.Empty(entry.Sets);
+}
+
+/// <summary>
+/// Пробелы примечанием не считаются: иначе день из одних пробелов сохранялся бы как выполненный.
+/// </summary>
+[Fact]
+public async Task ПримечаниеИзПробелов_НеСчитаетсяЗаполненным()
+{
+    using var database = new TemporaryDatabase();
+    var day = new DateOnly(2026, 10, 5);
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, day);
+
+    viewModel.SelectedPlan = plan;
+    viewModel.Current!.NoteText = "   ";
+
+    Assert.False(viewModel.Current.HasNote);
+    Assert.False(viewModel.Current.HasData);
+    Assert.False(viewModel.SaveAndCloseCommand.CanExecute(null));
+}
+
+/// <summary>
+/// Подтягивание прошлого дня отдаёт примечание подсказкой, ровно как повторения: значение
+/// прошлого раза записало бы в журнал то, чего в этот раз не писали.
+/// </summary>
+[Fact]
+public async Task Подтягивание_ПримечаниеПрошлогоДня_Подсказкой()
+{
+    using var database = new TemporaryDatabase();
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var previous = new TrainingSession
+    {
+        Date = new DateOnly(2026, 10, 8),
+        PlanId = plan.Id,
+        PlanName = plan.Name,
+    };
+
+    previous.AddExercise(plan.Exercises[0], "болело левое плечо").AddSet(10, 60m);
+
+    await database.SessionRepository.AddAsync(previous);
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+    viewModel.SelectedPlan = plan;
+
+    await SettleAsync();
+
+    var row = viewModel.Current!;
+
+    Assert.Equal(string.Empty, row.NoteText);
+    Assert.Equal("болело левое плечо", row.NotePlaceholder);
+    Assert.True(row.HasNotePlaceholder);
+
+    // Подсказка данными не считается: введённое примечание отличает подсказку от значения,
+    // а сохранённое примечание осталось бы чужим.
+    Assert.False(row.HasNote);
+
+    await viewModel.SaveAndCloseCommand.ExecuteAsync(null);
+
+    var stored = await database.SessionRepository.GetByDateAsync(new DateOnly(2026, 10, 10));
+
+    // Подсказка данными не считается — иначе упражнение сохранилось бы с чужим примечанием.
+    Assert.Null(Assert.Single(stored!.Exercises).Notes);
+}
+
+/// <summary>
+/// Подтянутое примечание без подходов форму не наполняет: в прошлый раз упражнение отмечено
+/// было только заметкой, и подставлять её значениеми нельзя — день получился бы выполненным из
+/// ничего, а надпись о несохранённом загорелась бы от того, чего пользователь не вводил.
+/// </summary>
+[Fact]
+public async Task Подтягивание_ПримечаниеБезПодходов_ФормуНеНаполняет()
+{
+    using var database = new TemporaryDatabase();
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var previous = new TrainingSession
+    {
+        Date = new DateOnly(2026, 10, 8),
+        PlanId = plan.Id,
+        PlanName = plan.Name,
+    };
+
+    previous.AddExercise(plan.Exercises[0], "болело левое плечо");
+
+    await database.SessionRepository.AddAsync(previous);
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+    viewModel.SelectedPlan = plan;
+
+    await SettleAsync();
+
+    var row = viewModel.Current!;
+
+    Assert.Equal("болело левое плечо", row.NotePlaceholder);
+    Assert.False(row.HasData);
+    Assert.False(viewModel.HasUnsavedChanges);
+    Assert.False(viewModel.SaveAndCloseCommand.CanExecute(null));
+}
+
+/// <summary>
+/// На правке примечание показывается значением: за этот день оно уже записано, и пользователь
+/// правит его, а не сверяется с прошлым разом.
+/// </summary>
+[Fact]
+public async Task ПравкаДня_ПримечаниеГрузитсяЗначением()
+{
+    using var database = new TemporaryDatabase();
+    var day = new DateOnly(2026, 10, 5);
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var session = new TrainingSession { Date = day, PlanId = plan.Id, PlanName = plan.Name };
+    session.AddExercise(plan.Exercises[0], "колени побаливали").AddSet(8, 60m);
+
+    await database.SessionRepository.AddAsync(session);
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, day);
+
+    var row = viewModel.Current!;
+
+    Assert.Equal("колени побаливали", row.NoteText);
+    Assert.Equal(string.Empty, row.NotePlaceholder);
+    Assert.True(row.HasNote);
+    Assert.False(row.HasNotePlaceholder);
+
+    // И надпись не горит: загруженное значение — это то, что лежит в базе.
+    Assert.False(viewModel.HasUnsavedChanges);
+}
+
+/// <summary>
+/// Правка одного примечания — это изменение дня: надпись обязана гореть, и гаснуть, когда
+/// значение вернули к базовому.
+/// </summary>
+[Fact]
+public async Task Надпись_ПравкаПримечания_ГоритИГаснет()
+{
+    using var database = new TemporaryDatabase();
+    var day = new DateOnly(2026, 10, 5);
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var viewModel = await CreateReadyToSaveAsync(database, day, plan);
+
+    viewModel.Current!.NoteText = "колени побаливали";
+    Assert.True(viewModel.HasUnsavedChanges);
+
+    await viewModel.SaveCommand.ExecuteAsync(null);
+
+    Assert.False(viewModel.HasUnsavedChanges);
+
+    viewModel.Current!.NoteText = "колени побаливали сильнее";
+    Assert.True(viewModel.HasUnsavedChanges);
+
+    viewModel.Current!.NoteText = "колени побаливали";
+    Assert.False(viewModel.HasUnsavedChanges);
+}
+
+/// <summary>
+/// Примечание лежит на строке упражнения, а не в подходе, поэтому модель обязана слушать и
+/// строку. Без подписки WPF держала бы активность кнопки до <c>CanExecuteChanged</c>, и нажатие
+/// молча ничего бы не сделало.
+/// </summary>
+[Fact]
+public async Task ПравкаПримечания_ОбновляетАктивностьСохранения()
+{
+    using var database = new TemporaryDatabase();
+    var day = new DateOnly(2026, 10, 5);
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var viewModel = await CreateInitializedAsync(database);
+    await LoadDayAsync(viewModel, day);
+
+    viewModel.SelectedPlan = plan;
+
+    Assert.False(viewModel.SaveAndCloseCommand.CanExecute(null));
+
+    var raised = 0;
+    viewModel.SaveAndCloseCommand.CanExecuteChanged += (_, _) => raised++;
+
+    viewModel.Current!.NoteText = "не делал, спина";
+
+    Assert.True(raised > 0);
+    Assert.True(viewModel.SaveAndCloseCommand.CanExecute(null));
+}
+
+/// <summary>
+/// Подсказка гаснет, как только пользователь начал набирать: под введённым текстом она только
+/// мешала бы. Стирание возвращает её обратно, как в html-поле.
+/// </summary>
+[Fact]
+public void ПлейсхолдерПримечания_ГаснетПослеВвода()
+{
+    var row = PlanExerciseViewModel.Create(new Exercise { Name = "Приседание" }, 1);
+
+    row.NotePlaceholder = "болело левое плечо";
+
+    Assert.True(row.HasNotePlaceholder);
+
+    row.NoteText = "не болело";
+
+    Assert.False(row.HasNotePlaceholder);
+    Assert.True(row.HasNote);
+
+    row.NoteText = string.Empty;
+
+    Assert.True(row.HasNotePlaceholder);
+    Assert.False(row.HasNote);
+}
+
+/// <summary>
+/// Пробелы по краям не считаются различием: иначе надпись горела бы на поле, которое
+/// сохранилось бы ровно тем же, что лежит в базе.
+/// </summary>
+[Fact]
+public void Differs_Примечание_ЛовитРазницуИПрощаетПробелы()
+{
+    var saved = SessionWithNote("Ноги", "колени побаливали");
+    var current = SessionWithNote("Ноги", "колени побаливали сильнее");
+
+    Assert.True(AddDayViewModel.Differs(saved, current));
+    Assert.False(AddDayViewModel.Differs(saved, SessionWithNote("Ноги", "колени побаливали")));
+    Assert.False(AddDayViewModel.Differs(saved, SessionWithNote("Ноги", " колени побаливали ")));
+}
+
+/// <summary>
+/// Смена плана переписывает состав дня вместе с примечаниями — иначе примечание от упражнения
+/// чужого плана уехало бы в запись нового.
+/// </summary>
+[Fact]
+public async Task СменаПлана_ЧиститПримечание()
+{
+    using var database = new TemporaryDatabase();
+    await CreatePlanAsync(database, "Ноги", "Приседание");
+    await CreatePlanAsync(database, "Верх", "Жим лёжа");
+
+    var viewModel = await CreateInitializedAsync(database);
+
+    viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Ноги");
+    viewModel.Current!.NoteText = "колени побаливали";
+
+    viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Верх");
+
+    Assert.Equal(string.Empty, Assert.Single(viewModel.Exercises).NoteText);
+    Assert.False(Assert.Single(viewModel.Exercises).HasNote);
+}
+
+/// <summary>
+/// Два индикатора в шапке примечания зажигаются взаимно исключительно. В самой разметке этого
+/// не проверить, а столкнуться они могут только из-за ломаной привязки: пока упражнение не
+/// выбрано, путь через Current не разрешается, привязка отдаёт Visible, и горят оба сразу.
+/// </summary>
+[Fact]
+public void Индикаторы_НеЗажигаютсяОдновременно()
+{
+    var row = PlanExerciseViewModel.Create(new Exercise { Name = "Приседание" }, 1);
+
+    Assert.False(row.HasNote);
+    Assert.False(row.HasNotePlaceholder);
+
+    row.NotePlaceholder = "болело левое плечо";
+
+    Assert.False(row.HasNote);
+    Assert.True(row.HasNotePlaceholder);
+
+    row.NoteText = "не болело";
+
+    Assert.True(row.HasNote);
+    Assert.False(row.HasNotePlaceholder);
+
+    // Пробелы примечанием не считаются, но поле ими заполнено — подсказка гаснет.
+    row.NoteText = "   ";
+
+    Assert.False(row.HasNote);
+    Assert.False(row.HasNotePlaceholder);
+}
+
+/// <summary>
+/// Блок примечания скрыт, пока упражнения нет: показывать поле там, где некому его заполнить,
+/// незачем. Показ привязан к HasCurrent, а не к Current, — иначе ломаная привязка оставила бы
+/// элемент видимым (ловушка 43).
+/// </summary>
+[Fact]
+public async Task БезПлана_УпражненияНет_ИПримечаниеСкрыто()
+{
+    using var database = new TemporaryDatabase();
+    await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var viewModel = await CreateInitializedAsync(database);
+
+    Assert.Null(viewModel.Current);
+    Assert.False(viewModel.HasCurrent);
+
+    viewModel.SelectedPlan = Assert.Single(viewModel.Plans);
+
+    Assert.NotNull(viewModel.Current);
+    Assert.True(viewModel.HasCurrent);
+
+    await SettleAsync();
+
+    viewModel.SelectedPlan = null;
+
+    Assert.False(viewModel.HasCurrent);
+}
+
+/// <summary>
+/// Признак обязан уведомляться в общей точке пересчёта: уведомления на сеттере индекса не
+/// поднимается — при смене плана индекс и так ноль, а блок примечания остался бы скрытым.
+/// </summary>
+[Fact]
+public async Task СменаПлана_СообщаетОНаличииУпражнения()
+{
+    using var database = new TemporaryDatabase();
+    await CreatePlanAsync(database, "Ноги", "Приседание", "Жим");
+
+    var viewModel = await CreateInitializedAsync(database);
+    var notifications = TrackNotifications(viewModel);
+
+    viewModel.SelectedPlan = Assert.Single(viewModel.Plans);
+
+    Assert.Contains(nameof(AddDayViewModel.HasCurrent), notifications);
+    Assert.True(viewModel.HasCurrent);
+}
+
+/// <summary>
+/// Запись с одним упражнением и примечанием — для правила сравнения.
+/// </summary>
+private static TrainingSession SessionWithNote(string planName, string? note)
+{
+    var session = new TrainingSession { PlanName = planName };
+    var entry = session.AddExercise("Приседание");
+
+    entry.Notes = note;
+    entry.AddSet(8, 60m);
+
+    return session;
+}
+
 private static TrainingSession Session(string planName, params (string Exercise, int Repetitions, decimal Weight)[] sets)
 {
     var session = new TrainingSession { PlanName = planName };

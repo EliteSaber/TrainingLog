@@ -254,7 +254,7 @@ public sealed partial class AddDayViewModel : ObservableObject
             var current = BuildSession(plan);
 
             return current is null
-                ? Exercises.Any(row => row.Sets.Any(set => set.HasData))
+                ? Exercises.Any(row => row.HasData)
                 : Differs(_savedSnapshot, current);
         }
     }
@@ -268,6 +268,22 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// <summary>Активное упражнение: его подходы показаны в центре окна.</summary>
     public PlanExerciseViewModel? Current =>
         CurrentIndex >= 0 && CurrentIndex < Exercises.Count ? Exercises[CurrentIndex] : null;
+
+    /// <summary>
+    /// Есть ли активное упражнение.
+    /// </summary>
+    /// <remarks>
+    /// Отдельное свойство, а не вычисление в разметке, и это не удобство: привязка индикации
+    /// идёт через <see cref="Current"/>, который до выбора плана равен <c>null</c>, и тогда
+    /// путь не разрешается — привязка отдаёт значение по умолчанию целевого свойства, а у
+    /// <c>Visibility</c> это <c>Visible</c> (ловушка 43). Здесь источник непустой, и обычная
+    /// привязка через конвертер снова законна.
+    ///
+    /// Уведомляется в <see cref="Refresh"/> рядом с <see cref="Current"/>: это единственная
+    /// общая точка, где меняется текущее упражнение, и уведомление на сеттере индекса не
+    /// поднялось бы — при смене плана индекс и так ноль.
+    /// </remarks>
+    public bool HasCurrent => Current is not null;
 
     /// <summary>
     /// Заголовок окна: на добавление или на правку — по тому, есть ли уже запись за дату.
@@ -471,7 +487,8 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// <remarks>
     /// Веса становятся значениями, повторения — подсказками: подходы одного упражнения
     /// отличаются повторениями гораздо чаще, чем весом, и молчаливая подстановка прошлого
-    /// числа записала бы в журнал то, чего в этот раз не делали.
+    /// числа записала бы в журнал то, чего в этот раз не делали. Примечание прошлого дня — тоже
+    /// подсказкой, по той же причине и вместе с повторениями.
     ///
     /// Наполнение идёт под <c>_isApplyingSets</c>: иначе надпись «Не сохранён» мигала бы на
     /// каждом подходе по ходу заполнения. Дата источника ставится после наполнения, чтобы
@@ -491,6 +508,12 @@ public sealed partial class AddDayViewModel : ObservableObject
                 var entry = previous.Exercises.SingleOrDefault(item => item.ExerciseId == row.Exercise.Id);
 
                 row.Sets.Clear();
+
+                // Примечание подтягивается подсказкой и всегда с нуля: в форме его ещё нет,
+                // а оставлять прежнее значение у упражнения, которое в прошлый раз не делали,
+                // значило бы показать подсказку от чужого упражнения.
+                row.NoteText = string.Empty;
+                row.NotePlaceholder = entry?.Notes ?? string.Empty;
 
                 if (entry is not null)
                 {
@@ -558,6 +581,11 @@ public sealed partial class AddDayViewModel : ObservableObject
             var entry = stored?.Exercises.SingleOrDefault(item => item.ExerciseId == row.Exercise.Id);
 
             row.Sets.Clear();
+
+            // Примечание здесь — значение, а не подсказка: показывается то, что записано за
+            // этот день, и пользователь правит его, а не сверяется с прошлым разом.
+            row.NoteText = entry?.Notes ?? string.Empty;
+            row.NotePlaceholder = string.Empty;
 
             if (entry is not null)
             {
@@ -680,7 +708,8 @@ public sealed partial class AddDayViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Подписывает состав на изменения: появление и исчезновение подходов, а также ввод в них.
+    /// Подписывает состав на изменения: появление и исчезновение подходов, ввод в них и
+    /// правку примечания.
     /// </summary>
     /// <remarks>
     /// Подписка на все упражнения, а не на видимое, и это не разница в оптимизации. Снимок и
@@ -694,11 +723,15 @@ public sealed partial class AddDayViewModel : ObservableObject
     ///
     /// Отписка снимает и подписки на подходы: у строк свой состав, и на новый набор они
     /// навешиваются заново.
+    ///
+    /// Подписка на саму строку нужна ради примечания: оно лежит не в подходе, и без неё правка
+    /// примечания молча не обновила бы ни надпись, ни активность кнопок сохранения.
     /// </remarks>
     private void SubscribeToRows()
     {
         foreach (var row in Exercises)
         {
+            row.PropertyChanged += OnRowPropertyChanged;
             row.Sets.CollectionChanged += OnSetsCollectionChanged;
 
             foreach (var set in row.Sets)
@@ -715,6 +748,7 @@ public sealed partial class AddDayViewModel : ObservableObject
     {
         foreach (var row in Exercises)
         {
+            row.PropertyChanged -= OnRowPropertyChanged;
             row.Sets.CollectionChanged -= OnSetsCollectionChanged;
 
             foreach (var set in row.Sets)
@@ -756,6 +790,28 @@ public sealed partial class AddDayViewModel : ObservableObject
     private void OnSetPropertyChanged(object? sender, PropertyChangedEventArgs e) => Refresh();
 
     /// <summary>
+    /// Правка примечания пересчитывает окно целиком.
+    /// </summary>
+    /// <remarks>
+    /// По списку свойств, а не безусловно — единственное место в окне, где так. У строки
+    /// упражнения есть <c>IsSelected</c>, и его пишет сам <see cref="Refresh"/>: безусловная
+    /// реакция гоняла бы пересчёт вхолостую по кругу, Refresh → IsSelected → Refresh.
+    ///
+    /// У подходов такой проблемы нет — их свойства никто извне не пишет, поэтому
+    /// <see cref="OnSetPropertyChanged"/> реагирует на всё подряд и забыть новое поле не может.
+    /// Здесь перечислены оба поля примечания, и это список исчерпывающий: третьего текстового
+    /// поля у упражнения нет.
+    /// </remarks>
+    private void OnRowPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(PlanExerciseViewModel.NoteText)
+            or nameof(PlanExerciseViewModel.NotePlaceholder))
+        {
+            Refresh();
+        }
+    }
+
+    /// <summary>
     /// Приводит окно в согласованное состояние: текущее упражнение, отметки активности,
     /// подписки на ввод и активность команд.
     /// </summary>
@@ -769,7 +825,9 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// подходов остаётся пустой, пока пользователь не переключит упражнение кнопкой.
     ///
     /// Через <see cref="Refresh"/> проходят все изменения состава и набора подходов, поэтому
-    /// уведомление о текущем упражнении нельзя забыть в будущей правке.
+    /// уведомление о текущем упражнении нельзя забыть в будущей правке. Рядом с ним уведомляется
+    /// и <see cref="HasCurrent"/> — иначе блок примечания остался бы скрытым после выбора плана,
+    /// потому что поднять это уведомление больше негде.
     ///
     /// Подписки на состав идут в <see cref="SubscribeToRows"/>, а не здесь: Refresh зовётся
     /// часто, и навешивать подписки в нём значило бы каждый раз пересоздавать их заново.
@@ -782,6 +840,7 @@ public sealed partial class AddDayViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(Current));
+        OnPropertyChanged(nameof(HasCurrent));
 
         AddSetCommand.NotifyCanExecuteChanged();
         RemoveSetCommand.NotifyCanExecuteChanged();
@@ -916,10 +975,13 @@ PreviousCommand.NotifyCanExecuteChanged();
     /// должен сохраняться, а проверка сравнения с прошлой редакцией потребовала бы хранить
     /// снимок исходных значений. Вместо этого проверяется пригодность: пустой день сохранять
     /// нечего, а негодный текст в поле разбирать нечем.
+    ///
+    /// Упражнение с одним примечанием и без подходов день наполняет — по тому же решению, что и
+    /// <see cref="BuildSession"/>: кнопка не должна быть серой при содержимом, которое сохранится.
     /// </remarks>
     private bool CanAccept() =>
         SelectedPlan is not null
-        && Exercises.Any(row => row.Sets.Any(set => set.HasData))
+        && Exercises.Any(row => row.HasData)
         && Exercises.All(row => row.Sets.All(set => set.IsValid));
 
     /// <summary>
@@ -1075,8 +1137,31 @@ PreviousCommand.NotifyCanExecuteChanged();
             return false;
         }
 
+        // Примечание сравнивается нормализованным — тем же, что уходит в базу. Без этого
+        // пробелы по краям, оставшиеся в записи от прежней редакции, горели бы надписью
+        // «Не сохранено» на ненабранном поле.
+        if (NormalizeNote(saved.Notes) != NormalizeNote(current.Notes))
+        {
+            return false;
+        }
+
         return saved.Sets.Count == current.Sets.Count
             && saved.Sets.Zip(current.Sets, SetsEqual).All(equal => equal);
+    }
+
+    /// <summary>
+    /// Приводит примечание к сравнимому виду: края срезаны, пустое — <c>null</c>.
+    /// </summary>
+    /// <remarks>
+    /// Одна функция на запись и на сравнение, и это обязательно: обе стороны должны решать
+    /// «пусто или нет» одинаково, иначе надпись горела бы на поле, которое сохранилось бы
+    /// ровно тем же, что лежит в базе.
+    /// </remarks>
+    private static string? NormalizeNote(string? note)
+    {
+        var trimmed = note?.Trim();
+
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 
     private static bool SetsEqual(TrainingSet saved, TrainingSet current) =>
@@ -1088,9 +1173,15 @@ PreviousCommand.NotifyCanExecuteChanged();
     /// Собирает запись дня из введённых подходов.
     /// </summary>
     /// <remarks>
-    /// Упражнение без введённых подходов в запись не попадает: план выполнен не целиком,
-    /// а невыполненные упражнения в журнале только шумят. Идентификатор упражнения ставится
-    /// рядом с копией названия, чтобы запись знала и справочник, и своё название.
+    /// Упражнение без введённых подходов и без примечания в запись не попадает: план выполнен
+    /// не целиком, а невыполненные упражнения в журнале только шумят. Примечание — исключение,
+    /// и оно осознанное: упражнение, к которому записали только примечание, выбросить из записи
+    /// хуже, чем показать лишнее. Идентификатор упражнения ставится рядом с копией названия,
+    /// чтобы запись знала и справочник, и своё название.
+    ///
+    /// Примечание нормализуется: края срезаются, а пустое или из одних пробелов становится
+    /// <c>null</c>. Без этого пробелы, оставшиеся от стирания, считались бы примечанием, и
+    /// надпись о несохранённом горела бы на пустом поле.
     /// </remarks>
     /// <returns><c>null</c>, если сохранять нечего.</returns>
     private TrainingSession? BuildSession(TrainingPlan plan)
@@ -1107,7 +1198,7 @@ PreviousCommand.NotifyCanExecuteChanged();
         {
             var sets = row.Sets.Where(set => set.HasData).ToList();
 
-            if (sets.Count == 0)
+            if (sets.Count == 0 && !row.HasNote)
             {
                 continue;
             }
@@ -1116,6 +1207,7 @@ PreviousCommand.NotifyCanExecuteChanged();
             {
                 ExerciseId = row.Exercise.Id,
                 ExerciseName = row.Name,
+                Notes = NormalizeNote(row.NoteText),
             };
 
             foreach (var set in sets)
