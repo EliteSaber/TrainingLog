@@ -19,7 +19,18 @@ public sealed class PopupPlacementTests
     /// </summary>
     private static readonly Rect Field = new(687, 16, 52, 22);
 
-    private static readonly Rect Window = new(16, 16, 868, 488);
+    /// <summary>
+    /// Содержимое главного окна в координатах окна: клиентская область без заголовка и рамок.
+    /// </summary>
+    /// <remarks>
+    /// Начало не в нуле — рамка и заголовок сдвигают содержимое вниз и вправо, и именно поэтому
+    /// пределы нельзя брать у <c>Window.ActualHeight</c>: это размер окна целиком, и подсказка по
+    /// нему уезжала за нижнюю границу окна.
+    /// </remarks>
+    private static readonly Rect Content = new(0, 0, 900, 520);
+
+    /// <summary>Рабочая область: содержимое окна минус отступ 16 по краям.</summary>
+    private static readonly Rect Window = PopupPlacement.WorkArea(Content, inset: 16);
 
     /// <summary>Подсказка шире поля, но заметно уже окна.</summary>
     private static readonly Size Hint = new(270, 40);
@@ -218,6 +229,84 @@ public sealed class PopupPlacementTests
         Assert.Equal(target.Left + (target.Width / 2), placement.X + (width / 2));
         Assert.True(placement.X >= Window.Left);
         Assert.True(placement.X + width <= Window.Right);
+    }
+
+    /// <summary>
+    /// Предел высоты — это окно минус зазор до поля и минус собственные поля блока. Проверяется
+    /// числом, а не «помещается ли»: смысл предела ровно в этом равенстве.
+    /// </summary>
+    [Fact]
+    public void ResolveMaxHeight_ОтнимаетЗазорИПоляБлока()
+    {
+        var chrome = 16;
+
+        var height = PopupPlacement.ResolveMaxHeight(Window, Gap, chrome);
+
+        Assert.Equal(Window.Height - Gap - chrome, height);
+    }
+
+    /// <summary>
+    /// Смысл предела высоты: с блоком такой высоты правило положения влезает в окно целиком,
+    /// то есть нижний край подсказки не уезжает за границу. Без предела блок длиннее окна и
+    /// правило прижимает его к верхнему краю — с уходом низа за окно.
+    /// </summary>
+    [Fact]
+    public void ResolveMaxHeight_ПредельныйРазмер_БлокВлезаетВОкно()
+    {
+        var chrome = 16;
+        var height = PopupPlacement.ResolveMaxHeight(Window, Gap, chrome);
+
+        var placement = PopupPlacement.Resolve(Field, new Size(Hint.Width, height), Window, Gap);
+
+        Assert.True(placement.Y >= Window.Top);
+        Assert.True(placement.Y + height <= Window.Bottom);
+    }
+
+    /// <summary>
+    /// Окно меньше самой подсказки с её полями: правило возвращает ноль, а не отрицательный
+    /// предел, который в разметку не поставить.
+    /// </summary>
+    [Fact]
+    public void ResolveMaxHeight_ОкноМеньшеПодсказки_Ноль()
+    {
+        Assert.Equal(0, PopupPlacement.ResolveMaxHeight(Window, Gap, chrome: 600));
+    }
+
+    /// <summary>
+    /// Отступ отступом: рабочая область начинается на отступ внутрь содержимого по каждой оси, и
+    /// её размер меньше размера содержимого вдвое по отступу. Начало не в нуле — содержимое сдвинуто
+    /// рамкой и заголовком, и этот сдвиг обязан сохраниться.
+    /// </summary>
+    [Fact]
+    public void WorkArea_ОтступСоВсехСторон_НачалоСодержимогоСохраняется()
+    {
+        Assert.Equal(new Rect(16, 16, 868, 488), PopupPlacement.WorkArea(Content, inset: 16));
+    }
+
+    /// <summary>
+    /// Смысл правила: нижняя граница рабочей области — это нижняя граница содержимого окна, а не
+    /// окна. Иначе правило положения прижимает подсказку к низу окна вместе с заголовком и рамкой,
+    /// то есть рисует её за пределами окна.
+    /// </summary>
+    [Fact]
+    public void WorkArea_ПределСодержимого_НеЗаходитНаЗаголовок()
+    {
+        var workArea = PopupPlacement.WorkArea(Content, inset: 16);
+
+        Assert.Equal(Content.Height - 32, workArea.Height);
+        Assert.True(workArea.Bottom <= Content.Bottom);
+    }
+
+    /// <summary>
+    /// Отступ, съедающий содержимое, даёт точку, а не перевёрнутый прямоугольник: правило положения
+    /// всё равно прижмёт блок к краю, и отрицательные размеры испортили бы только сдвиг.
+    /// </summary>
+    [Fact]
+    public void WorkArea_ОтступБольшеСодержимого_Точка()
+    {
+        var workArea = PopupPlacement.WorkArea(new Rect(0, 0, 20, 20), inset: 40);
+
+        Assert.Equal(new Rect(40, 40, 0, 0), workArea);
     }
 
     /// <summary>

@@ -1,14 +1,22 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
+using TrainingLog.ViewModels;
 
 namespace TrainingLog.Controls;
 
 /// <summary>
-/// Всплывающая подсказка об отказе по вводу: показывает текст под указанным элементом, живёт
-/// несколько секунд и закрывается крестиком, нажатием снаружи или сама.
+/// Всплывающая подсказка окна: показывает текст под указанным элементом, живёт заданное время и
+/// закрывается крестиком, нажатием снаружи или сама.
 /// </summary>
+/// <remarks>
+/// Показывается ею и отказ по вводу, и примечание упражнения — различаются тон и срок жизни, их
+/// задаёт модель (<see cref="HintState.Kind"/> и <see cref="HintState.Lifetime"/>), а рисует их
+/// контрол. Вид, поведение при закрытии и правило позиционирования общие, иначе подсказки
+/// разъедутся при первом же копировании.
+/// </remarks>
 /// <remarks>
 /// Один контрол на все окна: вид, срок жизни и поведение при закрытии должны быть одинаковыми, и
 /// расходятся они дальше только потому, что оказалось скопировано. Правило позиционирования — в
@@ -20,11 +28,6 @@ namespace TrainingLog.Controls;
 /// </remarks>
 public partial class StatusHint : UserControl
 {
-    /// <summary>
-    /// Сколько живёт подсказка, пока её не закрыли крестиком или нажатием снаружи.
-    /// </summary>
-    private static readonly TimeSpan Lifetime = TimeSpan.FromSeconds(5);
-
     /// <summary>
     /// Высота рисунка стрелки, указывающей на поле. Рисунок 18×9.
     /// </summary>
@@ -102,8 +105,8 @@ public partial class StatusHint : UserControl
     private const double Gap = ArrowHeight - ArrowTipOverlap - 1;
 
     /// <summary>
-    /// Отступ подсказки от границы окна. Тот же, что <c>Margin="16"</c> у корневой сетки окна:
-    /// подсказка примыкает к содержимому по той же линии, что и всё остальное в шапке.
+    /// Отступ подсказки от границы содержимого окна. Тот же, что <c>Margin="16"</c> у корневой
+    /// сетки окна: подсказка примыкает к содержимому по той же линии, что и всё остальное в шапке.
     /// </summary>
     private const double Inset = 16;
 
@@ -134,6 +137,35 @@ public partial class StatusHint : UserControl
         new PropertyMetadata(string.Empty, OnTextChanged));
 
     /// <summary>
+    /// Вид показа: отказ по вводу или примечание упражнения.
+    /// </summary>
+    /// <remarks>
+    /// Задаёт тон текста и крестика. Примечание — спокойное сообщение, а не отказ, поэтому оно
+    /// рисуется обычным цветом текста окна; красным показывают только то, что пользователь
+    /// сделал не так.
+    /// </remarks>
+    public static readonly DependencyProperty KindProperty = DependencyProperty.Register(
+        nameof(Kind),
+        typeof(HintState.HintKind),
+        typeof(StatusHint),
+        new PropertyMetadata(HintState.HintKind.Rejection, OnKindChanged));
+
+    /// <summary>
+    /// Сколько живёт подсказка, пока её не закрыли крестиком или нажатием снаружи.
+    /// </summary>
+    /// <remarks>
+    /// Значение по умолчанию — срок отказа по вводу; примечание приходит со своим и держится
+    /// подольше. Задаёт модель: это её решение, а не свойство окна (см. <see cref="HintState"/>).
+    /// Применяется к таймеру и здесь, и при каждом запуске отсчёта: показать одну и ту же
+    /// подсказку дважды можно с разным сроком, и таймер обязан считать по последнему.
+    /// </remarks>
+    public static readonly DependencyProperty LifetimeProperty = DependencyProperty.Register(
+        nameof(Lifetime),
+        typeof(TimeSpan),
+        typeof(StatusHint),
+        new PropertyMetadata(HintState.RejectionLifetime, OnLifetimeChanged));
+
+    /// <summary>
     /// Показана ли подсказка. Привязывается односторонне: показом ведёт модель, а окно
     /// подсказки само модель не трогает.
     /// </summary>
@@ -150,11 +182,16 @@ public partial class StatusHint : UserControl
     /// Задаётся окном: у полей внутри <c>DataTemplate</c> нет имени, на которое можно сослаться
     /// в разметке, зато у события отказа по вводу есть <c>Source</c> — то есть сам отказавшее
     /// поле. Без якоря показывать нечего, и подсказка не показывается вовсе.
+    ///
+    /// **Привязкой на этом свойстве заниматься нельзя:** окно переставляет якорь с отказа на
+    /// примечание и обратно, а локальное присваивание заменяет привязку навсегда — ровно то,
+    /// из-за чего страдало поведение <c>ScrollBarGutter</c> (ловушка 11).
     /// </remarks>
     public static readonly DependencyProperty TargetProperty = DependencyProperty.Register(
         nameof(Target),
         typeof(FrameworkElement),
-        typeof(StatusHint));
+        typeof(StatusHint),
+        new PropertyMetadata(null, OnTargetChanged));
 
     /// <summary>
     /// Команда гашения показа: её зовут крестик, таймер и нажатие снаружи.
@@ -185,6 +222,20 @@ public partial class StatusHint : UserControl
     {
         get => (string)GetValue(TextProperty);
         set => SetValue(TextProperty, value);
+    }
+
+    /// <summary>Вид показа: отказ по вводу или примечание упражнения.</summary>
+    public HintState.HintKind Kind
+    {
+        get => (HintState.HintKind)GetValue(KindProperty);
+        set => SetValue(KindProperty, value);
+    }
+
+    /// <summary>Сколько живёт подсказка.</summary>
+    public TimeSpan Lifetime
+    {
+        get => (TimeSpan)GetValue(LifetimeProperty);
+        set => SetValue(LifetimeProperty, value);
     }
 
     /// <summary>Показана ли подсказка.</summary>
@@ -223,7 +274,9 @@ public partial class StatusHint : UserControl
     /// уведомления об изменении состояния не будет, и отсчёт, начатый на первом отказе, истёк бы
     /// на середине набора.
     ///
-    /// Перестановки здесь нет: она идёт из смены текста, а якорь окно задаёт каждый раз заново.
+    /// Интервал ставится здесь, а не только в обработчике изменения срока: тот успевает сработать
+    /// при смене срока у уже висящей подсказки, но не при первом показе — тогда таймер создан с
+    /// интервалом по умолчанию. Число одно и то же в обоих местах задаёт модель.
     /// </remarks>
     public void RestartCountdown()
     {
@@ -233,6 +286,7 @@ public partial class StatusHint : UserControl
         }
 
         _timer.Stop();
+        _timer.Interval = Lifetime;
         _timer.Start();
     }
 
@@ -241,6 +295,45 @@ public partial class StatusHint : UserControl
         if (d is StatusHint hint)
         {
             hint.OnVisibilityChanged();
+        }
+    }
+
+    /// <summary>
+    /// Вид показа сменился, пока подсказка на экране: перекрасить её. Позицию и отсчёт не трогаем:
+    /// ни размер, ни положение от тона не зависят.
+    /// </summary>
+    private static void OnKindChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is StatusHint hint && hint.IsOpen)
+        {
+            hint.SyncHint();
+        }
+    }
+
+    /// <summary>
+    /// Срок жизни сменился, пока подсказка на экране: отсчёт продолжает идти по старому, поэтому
+    /// перезапускаем его по новому.
+    /// </summary>
+    private static void OnLifetimeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is StatusHint hint)
+        {
+            hint.RestartCountdown();
+        }
+    }
+
+    /// <summary>
+    /// Якорь сменился, пока подсказка на экране: переставить её под новый элемент.
+    /// </summary>
+    /// <remarks>
+    /// Без этого подсказка осталась бы под прежним якорем: показать два примечания с одинаковым
+    /// текстом состояние не меняет, а переставляет подсказку только смена текста.
+    /// </remarks>
+    private static void OnTargetChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is StatusHint hint && hint.IsOpen)
+        {
+            hint.Place();
         }
     }
 
@@ -275,6 +368,14 @@ public partial class StatusHint : UserControl
         HintText.Text = Text;
         HintButton.Command = DismissCommand;
 
+        var accent = Accent(Kind);
+
+        // Тон задаётся и надписи, и крестику: они означают одно и то же, и разъезжаться не
+        // должны. Присваиванием, а не привязкой к кисти ресурса: вид показа сменился, а ресурс
+        // с тем же ключом остался бы прежним.
+        HintText.Foreground = accent;
+        HintCross.Fill = accent;
+
         var visibility = IsOpen ? Visibility.Visible : Visibility.Collapsed;
 
         // Collapsed, а не Hidden: скрытая подсказка не рисуется, но всё ещё ловит наведение и
@@ -285,6 +386,18 @@ public partial class StatusHint : UserControl
         // она осталась бы висеть одна, без подсказки, которую она указывает.
         HintArrow.Visibility = visibility;
     }
+
+    /// <summary>
+    /// Тон подсказки по виду показа: отказ — предупреждающим цветом, примечание — обычным цветом
+    /// текста окна.
+    /// </summary>
+    /// <remarks>
+    /// Цвет отказа взят напрямую, а цвет текста — системной кистью: тот же, что у подписей
+    /// «Вес» и «Повторения» в строке журнала, поэтому примечание читается как часть таблицы, а
+    /// в тёмной теме не становится тёмным пятном на светлой подложке.
+    /// </remarks>
+    private static SolidColorBrush Accent(HintState.HintKind kind) =>
+        kind == HintState.HintKind.Note ? SystemColors.ControlTextBrush : Brushes.Firebrick;
 
     /// <summary>
     /// Показ включился — ставим подсказку, запускаем отсчёт и слежение за окном; выключился —
@@ -331,16 +444,40 @@ public partial class StatusHint : UserControl
     /// Координаты цели берутся <c>TranslatePoint</c> относительно окна, а не обходом визуального
     /// дерева: у содержимого, завёрнутого в <c>ScrollContentPresenter</c>, визуальным родителем
     /// является не то, что кажется (ловушка 11).
+    ///
+    /// Кроме ширины считается и предел высоты: правило сдвигает блок вверх ровно на свой выход,
+    /// а блок длиннее окна сдвинуть некуда, и текст уходит за нижний край. Предел ставится до
+    /// измерения, потому что иначе меряется неограниченный текст (см.
+    /// <see cref="PopupPlacement.ResolveMaxHeight"/>).
+    ///
+    /// Якоря на экране больше нет — подсказка гаснет. Пока подсказка висит, журнал может
+    /// перечитаться (правка дня, «Применить»), а строки дней пересоздаются вместе с кнопками
+    /// примечаний. Отсоединённый элемент координат не отдаёт: <c>TranslatePoint</c> вернул бы
+    /// точку отсчёта, и подсказка уехала бы в угол окна на весь оставшийся срок.
     /// </remarks>
     private void Place()
     {
-        if (Target is not { } target || Window.GetWindow(this) is not { } window || WindowBounds() is not { } bounds)
+        if (Target is not { IsLoaded: true } target || Window.GetWindow(this) is not { } window || WindowBounds() is not { } bounds)
         {
+            Dismiss();
+
             return;
         }
 
         var origin = target.TranslatePoint(new Point(0, 0), window);
         var anchor = new Rect(origin, new Size(target.ActualWidth, target.ActualHeight));
+
+        // Предел высоты ставится до первого измерения: иначе меряется неограниченный текст, и
+        // блок оказывается длиннее окна — правило положения сдвинет его вверх ровно на свой
+        // выход, то есть никуда, и низ уйдёт за нижнюю границу (ловушка 35 по вертикали).
+        //
+        // Предел достаётся содержимому, а не блоку: поля блока и так заняты, и передавать их
+        // размером блока было бы двойным счётом. Сами поля читаются из разметки, чтобы число не
+        // расходилось с ней.
+        HintTextScroll.MaxHeight = PopupPlacement.ResolveMaxHeight(
+            bounds,
+            Gap,
+            HintBlock.Padding.Top + HintBlock.Padding.Bottom);
 
         // Ширина задаётся явно, а не пределом — и это не stylistic, а требование: у предела
         // фактический размер может разойтись с измеренным (текст или предел успевают измениться
@@ -417,24 +554,37 @@ public partial class StatusHint : UserControl
     }
 
     /// <summary>
-    /// Пределы окна-владельца минус отступ: рабочая область, в которой подсказке положено
-    /// помещаться.
+    /// Пределы, в которых подсказке положено помещаться: содержимое окна-владельца минус отступ.
     /// </summary>
-    /// <returns><c>null</c>, если окна ещё нет.</returns>
+    /// <remarks>
+    /// Пределы берутся у <b>содержимого</b> окна, а не у самого окна, и на этом уже была ошибка:
+    /// <c>Window.ActualHeight</c> — размер окна целиком, с заголовком и рамками, а
+    /// <see cref="PopupPlacement.Resolve"/> прижимает нижнюю грань блока к нижней границе
+    /// пределов. По размеру окна это уводило подсказку на заголовок и рамки, то есть за пределы
+    /// окна: на коротком отказе по вводу не видно (он висит под полем и никогда не сдвигается
+    /// вверх), а на длинном примечании упражнения видно сразу — блок прижимается к низу и уезжает
+    /// под нижнюю границу.
+    ///
+    /// Содержимое и есть та область, в которой подсказка нарисована, и его начало приходится
+    /// переносить в координаты окна: рамка и заголовок сдвигают его вниз.
+    ///
+    /// У обоих окон приложения <c>Content</c> — корневая сетка, так что иначе и не бывает; на
+    /// случай, когда содержимого нет, правило то же, что при отсутствии окна, — возвращается
+    /// <c>null</c>, и <see cref="Place"/> гасит подсказку.
+    /// </remarks>
+    /// <returns><c>null</c>, если окна или его содержимого ещё нет.</returns>
     private Rect? WindowBounds()
     {
-        if (Window.GetWindow(this) is not { } window)
+        if (Window.GetWindow(this) is not { } window
+            || window.Content is not FrameworkElement content)
         {
             return null;
         }
 
-        var bounds = new Rect(new Size(window.ActualWidth, window.ActualHeight));
+        var origin = content.TranslatePoint(new Point(0, 0), window);
+        var bounds = new Rect(origin, new Size(content.ActualWidth, content.ActualHeight));
 
-        // Rect.Inflate двигает и сжимает прямоугольник одновременно, поэтому одним вызовом
-        // получается рабочая область, а не окно с полями по краям.
-        bounds.Inflate(-Inset, -Inset);
-
-        return bounds;
+        return PopupPlacement.WorkArea(bounds, Inset);
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using TrainingLog.Controls;
 using TrainingLog.ViewModels;
 
@@ -37,9 +38,14 @@ public partial class MainWindow : Window
     /// В поле количества дней введено или вставлено недопустимое.
     /// </summary>
     /// <remarks>
-    /// Всё остальное — текст подсказки, срок жизни, позиция и крестик — живёт в
-    /// <see cref="StatusHint"/> и в состоянии <c>Hint</c>. Здесь только команда: окно знает,
-    /// что отказ случился, а не как он выглядит.
+    /// Всё остальное — вид, текст, срок жизни, позиция и крестик — живёт в
+    /// <see cref="StatusHint"/> и в состоянии <c>Hint</c>. Здесь только якорь и команда: окно
+    /// знает, что отказ случился и от какого поля, а не как он выглядит.
+    ///
+    /// Якорь задаётся здесь, а не в разметке: подсказка общая у отказа и примечания, и якорь у
+    /// них разный. Задаётся до показа — подсказка позиционируется при появлении, и без цели она
+    /// бы не знала, под кем встать. Без этого примечание, показанное кнопкой «Показать»,
+    /// оставило бы отказ висеть под той же кнопкой.
     ///
     /// Отказ по вводу: показать объяснение и перезапустить отсчёт. Отсчёт явно, потому что
     /// повторный отказ даёт тот же текст и состояние подсказки не меняется, так что само по себе
@@ -49,6 +55,8 @@ public partial class MainWindow : Window
     {
         if (e is AllowedCharsInput.RejectedEventArgs rejected)
         {
+            InputHint.Target = DaysCountBox;
+
             _viewModel.Hint.ShowCommand.Execute(rejected.Message);
 
             InputHint.RestartCountdown();
@@ -72,6 +80,37 @@ public partial class MainWindow : Window
     {
         AllowedCharsInput.RemoveRejectedHandler(this, OnInputRejected);
         AllowedCharsInput.RemoveAcceptedHandler(this, OnInputAccepted);
+    }
+
+    /// <summary>
+    /// Нажата кнопка «Показать» у упражнения: показываем примечание той же подсказкой, что и
+    /// отказ по вводу, только обычным тоном и на тридцать секунд.
+    /// </summary>
+    /// <remarks>
+    /// Вид и срок задаёт модель (<see cref="HintState.ShowNoteCommand"/>), окно знает только
+    /// якорь: подсказка должна встать под нажатую кнопку, а имя у кнопок в строке данных
+    /// отсутствует — они создаются по составу упражнений.
+    ///
+    /// Якорь задаётся до показа: позиция считается в момент включения показа. Отсчёт
+    /// перезапускается явно — нажатие подряд по двум кнопкам с одинаковым текстом примечания не
+    /// меняет состояние, и подсказка погасла бы на середине срока.
+    ///
+    /// Пустой якорь или ячейка без примечания — не показываем ничего: так случиться не может
+    /// (кнопка свёрнута, когда примечания нет), но проверка стоит копейку и снимает вопрос «а
+    /// что показывает <c>null</c>».
+    /// </remarks>
+    private void OnShowNoteClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement button || button.DataContext is not DayExerciseCell { HasNote: true } exercise)
+        {
+            return;
+        }
+
+        InputHint.Target = button;
+
+        _viewModel.Hint.ShowNoteCommand.Execute(exercise.Note);
+
+        InputHint.RestartCountdown();
     }
 
     /// <summary>
@@ -124,12 +163,60 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.OriginalSource is DependencyObject source
-            && days.ContainerFromElement(source) is FrameworkElement { DataContext: DayRowViewModel day })
+        if (e.OriginalSource is not DependencyObject source
+            || days.ContainerFromElement(source) is not FrameworkElement { DataContext: DayRowViewModel day } container)
         {
-            _viewModel.EditDayCommand.Execute(day);
+            return;
         }
+
+        if (IsShowNoteButton(source, container))
+        {
+            return;
+        }
+
+        _viewModel.EditDayCommand.Execute(day);
     }
+
+    /// <summary>
+    /// Двойной клик пришёлся по кнопке «Показать» у упражнения, а не по самой строке.
+    /// </summary>
+    /// <remarks>
+    /// Два быстрых клика по «Показать» — обычный способ перечитать примечание, и правку дня они
+    /// открывать не должны. Проверка живёт здесь, а не гашением <c>MouseDoubleClick</c> на кнопке:
+    /// событие поднимается от элемента под указателем, и на самой кнопке помечать его оказалось
+    /// бесполезно — до списка дней оно доходило как ни в чём не бывало (ловушка 45).
+    ///
+    /// Обход идёт от элемента под указателем до контейнера строки: под указателем может лежать
+    /// <c>TextBlock</c> с надписью кнопки, а кнопка в строке дня одна, так что проверки
+    /// «есть ли кнопка на пути» достаточно — но и она сделана по данным ячейки, чтобы сработать
+    /// ровно на той кнопке, которая показывает примечание.
+    /// </remarks>
+    /// <param name="source">Элемент под указателем.</param>
+    /// <param name="container">Контейнер строки дня: обход идёт до него, не включая.</param>
+    private static bool IsShowNoteButton(DependencyObject source, DependencyObject container)
+    {
+        for (var element = source; element is not null && !ReferenceEquals(element, container); element = ParentOf(element))
+        {
+            if (element is Button { DataContext: DayExerciseCell { HasNote: true } })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Родитель элемента: визуальный для <see cref="Visual"/>, логический для прочего.
+    /// </summary>
+    /// <remarks>
+    /// Ветка для не-<see cref="Visual"/> нужна на всякий случай: <c>VisualTreeHelper</c> такой
+    /// элемент не берёт и бросает исключение, а источником события может оказаться любой элемент
+    /// под указателем. Обход вверх на глубине дерева строки дня стоит копейку, поэтому исключение
+    /// ловить нечем.
+    /// </remarks>
+    private static DependencyObject? ParentOf(DependencyObject element) =>
+        element is Visual ? VisualTreeHelper.GetParent(element) : LogicalTreeHelper.GetParent(element);
 
     /// <summary>
     /// Кладёт строку дня в открываемое меню: модель главного окна и параметр команды.

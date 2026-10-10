@@ -121,10 +121,58 @@ public sealed class HintStateTests
         Assert.True(hint.IsVisible);
     }
 
-    /// <summary>
-    /// Принятый ввод гасит подсказку, но не вычищает её текст: текст живёт до закрытия и убирается
-    /// по <see cref="HintState.ClearCommand"/>, как и при любом другом закрытии.
+/// <summary>
+    /// Примечание упражнения показывается той же подсказкой, но живёт дольше и выглядит иначе:
+    /// оба различия задаёт модель, поэтому проверяются здесь, а не в окне.
     /// </summary>
+    [Fact]
+    public void ShowNoteCommand_Примечание_ПоказываетТекстНаСвойСрок()
+    {
+        var hint = new HintState();
+
+        hint.ShowNoteCommand.Execute("Болело левое плечо");
+
+        Assert.True(hint.IsVisible);
+        Assert.Equal("Болело левое плечо", hint.Text);
+        Assert.Equal(HintState.HintKind.Note, hint.Kind);
+        Assert.Equal(TimeSpan.FromSeconds(30), hint.Lifetime);
+    }
+
+    /// <summary>
+    /// После показа примечания обычный отказ по вводу снова живёт пять секунд и выглядит как
+    /// отказ. Иначе отказ, случившийся следом, держался бы на срок примечания.
+    /// </summary>
+    [Fact]
+    public void ShowCommand_ПослеПоказаПримечания_ВозвращаетОтказПоВводу()
+    {
+        var hint = new HintState();
+        hint.ShowNoteCommand.Execute("Болело левое плечо");
+
+        hint.ShowCommand.Execute(Message);
+
+        Assert.Equal(HintState.HintKind.Rejection, hint.Kind);
+        Assert.Equal(TimeSpan.FromSeconds(5), hint.Lifetime);
+    }
+
+    /// <summary>
+    /// Срок и вид отказа задаются по умолчанию: окна зовут обычный показ и не должны сами помнить,
+    /// что подсказка до того показывала примечание.
+    /// </summary>
+    [Fact]
+    public void ShowCommand_ПодсказкиНеБыло_ОтказПоУмолчанию()
+    {
+        var hint = new HintState();
+
+        hint.ShowCommand.Execute(Message);
+
+        Assert.Equal(HintState.HintKind.Rejection, hint.Kind);
+        Assert.Equal(TimeSpan.FromSeconds(5), hint.Lifetime);
+    }
+
+    /// <summary>
+/// Принятый ввод гасит подсказку, но не вычищает её текст: текст живёт до закрытия и убирается
+/// по <see cref="HintState.ClearCommand"/>, как и при любом другом закрытии.
+/// </summary>
     [Fact]
     public void DismissCommand_ПослеПоказа_ГаситПоказИОставляетТекст()
     {

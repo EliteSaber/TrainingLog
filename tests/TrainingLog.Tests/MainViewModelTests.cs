@@ -4,9 +4,9 @@ using TrainingLog.ViewModels;
 namespace TrainingLog.Tests;
 
 /// <summary>
-/// Главное окно. Проверяются три вещи: отбор последних дней, применение количества дней
-/// кнопкой и строка дня — раскладка столбцов, от которой зависит, встанет ли вес над своим
-/// повторением.
+/// Главное окно. Проверяются четыре вещи: отбор последних дней, применение количества дней
+/// кнопкой, строка дня — раскладка столбцов, от которой зависит, встанет ли вес над своим
+/// повторением, — и примечание упражнения в этой строке.
 /// </summary>
 public sealed class MainViewModelTests
 {
@@ -235,6 +235,44 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
             .DateTimeFormat.GetAbbreviatedDayName(new DateOnly(2026, 10, 5).DayOfWeek);
 
         Assert.Equal($"05 октября 2026 ({abbreviated})", row.DateText);
+    }
+
+    /// <summary>
+    /// Примечание доходит до ячейки упражнения, а у упражнения без примечания показывать
+    /// нечего: вместо кнопки «Показать» в строке журнала стоит прочерк.
+    /// </summary>
+    [Fact]
+    public void DayRowViewModel_ПримечаниеУпражнения_ПопадаетВЯчейку()
+    {
+        var session = Session(new DateOnly(2026, 10, 5));
+
+        session.AddExercise("Жим").AddSet(5, 60m);
+        session.AddExercise("Приседание", "Болело левое плечо").AddSet(8, 70m);
+
+        var row = DayRowViewModel.Create(session);
+
+        var withoutNote = row.Exercises[0];
+        Assert.False(withoutNote.HasNote);
+        Assert.Null(withoutNote.Note);
+
+        var withNote = row.Exercises[1];
+        Assert.True(withNote.HasNote);
+        Assert.Equal("Болело левое плечо", withNote.Note);
+    }
+
+    /// <summary>
+    /// Примечание из одних пробелов примечанием не считается. В базу оно таким и не пишется
+    /// (<c>NormalizeNote</c>), но показывать «Показать» не о чем и при таком значении нельзя.
+    /// </summary>
+    [Fact]
+    public void DayRowViewModel_ПримечаниеИзПробелов_СчитаетсяОтсутствующим()
+    {
+        var session = Session(new DateOnly(2026, 10, 5));
+        session.AddExercise("Жим", "   ").AddSet(5, 60m);
+
+        var row = DayRowViewModel.Create(session);
+
+        Assert.False(Assert.Single(row.Exercises).HasNote);
     }
 
     /// <summary>
