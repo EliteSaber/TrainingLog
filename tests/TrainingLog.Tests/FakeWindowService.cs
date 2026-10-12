@@ -35,12 +35,37 @@ internal sealed class FakeWindowService : IWindowService
     /// <summary>Дата последней правки дня: какую запись открыли на правку.</summary>
     public DateOnly? LastEditDay { get; private set; }
 
+    /// <summary>Что <c>ShowSettings</c> вернёт вызывающему.</summary>
+    public bool SettingsResult { get; set; }
+
+    /// <summary>
+    /// Что сделает <c>ShowSettings</c>, если задано: обычное действие вызывающего из теста.
+    /// </summary>
+    /// <remarks>
+    /// Нужно, чтобы окно параметров записало в файл то, что потом перечитает главное окно:
+    /// проверяется ровно то, что перечитывание случается по файлу, а не по значению,
+    /// оставшемуся у модели.
+    /// </remarks>
+    public Action? OnSettings { get; set; }
+
+    /// <summary>Сколько раз открывали окно параметров.</summary>
+    public int SettingsCalls { get; private set; }
+
     public void OpenExercises()
     {
     }
 
     public void OpenPlans()
     {
+    }
+
+    public bool ShowSettings()
+    {
+        SettingsCalls++;
+
+        OnSettings?.Invoke();
+
+        return SettingsResult;
     }
 
     public bool ShowEditExercise(Exercise exercise) => false;

@@ -9,6 +9,25 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      Файл настроек едет рядом с собранным exe: приложение ищет его в своём каталоге
+      (AppSettingsStore.Resolve), и без копирования при первом запуске не нашлось бы что
+      читать, а писать в папку исходников нельзя.
+
+      PreserveNewest, а не Always: файл в выводе сборки приложение переписывает само, и
+      Always стёр бы сохранённое значение при каждой пересборке. Newest означает «копировать,
+      только если источник свежее», а записанное приложением значение всегда свежее
+      репозиторного.
+
+      Update, а не Include: файл уже попал в None глобом SDK, и Include на том же пути
+      дал бы NETSDK1022 (повтор элемента).
+    -->
+    <None Update="settings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>

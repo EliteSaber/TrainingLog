@@ -13,7 +13,8 @@ public sealed class WindowService(
     Func<PlansWindow> plansWindowFactory,
     Func<EditPlanWindow> addPlanWindowFactory,
     Func<TrainingPlan, EditPlanWindow> editPlanWindowFactory,
-    Func<DateOnly?, AddDayWindow> dayWindowFactory) : IWindowService
+    Func<DateOnly?, AddDayWindow> dayWindowFactory,
+    Func<SettingsWindow> settingsWindowFactory) : IWindowService
 {
     private readonly SingleInstanceWindowHost<ExercisesWindow> _exercises = new(exercisesWindowFactory);
     private readonly SingleInstanceWindowHost<PlansWindow> _plans = new(plansWindowFactory);
@@ -21,6 +22,15 @@ public sealed class WindowService(
     public void OpenExercises() => _exercises.Show();
 
     public void OpenPlans() => _plans.Show();
+
+    /// <summary>
+    /// Окно параметров создаётся заново на каждый вызов, а не через
+    /// <see cref="SingleInstanceWindowHost{TWindow}"/>: внутри него значение, которое правят,
+    /// и переиспользование экземпляра с прошлым содержимым оставляло бы от пользователя
+    /// скрытым его же настройку.
+    /// </summary>
+    public bool ShowSettings() =>
+        ShowDialog(settingsWindowFactory(), Application.Current?.MainWindow);
 
     /// <summary>
     /// Окно редактирования намеренно создаётся заново на каждый вызов, а не через

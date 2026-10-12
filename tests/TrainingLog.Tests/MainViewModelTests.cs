@@ -1,23 +1,110 @@
 using TrainingLog.Core.Models;
+using TrainingLog.Core.Settings;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Tests;
 
 /// <summary>
-/// Главное окно. Проверяются четыре вещи: отбор последних дней, применение количества дней
-/// кнопкой, строка дня — раскладка столбцов, от которой зависит, встанет ли вес над своим
-/// повторением, — и примечание упражнения в этой строке.
+/// Главное окно. Проверяются пять вещей: сколько дней пришло из файла настроек, отбор
+/// последних дней, применение количества дней кнопкой, строка дня — раскладка столбцов, от
+/// которой зависит, встанет ли вес над своим повторением, — и примечание упражнения в этой
+/// строке.
 /// </summary>
-public sealed class MainViewModelTests
+public sealed class MainViewModelTests : IDisposable
 {
+    /// <summary>
+    /// Файл настроек на сообщение теста. Создаётся один на все проверки класса: экземпляр теста
+    /// в xUnit тоже один на проверку, а не на класс.
+    /// </summary>
+    private readonly TemporarySettings _settings = new();
+
+    public void Dispose() => _settings.Dispose();
+
     [Fact]
     public void ПоУмолчанию_ПоказыватьТриДня()
     {
         using var database = new TemporaryDatabase();
 
-        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository);
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store);
 
-        Assert.Equal(3, viewModel.DaysCount);
+        Assert.Equal(AppSettings.DefaultDaysCount, viewModel.DaysCount);
+    }
+
+    /// <summary>
+    /// Число дней приходит из файла, а не из константы: это настройка, и её место рядом с
+    /// программой. Здесь записано иное число, чем по умолчанию, — иначе проверка прошла бы и
+    /// по старому коду с константой.
+    /// </summary>
+    [Fact]
+    public void КоличествоДней_БерётсяИзФайлаНастроек()
+    {
+        using var database = new TemporaryDatabase();
+        _settings.Store.Save(new AppSettings { DaysCount = 9 });
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store);
+
+        Assert.Equal(9, viewModel.DaysCount);
+    }
+
+    /// <summary>
+    /// Параметры, сохранённые в окне, попадают в главное окно сразу: окно перечитывает файл,
+    /// а не ждёт перезапуска, и показанные дни перечитываются вместе с полем — иначе «Сохранить»
+    /// применял бы настройку, но её результата видно не было бы.
+    /// </summary>
+    /// <remarks>
+    /// Пять дней в журнале, показывается три, сохраняется два: проверяется именно количество
+    /// строк, а не число в поле, и без перечитывания остались бы прежние три.
+    /// </remarks>
+    [Fact]
+    public async Task OpenSettingsCommand_ПараметрыСохранены_ПолеИСписокОбновились()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
+        }
+
+        var windowService = new FakeWindowService
+        {
+            SettingsResult = true,
+            OnSettings = () => _settings.Store.Save(new AppSettings { DaysCount = 2 }),
+        };
+
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal(3, viewModel.Days.Count);
+
+        await viewModel.OpenSettingsCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, windowService.SettingsCalls);
+        Assert.Equal(2, viewModel.DaysCount);
+        Assert.Equal(2, viewModel.Days.Count);
+        Assert.Equal(["День 5", "День 4"], viewModel.Days.Select(day => day.PlanName));
+    }
+
+    /// <summary>
+    /// Отменённые параметры не трогают ни поля, ни списка: окно не записало файл, и перечитывать
+    /// нечего. Проверяется и то, что список не перечитывается попусту.
+    /// </summary>
+    [Fact]
+    public async Task OpenSettingsCommand_Отменено_ПолеИСписокНеМеняются()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
+        }
+
+        var windowService = new FakeWindowService { SettingsResult = false };
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        await viewModel.OpenSettingsCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, windowService.SettingsCalls);
+        Assert.Equal(AppSettings.DefaultDaysCount, viewModel.DaysCount);
+        Assert.Equal(3, viewModel.Days.Count);
     }
 
     [Fact]
@@ -54,7 +141,7 @@ public sealed class MainViewModelTests
             await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
         }
 
-        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository);
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsEmpty);
@@ -70,7 +157,7 @@ public sealed class MainViewModelTests
             await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
         }
 
-        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository);
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         Assert.Equal(3, viewModel.Days.Count);
@@ -89,11 +176,11 @@ public sealed class MainViewModelTests
     [Theory]
     [InlineData(0)]
     [InlineData(-5)]
-    [InlineData(MainViewModel.MaxDaysCount + 1)]
+    [InlineData(DaysCountRules.MaxDaysCount + 1)]
     public void ApplyCommand_НедопустимоеКоличество_КнопкаГасится(int count)
     {
         using var database = new TemporaryDatabase();
-        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository)
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
         {
             DaysCount = count,
         };
@@ -105,7 +192,7 @@ public sealed class MainViewModelTests
     public async Task LoadAsync_ЗаписейНет_СписокПуст()
     {
         using var database = new TemporaryDatabase();
-        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository);
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store);
 
         await viewModel.LoadCommand.ExecuteAsync(null);
 
@@ -123,7 +210,7 @@ public sealed class MainViewModelTests
         await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
 
         var windowService = new FakeWindowService { AddDayResult = true };
-        var viewModel = new MainViewModel(windowService, database.SessionRepository);
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         await database.SessionRepository.AddAsync(
@@ -153,7 +240,7 @@ public async Task AddDayCommand_СохраненоБезЗакрытия_Спи�
         AddDayResult = true,
     };
 
-    var viewModel = new MainViewModel(windowService, database.SessionRepository);
+    var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
     await viewModel.LoadCommand.ExecuteAsync(null);
 
     await viewModel.AddDayCommand.ExecuteAsync(null);
@@ -168,7 +255,7 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
         using var database = new TemporaryDatabase();
         await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
 
-        var viewModel = new MainViewModel(new FakeWindowService { AddDayResult = false }, database.SessionRepository);
+        var viewModel = new MainViewModel(new FakeWindowService { AddDayResult = false }, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         await viewModel.AddDayCommand.ExecuteAsync(null);
@@ -286,7 +373,7 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
         await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
 
         var windowService = new FakeWindowService();
-        var viewModel = new MainViewModel(windowService, database.SessionRepository);
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         var row = Assert.Single(viewModel.Days);
@@ -308,7 +395,7 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
         await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
 
         var windowService = new FakeWindowService { EditDayResult = true };
-        var viewModel = new MainViewModel(windowService, database.SessionRepository);
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         await database.SessionRepository.AddAsync(Session(new DateOnly(2026, 10, 6), "День 6"));
@@ -331,7 +418,7 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
         await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
 
         var windowService = new FakeWindowService { EditDayResult = true };
-        var viewModel = new MainViewModel(windowService, database.SessionRepository);
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         await viewModel.EditDayCommand.ExecuteAsync(null);

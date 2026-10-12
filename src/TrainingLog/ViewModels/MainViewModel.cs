@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TrainingLog.Core.Models;
 using TrainingLog.Core.Repositories;
+using TrainingLog.Core.Settings;
 using TrainingLog.Services;
 
 namespace TrainingLog.ViewModels;
@@ -12,27 +13,30 @@ namespace TrainingLog.ViewModels;
 /// </summary>
 public sealed partial class MainViewModel : ObservableObject
 {
-    /// <summary>Сколько дней показывать по умолчанию.</summary>
-    public const int DefaultDaysCount = 3;
-
-    /// <summary>
-    /// Больше дней показывать незачем: журнал показывают по одной записи в строке, и список
-    /// длиннее года на экране всё равно не помещается.
-    /// </summary>
-    public const int MaxDaysCount = 366;
-
     private readonly ITrainingSessionRepository _sessionRepository;
     private readonly IWindowService _windowService;
+    private readonly AppSettingsStore _settingsStore;
 
     /// <param name="windowService">Список окон приложения.</param>
     /// <param name="sessionRepository">Журнал тренировок.</param>
-    public MainViewModel(IWindowService windowService, ITrainingSessionRepository sessionRepository)
+    /// <param name="settingsStore">Файл настроек: сколько дней показывать.</param>
+    public MainViewModel(
+        IWindowService windowService,
+        ITrainingSessionRepository sessionRepository,
+        AppSettingsStore settingsStore)
     {
         ArgumentNullException.ThrowIfNull(windowService);
         ArgumentNullException.ThrowIfNull(sessionRepository);
+        ArgumentNullException.ThrowIfNull(settingsStore);
 
         _windowService = windowService;
         _sessionRepository = sessionRepository;
+        _settingsStore = settingsStore;
+
+        // Количество дней приходит из файла настроек, а не из константы: это настройка, и её
+        // место — рядом с программой, а не в коде. Файл к этому моменту уже создан хранилищем
+        // либо прочитан, так что поля не пустует даже первого запуска.
+        DaysCount = settingsStore.Load().DaysCount;
     }
 
     [ObservableProperty]
@@ -45,13 +49,48 @@ public sealed partial class MainViewModel : ObservableObject
     private void OpenPlans() => _windowService.OpenPlans();
 
     /// <summary>
+    /// Параметры из окна настроек: поле обновляется сразу, и показанные дни перечитываются
+    /// вместе с ним.
+    /// </summary>
+    /// <remarks>
+    /// Файл перечитывается, а не значение передаётся из окна: единственный источник истины —
+    /// настройка на диске, и главное окно не должно узнавать о ней иным способом, даже если
+    /// сегодня это одно и то же число.
+    ///
+    /// Список дней перечитывается сам, в отличие от значения, введённого в это же поле на
+    /// главном окне: там кнопка «Применить» существует ради того, чтобы поле не перечитывало
+    /// журнал на каждый введённый символ, а здесь число уже применено — оно записано в файл и
+    /// пользователь его отпустил. Оставив список прежним, окно параметров показало бы сохранённое
+    /// значение и не показало бы его результата, и «сохранить» выглядело бы не сработавшим.
+    ///
+    /// Кнопка «Применить» при этом остаётся: она по-прежнему применяет число, введённое в
+    /// поле на главном окне, и по-прежнему в файл не пишет.
+    /// </remarks>
+    [RelayCommand]
+    private async Task OpenSettingsAsync()
+    {
+        if (!_windowService.ShowSettings())
+        {
+            return;
+        }
+
+        DaysCount = _settingsStore.Load().DaysCount;
+
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
     /// Сколько дней показать. Значение применяется кнопкой «Применить»: пока она не
     /// нажата, показанные дни не меняются, иначе список перечитывался бы на каждый
     /// введённый символ.
     /// </summary>
+    /// <remarks>
+    /// В файл настроек «Применить» не пишет: настройкой владеет окно параметров, и второе
+    /// место, откуда её можно изменить, рано или поздно разошлось бы с первым.
+    /// </remarks>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ApplyCommand))]
-    private int _daysCount = DefaultDaysCount;
+    private int _daysCount;
 
     /// <summary>
     /// Подсказка об отказе по вводу в поле количества дней.
@@ -88,7 +127,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private Task LoadAsync() => RefreshAsync();
 
-    private bool CanApply() => DaysCount > 0 && DaysCount <= MaxDaysCount;
+    private bool CanApply() => DaysCountRules.IsValid(DaysCount);
 
     [RelayCommand(CanExecute = nameof(CanApply))]
     private Task ApplyAsync() => RefreshAsync();

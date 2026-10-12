@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TrainingLog.Core.Data;
 using TrainingLog.Core.Models;
 using TrainingLog.Core.Repositories;
+using TrainingLog.Core.Settings;
 using TrainingLog.Services;
 using TrainingLog.ViewModels;
 using TrainingLog.Windows;
@@ -46,6 +47,12 @@ public partial class App : Application
         services.AddSingleton<ITrainingPlanRepository, TrainingPlanRepository>();
         services.AddSingleton<ITrainingSessionRepository, TrainingSessionRepository>();
 
+        // Настройки — один экземпляр на всё приложение: файл один, и держать две копии
+        // состояния значило бы завести второе место, откуда его можно изменить. Экземпляр
+        // создаётся здесь, а не через AddSingleton<T>, потому что конструктор без параметров
+        // у хранилища один — тот, что ищет файл рядом с программой.
+        services.AddSingleton(new AppSettingsStore());
+
         // Окно упражнений и окно планов единственные, поэтому состояние хоста переиспользуется,
         // а сам сервис должен быть синглтоном. Окна редактирования, наоборот, создаются заново
         // на каждый вызов: внутри них то, что правят.
@@ -72,7 +79,12 @@ public partial class App : Application
             day => new AddDayWindow(new AddDayViewModel(
                 provider.GetRequiredService<ITrainingSessionRepository>(),
                 provider.GetRequiredService<ITrainingPlanRepository>(),
-                day))));
+                day)),
+            // Параметры — то же окно на каждый вызов, как и окна правки: внутри него значение,
+            // которое правят, и переиспользование экземпляра с прошлым содержимым показало бы
+            // пользователю чужую настройку. Значение лежит в файле рядом с программой.
+            () => new SettingsWindow(new SettingsViewModel(
+                provider.GetRequiredService<AppSettingsStore>()))));
 
         services.AddTransient<ExercisesViewModel>();
         services.AddTransient<ExercisesWindow>();

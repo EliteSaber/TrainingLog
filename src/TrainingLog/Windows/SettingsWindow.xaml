@@ -1,0 +1,155 @@
+<Window x:Class="TrainingLog.Windows.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:TrainingLog.ViewModels"
+        xmlns:helpers="clr-namespace:TrainingLog.Controls"
+        xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
+        d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
+        mc:Ignorable="d"
+        Title="Параметры"
+        Width="380"
+        SizeToContent="Height"
+        MinWidth="320"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <!--
+      Окно параметров: редактор числа, которое главное окно показывает рядом с заголовком.
+      Само число в поле выглядит как в главном окне и ведёт себя так же — фильтр цифр,
+      центрирование, подпись передаёт фокус по клику, — иначе одно и то же значение выглядело
+      бы двумя разными полями в двух окнах одного приложения.
+
+      Ширина окна и SizeToContent — как у окна правки упражнения: высоту задаёт содержимое,
+      ширину держит окно. Высота меняется вместе с содержимым — перенос подписи в две строки
+      добавляет окну строку.
+    -->
+    <Window.Resources>
+        <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--
+          Подпись и поле на одной строке: значение принадлежит подписи, а не таблице полей.
+
+          Раскладка — две Auto-колонки, а не горизонтальная панель: панель меряет содержимое
+          бесконечной шириной, и перенос строк у подписи перестал бы работать вовсе (ловушка 29).
+          И не колонка `*` под подпись при Auto под поле: колонка `*` забирает весь остаток, и
+          поле уехало бы к правому краю окна, оставив дыру между подписью и полем.
+
+          Две Auto-колонки делят нехватку ширины поровну (ловушка 38), и без MinWidth у поля
+          поле ужалось бы вместе с подписью. MinWidth — это пол колонки, ниже которого она не
+          сжимается: сколько ширины не хватило, столько уходит подписи, и она переносится по
+          словам, а поле остаётся прежним. Width задаёт размер поля, MinWidth — границу, на
+          которой сжатие прекращается; на крупном шрифте без него поле потеряло бы несколько
+          пикселей и обрезало цифру.
+
+          По вертикали оба по центру: подпись в две строки не должна оставлять поле у верхнего
+          края строки.
+        -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!--
+              Подпись кликабельна: клик по слову ставит фокус в поле. Background="Transparent"
+              нужен для попадания кликом — с null-фоном подпись ловит клик только по буквам, и
+              клик по пробелу между словами не сработал бы (ловушка 13).
+
+              HorizontalAlignment не задан намеренно: центрированный элемент меряется под своё
+              содержимое, и перенос перестал бы работать (ловушка 29, второй раз в этом файле).
+              Нужен Stretch — значение по умолчанию.
+            -->
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       Background="Transparent"
+                       TextWrapping="Wrap"
+                       Text="Количество отображаемых дней"
+                       helpers:ClickToFocus.Target="{Binding ElementName=DaysCountBox}" />
+
+            <!--
+              Поле устроено как на главном окне и настроено так же: та же ширина, те же отступы
+              внутри и центрирование, тот же фильтр цифр и то же обновление при вводе. Одно и то
+              же число в двух окнах должно выглядеть одинаково, иначе второе окно читается как
+              другой счётчик.
+
+              Отступ только по горизонтали: раньше он задавал зазор строкой ниже, а теперь поле
+              стоит в одной строке с подписью.
+
+              Обновление при вводе, а не по LostFocus: значение однострочное и без разделителей,
+              а «Сохранить» рядом и гаснет сам, когда число негодное.
+            -->
+            <TextBox x:Name="DaysCountBox"
+                     Grid.Column="1"
+                     Width="52"
+                     MinWidth="52"
+                     Margin="8,0,0,0"
+                     VerticalAlignment="Center"
+                     Padding="4,3"
+                     HorizontalContentAlignment="Center"
+                     VerticalContentAlignment="Center"
+                     helpers:AllowedCharsInput.Allowed="Digits"
+                     Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
+        </Grid>
+
+        <!--
+          Отказ записи — красной строкой, а не подсказкой: он живёт до успешного сохранения, и
+          настройка не записалась, то есть объяснение обязано дождаться, пока им займутся
+          (правило отказа о сохранении дня). Подсказка под полем для этого не годится — её
+          срок здесь пять секунд.
+
+          Строка в сетке, а не в горизонтальной панели: панель отдаёт содержимому бесконечную
+          ширину, и перенос строк у отказа перестал бы работать (ловушка 29).
+        -->
+        <TextBlock Grid.Row="1"
+                   Margin="0,12,0,0"
+                   TextWrapping="Wrap"
+                   Foreground="Firebrick"
+                   Visibility="{Binding HasStatus, Converter={StaticResource BooleanToVisibilityConverter}}"
+                   Text="{Binding Status}" />
+
+        <!--
+          «Сохранить» — единственная кнопка IsDefault в окне: иначе Enter звал бы обе. «Отменить»
+          IsCancel: крестик и Esc закрывают окно так же, как и в остальных модальных окнах.
+        -->
+        <StackPanel Grid.Row="2"
+                    Margin="0,16,0,0"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <Button Padding="14,4"
+                    Command="{Binding SaveCommand}"
+                    Content="Сохранить"
+                    IsDefault="True" />
+
+            <Button Margin="8,0,0,0"
+                    Padding="14,4"
+                    Content="Отменить"
+                    IsCancel="True" />
+        </StackPanel>
+
+        <!--
+          Отказ по вводу — той же всплывающей подсказкой, что в главном окне и в окне дня:
+          один контрол на все три окна, поэтому вид и срок жизни не могут разойтись.
+
+          Нарисована поверх содержимого окна, а не в отдельном окне: второе окно WPF отнимает у
+          окна наведение и курсор (ловушка 34). Panel.ZIndex поднимает подсказку над
+          содержимым: порядок отрисовки задаётся им среди соседей.
+
+          Target задаёт окно из code-behind по полю отказа события, как в остальных окнах.
+        -->
+        <helpers:StatusHint x:Name="InputHint"
+                            Panel.ZIndex="10"
+                            ClosedCommand="{Binding Hint.ClearCommand}"
+                            DismissCommand="{Binding Hint.DismissCommand}"
+                            IsOpen="{Binding Hint.IsVisible}"
+                            Text="{Binding Hint.Text}" />
+    </Grid>
+</Window>
