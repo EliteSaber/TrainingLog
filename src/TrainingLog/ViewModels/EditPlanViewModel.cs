@@ -21,9 +21,18 @@ public sealed partial class EditPlanViewModel : ObservableObject
     private readonly IExerciseRepository _exerciseRepository;
 
     /// <summary>
-    /// Остальные планы: нужны для проверки дубликата без обращения к базе на каждое нажатие клавиши.
+    /// Остальные планы: нужны для проверки дубликата без обращения к базе на каждое нажатие клавиши
+    /// и как список выбора «На основе». Второй коллекции нет: состав источника нужен только
+    /// проверке имени, а выбор и проверка по одному и тому же набору планов иначе разошлись бы
+    /// при первом же различии правил.
     /// </summary>
     private readonly ObservableCollection<TrainingPlan> _otherPlans = [];
+
+    /// <summary>
+    /// Нужны не только при инициализации: выбор «На основе» приходит позже и тоже идёт по
+    /// идентификаторам, взятым из чужого плана.
+    /// </summary>
+    private readonly Dictionary<int, PlanExerciseSelection> _rowsByExerciseId = [];
 
     /// <summary>
     /// Справочник упражнений по алфавиту с отметками вхождения в план.
@@ -88,8 +97,25 @@ public sealed partial class EditPlanViewModel : ObservableObject
     [ObservableProperty]
     private bool? _isAllChecked;
 
+    /// <summary>
+    /// План, чей состав берётся в этот. Ссылка живёт только в окне: при сохранении в базу она не
+    /// пишется, и новый план дальше независим от источника.
+    /// </summary>
+    /// <remarks>
+    /// Наследование разовое, а не постоянная связь: у плана нет составных частей, которые нужно
+    /// было бы пересобирать при каждой правке источника, а ручные отметки, перестановка и
+    /// «Выбрать все» с постоянной связью разошлись бы — что показывать, когда в базовом плане
+    /// упражнение добавили, а в производном его сняли руками, по одному составу не ответить.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ResetBaseCommand))]
+    private TrainingPlan? _basePlan;
+
     /// <summary>Все упражнения справочника с отметками вхождения в план.</summary>
     public ObservableCollection<PlanExerciseSelection> AllExercises => _allExercises;
+
+    /// <summary>Планы, из которых берётся состав: все, кроме редактируемого.</summary>
+    public ObservableCollection<TrainingPlan> BasePlans => _otherPlans;
 
     /// <summary>Упражнения плана в порядке выполнения, с номерами.</summary>
     public ObservableCollection<PlanExerciseSelection> SelectedExercises => _selectedExercises;
@@ -142,6 +168,9 @@ public sealed partial class EditPlanViewModel : ObservableObject
 
         return target;
     }
+
+    /// <summary>Смена источника состава идёт через <see cref="ApplyComposition"/>.</summary>
+    partial void OnBasePlanChanged(TrainingPlan? value) => ApplyComposition(value);
 
     partial void OnIsAllCheckedChanged(bool? value)
     {
@@ -219,13 +248,16 @@ public sealed partial class EditPlanViewModel : ObservableObject
     {
         var plans = await _planRepository.GetAllAsync().ConfigureAwait(true);
 
+        // Порядок выбора алфавитный — как в списке планов и в справочнике упражнений: список
+        // выбирают глазами, и порядок из базы на это не рассчитан. На проверку дубля порядок не
+        // влияет, а коллекция одна на оба назначения.
         _otherPlans.Clear();
-        foreach (var plan in plans)
+
+        foreach (var plan in plans
+                     .Where(plan => plan.Id != _plan.Id)
+                     .OrderBy(plan => plan.Name, StringComparer.Ordinal))
         {
-            if (plan.Id != _plan.Id)
-            {
-                _otherPlans.Add(plan);
-            }
+            _otherPlans.Add(plan);
         }
 
         var exercises = await _exerciseRepository.GetAllAsync().ConfigureAwait(true);
@@ -238,8 +270,7 @@ public sealed partial class EditPlanViewModel : ObservableObject
             _initialExerciseIds.Add(exercise.Id);
         }
 
-        var rowsById = new Dictionary<int, PlanExerciseSelection>();
-
+        _rowsByExerciseId.Clear();
         _allExercises.Clear();
 
         // То же сравнение кодов Unicode, что и в ExercisesViewModel, иначе одна и та же строка в двух
@@ -260,18 +291,61 @@ public sealed partial class EditPlanViewModel : ObservableObject
             row.PropertyChanged += OnRowPropertyChanged;
 
             _allExercises.Add(row);
-            rowsById[exercise.Id] = row;
+            _rowsByExerciseId[exercise.Id] = row;
         }
 
-        // Состав собирается по порядку плана, а не по алфавиту справочника.
-        _selectedExercises.Clear();
+        // Состав плана уже вычитан в _plan.Exercises по порядку выполнения, поэтому отдельного
+        // списка идентификаторов для сборки не нужно.
+        ApplyComposition(_plan);
 
-        foreach (var id in _initialExerciseIds)
+        // Инициализация — не правка: сравнение с исходным составом делает сам ApplyComposition.
+        AcceptCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Переносит состав указанного плана в редактируемый: <c>null</c> очищает состав.
+    /// </summary>
+    /// <remarks>
+    /// Замена состава целиком, а не дописывание недостающего: «на основе» читается как «взять этот
+    /// план», и дописывание к уже набранному давало бы состав, которого нет ни в одном из планов.
+    /// Очистка тем же вызовом обслуживает «Сбросить» — там <c>null</c> значит ровно это.
+    ///
+    /// Порядок берётся из <see cref="TrainingPlan.Exercises"/>, то есть из порядка выполнения
+    /// источника, а не из алфавита справочника: наследуют именно последовательность упражнений.
+    ///
+    /// Отметки задаются под <c>_isApplyingChecks</c>, иначе обработчик строки на каждой отметке
+    /// пересчитывал бы состав вхолостую и будил «Принять» на каждом шаге сборки.
+    /// </remarks>
+    private void ApplyComposition(TrainingPlan? source)
+    {
+        _isApplyingChecks = true;
+
+        try
         {
-            if (rowsById.TryGetValue(id, out var row))
+            foreach (var row in _allExercises)
             {
-                _selectedExercises.Add(row);
+                row.IsChecked = false;
             }
+
+            _selectedExercises.Clear();
+
+            if (source is not null)
+            {
+                foreach (var exercise in source.Exercises)
+                {
+                    if (!_rowsByExerciseId.TryGetValue(exercise.Id, out var row))
+                    {
+                        continue;
+                    }
+
+                    row.IsChecked = true;
+                    _selectedExercises.Add(row);
+                }
+            }
+        }
+        finally
+        {
+            _isApplyingChecks = false;
         }
 
         RecalculatePositions();
@@ -279,6 +353,28 @@ public sealed partial class EditPlanViewModel : ObservableObject
         NotifyMasterChanged();
 
         AcceptCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Сбросить можно только выбранный источник.</summary>
+    private bool CanResetBase() => BasePlan is not null;
+
+    /// <summary>
+    /// Снимает выбор источника и очищает подтянутый им состав.
+    /// </summary>
+    /// <remarks>
+    /// Граница проверяется здесь повторно: у [RelayCommand] проверка и выполнение разделены, и
+    /// <c>Execute</c> её не зовёт (ловушка 46). Без проверки программный вызов на пустом поле
+    /// молча стёр бы состав, набранный вручную.
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanResetBase))]
+    private void ResetBase()
+    {
+        if (BasePlan is null)
+        {
+            return;
+        }
+
+        BasePlan = null;
     }
 
     [RelayCommand(CanExecute = nameof(CanMoveUp))]

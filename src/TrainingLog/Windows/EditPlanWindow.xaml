@@ -18,6 +18,45 @@
     <Window.Resources>
         <!-- Свой экземпляр: ресурсы окна живут в окне, общий словарь ему недоступен (ловушка 6). -->
         <helpers:ScrollBarMarginConverter x:Key="ScrollBarMargin" />
+
+        <!--
+          Иконка-кнопка рядом с полем ввода: полоса во всю высоту, глиф по центру, рамки нет
+          намеренно — системная кнопка в этой строке стояла бы тяжелее соседнего списка и
+          выглядела бы отдельным элементом управления. Раз системной подсветки при наведении
+          больше нет, она описана здесь же.
+
+          Подложка взята системным цветом, как подложки панелей в остальных окнах, поэтому
+          в тёмной теме приведение останется темнее фона окна, а не станет светлым пятном.
+
+          Padding привязан: без этого отступ на кнопке шаблон не читал бы вовсе, а нажимать
+          пришлось бы по одному глифу.
+
+          Порядок триггеров значим: IsEnabled=False объявлен последним и потому выигрывает —
+          погашенная кнопка не должна отвечать на мышь.
+        -->
+        <ControlTemplate x:Key="IconButtonTemplate" TargetType="Button">
+            <Border x:Name="Surface"
+                    Background="Transparent"
+                    CornerRadius="3"
+                    Padding="{TemplateBinding Padding}"
+                    SnapsToDevicePixels="True">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Surface"
+                            Property="Background"
+                            Value="{DynamicResource {x:Static SystemColors.ControlLightBrushKey}}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="Surface"
+                            Property="Background"
+                            Value="Transparent" />
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
     </Window.Resources>
     <!--
       Окно общее для добавления и правки: различаются только заголовок и подпись кнопки, которые
@@ -29,7 +68,8 @@
       упорядочивать в одном списке нельзя, потому что алфавитный порядок и порядок выполнения
       противоречат друг другу, а ломать алфавитный поиск нельзя.
     -->
-    <Grid Margin="16">
+    <!-- Верхний отступ вдвое меньше бокового и нижнего и совпадает с зазором под подписью. -->
+    <Grid Margin="16,8,16,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -55,12 +95,89 @@
                  VerticalScrollBarVisibility="Auto"
                  Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
 
-        <CheckBox Grid.Row="2"
-                  Margin="0,12,0,0"
-                  VerticalAlignment="Center"
-                  Content="Выбрать все"
-                  IsThreeState="True"
-                  IsChecked="{Binding IsAllChecked, Mode=TwoWay}" />
+        <!--
+          «На основе» относится к составу, а не к поиску, и стоит рядом с отбором упражнений.
+          Списка источника отдельно нет — это те же планы, что и для проверки дубля, минус
+          редактируемый.
+
+          Между двумя группами разделитель: чекбокс отбирает состав, а «на основе» его
+          заполняет, и без границы это читалось бы как одна длинная надпись.
+        -->
+        <Grid Grid.Row="2"
+              Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <CheckBox Grid.Column="0"
+                      VerticalAlignment="Center"
+                      Content="Выбрать все"
+                      IsThreeState="True"
+                      IsChecked="{Binding IsAllChecked, Mode=TwoWay}" />
+
+            <!--
+              Высота не задаётся: растяжка берёт высоту строки, а она определяется самым высоким
+              элементом — списком. Свое число здесь означало бы разъезд с системной темой.
+
+              Ширина в 1 px обязана быть прижата к пикселю: начавшись на дробном, элемент такой
+              ширины рисуется через два пикселя полупрозрачностью и выглядит толще и размыто.
+              У линий между строками списков такой нужды нет — там толщина задаётся BorderThickness,
+              и разметчик прижимает её сам.
+
+              Цвет тот же, что у рамок панелей под строкой: разделитель читается как их
+              продолжение и остаётся тёмным в тёмной теме.
+
+              Поля у разделителя свои, и симметричные: у каждой стороны промежутка свой носитель —
+              слева поле разделителя, справа поле подписи. Поля на одном элементе разделитель
+              посередине не центрируют, а сдвигают в его сторону: без них он стоял бы вплотную к
+              «Выбрать все».
+            -->
+            <Border Grid.Column="1"
+                    Width="1"
+                    Margin="9,0,9,0"
+                    Background="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                    SnapsToDevicePixels="True" />
+
+            <!--
+              Левое поле у подписи убрано: его несёт разделитель, иначе зазор справа от линии
+              был бы 18 px против 9 слева.
+
+              Асимметрия в «План» окна дня (16 и 8) вынужденная: у DatePicker свой внутренний
+              правый отступ. Здесь такого поля нет — у CheckBox отступ справа нулевой, а рамка
+              ComboBox начинается ровно на краю элемента, — поэтому равные поля и означают равные
+              видимые зазоры.
+            -->
+            <TextBlock Grid.Column="2"
+                       Margin="0,0,9,0"
+                       VerticalAlignment="Center"
+                       Text="На основе" />
+
+            <ComboBox x:Name="BasePlanBox"
+                      Grid.Column="3"
+                      VerticalAlignment="Center"
+                      DisplayMemberPath="Name"
+                      ItemsSource="{Binding BasePlans}"
+                      SelectedItem="{Binding BasePlan}" />
+
+            <!--
+              Высота берётся у списка привязкой, а не числом в разметке: высота ComboBox приходит
+              из системной темы и меняется от DPI и масштаба шрифта, и своё число здесь разъехалось
+              бы на другой машине — ровно как разъехался бы предел MaxLength, взятый не из правила.
+            -->
+            <Button Grid.Column="4"
+                    Margin="6,0,0,0"
+                    Padding="6,0"
+                    Height="{Binding ActualHeight, ElementName=BasePlanBox}"
+                    VerticalAlignment="Center"
+                    Command="{Binding ResetBaseCommand}"
+                    Content="✕"
+                    Template="{StaticResource IconButtonTemplate}"
+                    ToolTip="Сбросить" />
+        </Grid>
 
         <Border Grid.Row="3"
                 Margin="0,10,0,0"

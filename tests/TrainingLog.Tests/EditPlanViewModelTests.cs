@@ -504,6 +504,175 @@ public sealed class EditPlanViewModelTests
         Assert.True(viewModel.AcceptCommand.CanExecute(null));
     }
 
+    [Fact]
+    public async Task BasePlans_ПравкаПлана_РедактируемогоПланаВСпискеНет()
+    {
+        using var database = new TemporaryDatabase();
+        var plan = new TrainingPlan { Name = "День" };
+        await database.PlanRepository.AddAsync(plan);
+        var other = new TrainingPlan { Name = "Ноги" };
+        await database.PlanRepository.AddAsync(other);
+
+        var viewModel = CreateViewModel(database, plan, isNew: false);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        Assert.Equal(["Ноги"], viewModel.BasePlans.Select(source => source.Name));
+    }
+
+    /// <summary>У нового плана нет идентификатора, а значит и «текущего» среди планов.</summary>
+    [Fact]
+    public async Task BasePlans_НовыйПлан_ДоступныВсеПланы()
+    {
+        using var database = new TemporaryDatabase();
+        await database.PlanRepository.AddAsync(new TrainingPlan { Name = "День" });
+        await database.PlanRepository.AddAsync(new TrainingPlan { Name = "Ноги" });
+
+        var viewModel = CreateViewModel(database, new TrainingPlan(), isNew: true);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        Assert.Equal(["День", "Ноги"], viewModel.BasePlans.Select(source => source.Name));
+    }
+
+    /// <summary>
+    /// Наследуется не множество упражнений, а последовательность: план на основе другого должен
+    /// открыться в том же порядке выполнения.
+    /// </summary>
+    [Fact]
+    public async Task BasePlan_ВыбранПлан_СоставБерётсяВЕгоПорядке()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = new Exercise { Name = "Приседание" };
+        var bench = new Exercise { Name = "Жим" };
+        var deadlift = new Exercise { Name = "Тяга" };
+        await database.Repository.AddAsync(squat);
+        await database.Repository.AddAsync(bench);
+        await database.Repository.AddAsync(deadlift);
+
+        var basePlan = new TrainingPlan { Name = "Ноги" };
+        basePlan.AddExercise(deadlift);
+        basePlan.AddExercise(squat);
+        await database.PlanRepository.AddAsync(basePlan);
+
+        var viewModel = CreateViewModel(database, new TrainingPlan(), isNew: true);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        viewModel.BasePlan = basePlan;
+
+        Assert.Equal(
+            [deadlift.Name, squat.Name],
+            viewModel.SelectedExercises.Select(row => row.Name));
+        Assert.Equal([1, 2], viewModel.SelectedExercises.Select(row => row.Position));
+        Assert.Null(viewModel.IsAllChecked);
+    }
+
+    /// <summary>
+    /// Источник заменяет состав целиком: иначе подтягивание давало бы смесь, которой нет ни в
+    /// одном плане.
+    /// </summary>
+    [Fact]
+    public async Task BasePlan_ВыбранПлан_ПрежнийСоставСнятИКнопкаБудит()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = new Exercise { Name = "Приседание" };
+        var bench = new Exercise { Name = "Жим" };
+        await database.Repository.AddAsync(squat);
+        await database.Repository.AddAsync(bench);
+
+        var plan = new TrainingPlan { Name = "День" };
+        plan.AddExercise(squat);
+        await database.PlanRepository.AddAsync(plan);
+
+        var basePlan = new TrainingPlan { Name = "Ноги" };
+        basePlan.AddExercise(bench);
+        await database.PlanRepository.AddAsync(basePlan);
+
+        var viewModel = CreateViewModel(database, plan, isNew: false);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.AcceptCommand.CanExecute(null));
+
+        viewModel.BasePlan = basePlan;
+
+        Assert.Equal([bench.Name], viewModel.SelectedExercises.Select(row => row.Name));
+        Assert.False(viewModel.AllExercises.Single(row => row.Exercise.Id == squat.Id).IsChecked);
+        Assert.True(viewModel.AcceptCommand.CanExecute(null));
+
+        await viewModel.AcceptCommand.ExecuteAsync(null);
+
+        var stored = await database.PlanRepository.GetAllAsync();
+        var saved = Assert.Single(stored, item => item.Id == plan.Id);
+        Assert.Equal(bench.Id, Assert.Single(saved.Exercises).Id);
+    }
+
+    /// <summary>
+    /// «Сбросить» снимает и выбор источника, и подтянутый им состав: иначе на экране остался бы
+    /// состав, происхождение которого уже не показано.
+    /// </summary>
+    [Fact]
+    public async Task ResetBaseCommand_ВыбранПлан_СнимаетВыборИСостав()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = new Exercise { Name = "Приседание" };
+        var bench = new Exercise { Name = "Жим" };
+        await database.Repository.AddAsync(squat);
+        await database.Repository.AddAsync(bench);
+
+        var basePlan = new TrainingPlan { Name = "Ноги" };
+        basePlan.AddExercise(bench);
+        basePlan.AddExercise(squat);
+        await database.PlanRepository.AddAsync(basePlan);
+
+        var viewModel = CreateViewModel(database, new TrainingPlan(), isNew: true);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        viewModel.BasePlan = basePlan;
+        viewModel.ResetBaseCommand.Execute(null);
+
+        Assert.Null(viewModel.BasePlan);
+        Assert.Empty(viewModel.SelectedExercises);
+        Assert.All(viewModel.AllExercises, row => Assert.False(row.IsChecked));
+        Assert.False(viewModel.IsAllChecked);
+    }
+
+    /// <summary>Кнопка гаснет, когда источник не выбран: сбрасывать нечего.</summary>
+    [Fact]
+    public async Task ResetBaseCommand_БезВыбора_КомандаНеактивна()
+    {
+        using var database = new TemporaryDatabase();
+        var viewModel = CreateViewModel(database, new TrainingPlan(), isNew: true);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.ResetBaseCommand.CanExecute(null));
+
+        var basePlan = new TrainingPlan { Name = "Ноги" };
+        await database.PlanRepository.AddAsync(basePlan);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        viewModel.BasePlan = basePlan;
+
+        Assert.True(viewModel.ResetBaseCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// Программный вызов команды при пустом поле не должен стирать набранный руками состав: у
+    /// [RelayCommand] проверка и выполнение разделены (ловушка 46).
+    /// </summary>
+    [Fact]
+    public async Task ResetBaseCommand_БезВыбора_СоставНеТрогает()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = new Exercise { Name = "Приседание" };
+        await database.Repository.AddAsync(squat);
+
+        var viewModel = CreateViewModel(database, new TrainingPlan(), isNew: true);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        viewModel.AllExercises.Single().IsChecked = true;
+        viewModel.ResetBaseCommand.Execute(null);
+
+        Assert.Equal([squat.Name], viewModel.SelectedExercises.Select(row => row.Name));
+    }
+
     private static EditPlanViewModel CreateViewModel(TemporaryDatabase database, TrainingPlan plan, bool isNew) =>
         new(plan, isNew, database.PlanRepository, database.Repository);
 
