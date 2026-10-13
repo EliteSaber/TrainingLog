@@ -49,12 +49,25 @@ public sealed partial class ExercisesViewModel : ObservableObject
     /// <summary>Признак, что справочник загружен.</summary>
     public bool IsEmpty => _all.Count == 0;
 
+    /// <summary>Сколько упражнений в справочнике: нужно для текста сообщения о выгрузке.</summary>
+    public int Count => _all.Count;
+
+    /// <summary>Выгружать нечего, пока справочник пуст.</summary>
+    public bool CanExport => _all.Count > 0;
+
+    /// <summary>Записался ли файл последней выгрузки.</summary>
+    /// <remarks>
+    /// Уведомления не поднимается: окно читает значение сразу после выполнения команды и
+    /// показывает результат сообщением, подписки тут не нужно.
+    /// </remarks>
+    public bool ExportSucceeded { get; private set; }
+
     partial void OnFilterTextChanged(string value) => RebuildVisible();
 
     partial void OnIsDescendingChanged(bool value)
     {
         OnPropertyChanged(nameof(SortIndicator));
-        OnPropertyChanged(nameof(IsEmpty));
+        RefreshEmptyState();
         RebuildVisible();
     }
 
@@ -69,7 +82,7 @@ public sealed partial class ExercisesViewModel : ObservableObject
             _all.Add(exercise);
         }
 
-        OnPropertyChanged(nameof(IsEmpty));
+        RefreshEmptyState();
         RebuildVisible();
     }
 
@@ -96,7 +109,7 @@ public sealed partial class ExercisesViewModel : ObservableObject
 
         _all.Add(exercise);
         NewName = string.Empty;
-        OnPropertyChanged(nameof(IsEmpty));
+        RefreshEmptyState();
         RebuildVisible();
     }
 
@@ -155,8 +168,50 @@ public sealed partial class ExercisesViewModel : ObservableObject
         }
 
         _all.Remove(exercise);
-        OnPropertyChanged(nameof(IsEmpty));
+        RefreshEmptyState();
         RebuildVisible();
+    }
+
+    /// <summary>
+    /// Выгружает весь справочник в файл, по одному упражнению на строку.
+    /// </summary>
+    /// <remarks>
+    /// Список полный и по алфавиту, независимо от строки поиска и направления сортировки: файл
+    /// должен отражать справочник, а не то, что сейчас показано на экране, иначе одна и та же
+    /// выгрузка давала бы разные файлы. Порядок тот же, что у сортировки в списке, поэтому два
+    /// выгруженных файла совпадают между собой.
+    ///
+    /// Путь приходит от окна — диалог сохранения открывается там, и привязать команду к кнопке
+    /// нельзя: у кнопки с обработчиком `Click` команда выполнилась бы с пустым параметром.
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanExport))]
+    private void Export(string? path)
+    {
+        // Проверка повторяется в теле команды, а не только в предикате: предикат отвечает за
+        // кнопку, а Execute его не спрашивает (ловушка 46).
+        if (string.IsNullOrWhiteSpace(path) || _all.Count == 0)
+        {
+            ExportSucceeded = false;
+
+            return;
+        }
+
+        ExportSucceeded = ExerciseFileWriter.Write(path, NamesForExport());
+    }
+
+    private IEnumerable<string> NamesForExport() =>
+        _all.Select(exercise => exercise.Name).Order(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Признаки пустоты справочника вычисляются, поэтому уведомляются оба: и надпись «Справочник
+    /// пуст», и доступность кнопки выгрузки. Команде нужен отдельный вызов — она переспрашивает
+    /// предикат сама и по уведомлению свойства не смотрит.
+    /// </summary>
+    private void RefreshEmptyState()
+    {
+        OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(CanExport));
+        ExportCommand.NotifyCanExecuteChanged();
     }
 
     private void RebuildVisible()
