@@ -6,9 +6,6 @@ using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
 
-/// <summary>
-/// Interaction logic for PlansWindow.xaml
-/// </summary>
 public partial class PlansWindow : Window
 {
     private readonly IExerciseRepository _exerciseRepository;

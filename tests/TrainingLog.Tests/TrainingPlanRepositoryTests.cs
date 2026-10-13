@@ -93,10 +93,7 @@ public sealed class TrainingPlanRepositoryTests
         Assert.Equal([1, 2, 3], stored.PlanExercises.OrderBy(link => link.Order).Select(link => link.Order));
     }
 
-    /// <summary>
-    /// Номера в хранилище всегда плотные и с единицы, даже если план передали с пропусками:
-    /// иначе сортировка по номеру однажды встанет произвольно.
-    /// </summary>
+    /// <summary>Иначе сортировка по номеру однажды встанет произвольно.</summary>
     [Fact]
     public async Task AddAsync_НомераСПропусками_ПеренумеровываютсяПлотно()
     {
@@ -185,10 +182,7 @@ public sealed class TrainingPlanRepositoryTests
         Assert.DoesNotContain(stored.Exercises, e => e.Id == squat.Id);
     }
 
-    /// <summary>
-    /// Перестановка упражнений — это и есть порядок выполнения, поэтому он сохраняется, а не
-    /// приводится к алфавитному.
-    /// </summary>
+    /// <summary>Сохранение без изменений дубликатом не считается.</summary>
     [Fact]
     public async Task UpdateAsync_ПерестановкаУпражнений_СохраняетНовыйПорядок()
     {
@@ -235,10 +229,7 @@ public sealed class TrainingPlanRepositoryTests
         Assert.Empty(Assert.Single(await database.PlanRepository.GetAllAsync()).Exercises);
     }
 
-    /// <summary>
-    /// Чекбоксы берутся из справочника при открытии окна, и упражнение могут удалить из другого
-    /// окна, пока диалог открыт. Сохранять такое имя плана нельзя — у него просто нет строки.
-    /// </summary>
+    /// <summary>Сохранять такое упражнение нельзя — у него просто нет строки.</summary>
     [Fact]
     public async Task UpdateAsync_УпражнениеУдаленоИзСправочника_ПропускаетЕгоТихо()
     {
@@ -438,10 +429,7 @@ public sealed class TrainingPlanRepositoryTests
         Assert.Equal("Приседание", Assert.Single(Assert.Single(all, p => p.Id == plan.Id).Exercises).Name);
     }
 
-    /// <summary>
-    /// Каскад удаляет строку связи упражнения, но номера у оставшихся не трогает: без
-    /// нормализации при чтении единственное упражнение плана показывалось бы как «2».
-    /// </summary>
+    /// <summary>Без нормализации при чтении единственное упражнение плана показывалось бы как «2».</summary>
     [Fact]
     public async Task GetAllAsync_ПослеУдаленияУпражнения_НомераПлотныеСЕдиницы()
     {

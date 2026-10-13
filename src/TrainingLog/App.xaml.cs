@@ -11,9 +11,6 @@ using TrainingLog.Windows;
 
 namespace TrainingLog;
 
-/// <summary>
-/// Interaction logic for App.xaml
-/// </summary>
 public partial class App : Application
 {
     private ServiceProvider? _services;
@@ -47,22 +44,18 @@ public partial class App : Application
         services.AddSingleton<ITrainingPlanRepository, TrainingPlanRepository>();
         services.AddSingleton<ITrainingSessionRepository, TrainingSessionRepository>();
 
-        // Настройки — один экземпляр на всё приложение: файл один, и держать две копии
-        // состояния значило бы завести второе место, откуда его можно изменить. Экземпляр
-        // создаётся здесь, а не через AddSingleton<T>, потому что конструктор без параметров
-        // у хранилища один — тот, что ищет файл рядом с программой.
+        // Экземпляр, а не AddSingleton<T>: у хранилища конструктор без параметров один — тот,
+        // что ищет файл рядом с программой.
         services.AddSingleton(new AppSettingsStore());
 
-        // Окно упражнений и окно планов единственные, поэтому состояние хоста переиспользуется,
-        // а сам сервис должен быть синглтоном. Окна редактирования, наоборот, создаются заново
-        // на каждый вызов: внутри них то, что правят.
+        // Синглтон, потому что окна справочников единственные и состояние их хоста переиспользуется.
         services.AddSingleton<IWindowService>(provider => new WindowService(
             () => provider.GetRequiredService<ExercisesWindow>(),
             exercise => new EditExerciseWindow(
                 new EditExerciseViewModel(exercise, provider.GetRequiredService<IExerciseRepository>())),
             () => provider.GetRequiredService<PlansWindow>(),
-            // Добавление и правка плана открывают одно окно, поэтому фабрики две: отличаются
-            // они планом и тем, новый он или уже сохранённый.
+            // Добавление и правка плана открывают одно окно, поэтому фабрики две: отличаются они
+            // планом и тем, новый он или уже сохранённый.
             () => new EditPlanWindow(new EditPlanViewModel(
                 new TrainingPlan(),
                 isNew: true,
@@ -73,16 +66,12 @@ public partial class App : Application
                 isNew: false,
                 provider.GetRequiredService<ITrainingPlanRepository>(),
                 provider.GetRequiredService<IExerciseRepository>())),
-            // День тренировки — то же окно и на добавление, и на правку: какая это запись,
-            // модель узнаёт по дате, поэтому фабрика одна — она принимает дату, а null
-            // означает добавление сегодняшнего дня.
+            // Окно дня одно на добавление и на правку: какая это запись, модель узнаёт по дате,
+            // поэтому фабрика одна, а null означает сегодняшний день.
             day => new AddDayWindow(new AddDayViewModel(
                 provider.GetRequiredService<ITrainingSessionRepository>(),
                 provider.GetRequiredService<ITrainingPlanRepository>(),
                 day)),
-            // Параметры — то же окно на каждый вызов, как и окна правки: внутри него значение,
-            // которое правят, и переиспользование экземпляра с прошлым содержимым показало бы
-            // пользователю чужую настройку. Значение лежит в файле рядом с программой.
             () => new SettingsWindow(new SettingsViewModel(
                 provider.GetRequiredService<AppSettingsStore>()))));
 

@@ -4,9 +4,6 @@ using TrainingLog.Core.Models;
 
 namespace TrainingLog.Core.Repositories;
 
-/// <summary>
-/// Реализация <see cref="IExerciseRepository"/> поверх SQLite.
-/// </summary>
 public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> contextFactory) : IExerciseRepository
 {
     /// <inheritdoc />
@@ -49,8 +46,8 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
         }
         catch (DbUpdateException)
         {
-            // Предварительная проверка могла разойтись с базой: та же проверка из другого окна
-            // или процесса успела вставить строку. Уникальный индекс — последний рубеж.
+            // Предварительная проверка могла разойтись с базой: ту же проверку из другого окна
+            // или процесса успели выполнить раньше. Уникальный индекс — последний рубеж.
             return AddExerciseOutcome.DuplicateName;
         }
 
@@ -144,8 +141,5 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
             .ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Сообщает подписчикам, что справочник изменился. Вызывается только после успешной записи.
-    /// </summary>
     private void NotifyChanged() => Changed?.Invoke(this, EventArgs.Empty);
 }

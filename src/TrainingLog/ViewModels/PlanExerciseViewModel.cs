@@ -18,8 +18,6 @@ namespace TrainingLog.ViewModels;
 /// </remarks>
 public sealed partial class PlanExerciseViewModel : ObservableObject
 {
-    /// <param name="exercise">Упражнение из справочника.</param>
-    /// <param name="number">Номер кнопки в плане, с единицы.</param>
     public PlanExerciseViewModel(Exercise exercise, int number)
     {
         ArgumentNullException.ThrowIfNull(exercise);
@@ -105,14 +103,9 @@ public sealed partial class PlanExerciseViewModel : ObservableObject
     public bool HasData => Sets.Any(set => set.HasData) || HasNote;
 
     /// <summary>
-    /// Создаёт строку упражнения с одним пустым подходом.
+    /// Один пустой подход, а не ноль: нулевой набор полей требовал бы первого нажатия «+»
+    /// ради того, чтобы просто начать ввод.
     /// </summary>
-    /// <remarks>
-    /// Подход один и пустой, а не ноль: нулевой набор полей требовал бы первого нажатия «+»
-    /// ради того, чтобы просто начать ввод. Лишний подход убирается кнопкой «−».
-    /// </remarks>
-    /// <param name="exercise">Упражнение из справочника.</param>
-    /// <param name="number">Номер кнопки в плане.</param>
     public static PlanExerciseViewModel Create(Exercise exercise, int number) =>
         new(exercise, number)
         {

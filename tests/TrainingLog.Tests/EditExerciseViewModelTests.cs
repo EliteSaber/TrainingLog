@@ -5,8 +5,7 @@ namespace TrainingLog.Tests;
 
 /// <summary>
 /// Окно правки опирается на уведомление об <see cref="EditExerciseViewModel.Accepted"/>, чтобы
-/// выставить DialogResult. Без этого уведомления правка сохраняется, а вызывающий об этом
-/// не узнаёт, поэтому механизм проверяется здесь.
+/// выставить DialogResult: без него правка сохранится, а вызывающий об этом не узнаёт.
 /// </summary>
 public sealed class EditExerciseViewModelTests
 {

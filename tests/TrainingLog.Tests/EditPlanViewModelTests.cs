@@ -6,9 +6,7 @@ namespace TrainingLog.Tests;
 
 /// <summary>
 /// Окно плана опирается на уведомление об <see cref="EditPlanViewModel.Accepted"/>, чтобы
-/// выставить DialogResult. Без этого уведомления план сохранится, а вызывающий об этом
-/// не узнаёт, поэтому механизм проверяется здесь. Заодно проверяется состав: он задаётся
-/// отметками строк, а не всем справочником.
+/// выставить DialogResult: без него план сохранится, а вызывающий об этом не узнаёт.
 /// </summary>
 public sealed class EditPlanViewModelTests
 {
@@ -63,10 +61,7 @@ public sealed class EditPlanViewModelTests
         Assert.Equal(bench.Id, Assert.Single(stored.Exercises).Id);
     }
 
-    /// <summary>
-    /// Правка состава с сохранением наименования — обычное дело, и требование «наименование
-    /// обязано измениться» делало бы «Принять» серой.
-    /// </summary>
+    /// <summary>Требование «наименование обязано измениться» делало бы «Принять» серой.</summary>
     [Fact]
     public async Task AcceptAsync_ТолькоСоставИзменён_КнопкаАктивнаИПланСохраняется()
     {
@@ -170,10 +165,7 @@ public sealed class EditPlanViewModelTests
         Assert.False(viewModel.AcceptCommand.CanExecute(null));
     }
 
-    /// <summary>
-    /// Пробелы вокруг прежнего названия изменением не считаются — как и в окне правки
-    /// упражнения, где на этом же стоит сравнение по регистру.
-    /// </summary>
+    /// <summary>Смена регистра — изменение, добавленные пробелы — нет.</summary>
     [Fact]
     public async Task AcceptAsync_ТолькоПробелыВНазвании_КнопкаНеАктивна()
     {
@@ -220,10 +212,7 @@ public sealed class EditPlanViewModelTests
         Assert.Equal("День", plan.Name);
     }
 
-    /// <summary>
-    /// Пустой план допустим: наполнить его можно позже, и требовать отметку значило бы
-    /// запретить создать заготовку.
-    /// </summary>
+    /// <summary>Требовать отметку значило бы запретить создать заготовку.</summary>
     [Fact]
     public async Task AcceptAsync_БезУпражнений_КнопкаАктивна()
     {
@@ -383,10 +372,7 @@ public sealed class EditPlanViewModelTests
         Assert.Equal(["а", "б", "в"], items);
     }
 
-    /// <summary>
-    /// План открывается в том порядке, в котором будет сохранён: база отдаёт упражнения
-    /// упорядоченными, и модель обязана этот порядок удержать, а не пересобрать по алфавиту.
-    /// </summary>
+    /// <summary>Модель обязана удержать порядок базы, а не пересобрать список по алфавиту.</summary>
     [Fact]
     public async Task InitializeAsync_ПланОткрываетсяВСвоёмПорядке()
     {
@@ -440,10 +426,7 @@ public sealed class EditPlanViewModelTests
         Assert.Equal(1, viewModel.SelectedExercises[0].Position);
     }
 
-    /// <summary>
-    /// Перестановка без смены наименования — тоже изменение плана, и «Принять» должна
-    /// разбудиться: иначе порядок нельзя было бы сохранить в тишине.
-    /// </summary>
+    /// <summary>Иначе порядок нельзя было бы сохранить в тишине.</summary>
     [Fact]
     public async Task MoveUpCommand_ТолькоПерестановка_БудитКнопкуПодтверждения()
     {
@@ -497,9 +480,7 @@ public sealed class EditPlanViewModelTests
         Assert.False(viewModel.MoveDownCommand.CanExecute(viewModel.SelectedExercises[1]));
     }
 
-    /// <summary>
-    /// Отметка справа не удаляет строку из справочника: он по алфавиту и нужен для поиска.
-    /// </summary>
+    /// <summary>Справочник по алфавиту нужен для поиска, его нельзя ломать перестановкой.</summary>
     [Fact]
     public async Task RemoveCommand_УбираетИзСоставаНоНеИзСправочника()
     {

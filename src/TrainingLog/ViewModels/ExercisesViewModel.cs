@@ -31,23 +31,22 @@ public sealed partial class ExercisesViewModel : ObservableObject
     /// <summary>Упражнения, видимые в списке: отфильтрованные и отсортированные.</summary>
     public ObservableCollection<Exercise> Visible { get; } = [];
 
-    /// <summary>Название нового упражнения.</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddCommand))]
     private string _newName = string.Empty;
 
-    /// <summary>Строка поиска. Пустая строка означает, что показан весь справочник.</summary>
+    /// <summary>Пустая строка означает, что показан весь справочник.</summary>
     [ObservableProperty]
     private string _filterText = string.Empty;
 
-    /// <summary>Направление сортировки: <c>false</c> — по возрастанию.</summary>
+    /// <summary><c>false</c> — по возрастанию.</summary>
     [ObservableProperty]
     private bool _isDescending;
 
-    /// <summary>Индикатор направления сортировки в заголовке колонки.</summary>
+    /// <summary>Показывается в заголовке колонки.</summary>
     public string SortIndicator => IsDescending ? "▼" : "▲";
 
-    /// <summary>Признак, что справочник загружен и в нём нет ни одного упражнения.</summary>
+    /// <summary>Признак, что справочник загружен.</summary>
     public bool IsEmpty => _all.Count == 0;
 
     partial void OnFilterTextChanged(string value) => RebuildVisible();

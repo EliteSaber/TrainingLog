@@ -5,16 +5,13 @@ using TrainingLog.Core.Models;
 
 namespace TrainingLog.Core.Repositories;
 
-/// <summary>
-/// Реализация <see cref="ITrainingSessionRepository"/> поверх SQLite.
-/// </summary>
 public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbContext> contextFactory)
     : ITrainingSessionRepository
 {
-    /// <summary>Код ошибки SQLite для нарушения ограничения: уникальный индекс, внешний ключ, NOT NULL.</summary>
+    /// <summary>Код SQLite для нарушения ограничения: уникальный индекс, внешний ключ, NOT NULL.</summary>
     private const int SqliteConstraintErrorCode = 19;
 
-    /// <summary>Имя таблицы записей журнала — нужно, чтобы отличить отказ по дате от других.</summary>
+    /// <summary>Нужна, чтобы отличить отказ по дате от отказа по другой причине.</summary>
     private const string SessionsTableName = "TrainingSessions";
     public async Task<IReadOnlyList<TrainingSession>> GetAsync(
         DateOnly? fromInclusive = null,
@@ -69,9 +66,7 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
         // Запись на дату уникальна, поэтому ближайшая прошедшая находится ровно одна, и взять
-        // её — дело FirstOrDefault после сортировки по убыванию. Порядок упражнений и подходов
-        // приходит тот же, что и при чтении дня, иначе полосы подходов разъехались бы по
-        // порядку, а он и есть содержание подхода.
+        // её — дело FirstOrDefault после сортировки по убыванию.
         return await Readable(context.TrainingSessions.AsNoTracking())
             .Where(session => session.PlanId == planId && session.Date < before)
             .OrderByDescending(session => session.Date)
@@ -100,9 +95,7 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
 
         // Запись собирается заново, а не присоединяется переданному объекту: у упражнений
         // в переданном объекте проставлены ссылками на строки, прочитанные другим контекстом,
-        // и EF счёл бы их новыми и вставил повторно. Состав собирается из того, что ещё
-        // есть в справочнике: упражнение, удалённое из окна правки, молча выпадает, как и
-        // у плана, а его название остаётся в записи.
+        // и EF счёл бы их новыми и вставил повторно.
         var stored = new TrainingSession
         {
             Date = session.Date,
@@ -205,7 +198,7 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
         }
 
         // Упражнения и подходы удалятся каскадом от базы: в модели за это отвечает
-        // DeleteBehavior.Cascade на обоих внешних ключах, заданный соглашением EF.
+        // DeleteBehavior.Cascade на обоих внешних ключах, заданный в TrainingLogDbContext.
         context.TrainingSessions.Remove(stored);
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -213,7 +206,9 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
     }
 
     /// <summary>
-    /// Запрос, который читает запись вместе с упражнениями и подходами по порядку выполнения.
+    /// Читает запись вместе с упражнениями и подходами по порядку выполнения: иначе показ
+    /// зависел бы от того, как база вернула строки, а столбцы в строке дня идут именно в этом
+    /// порядке.
     /// </summary>
     private static IQueryable<TrainingSession> Readable(IQueryable<TrainingSession> query) =>
         query
@@ -230,23 +225,20 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
             .ConfigureAwait(false);
 
     /// <summary>
-    /// Возвращает план из базы, если он ещё там, иначе <c>null</c>: ссылка обнуляется,
-    /// а название плана из записи при этом сохраняется.
+    /// Возвращает план из базы, если он ещё там, иначе <c>null</c>: ссылка обнуляется, а название
+    /// плана из записи при этом сохраняется. Без <c>AsNoTracking</c> — иначе план вернулся бы
+    /// отсоединённым, и добавление записи пометило бы весь достижимый граф как новый: <c>Add</c>
+    /// вставил бы план повторно, упал бы на уникальном индексе наименования, и отказ выглядел бы
+    /// как «дата занята».
     /// </summary>
-    /// <remarks>
-    /// Без <c>AsNoTracking</c> — иначе план вернулся бы отсоединённым, и добавление записи
-    /// пометило бы весь достижимый граф как новый: <c>Add</c> вставил бы план повторно,
-    /// упал бы на уникальном индексе наименования, и отказ выглядел бы как «дата занята».
-    /// </remarks>
     private static async Task<TrainingPlan?> ResolvePlanAsync(
         TrainingLogDbContext context,
         TrainingSession session,
         CancellationToken cancellationToken)
     {
         // Берётся идентификатор, а не сам объект: объект у вызывающего отсоединённый, и в Add он
-        // попал бы в граф как новый — планы добавляются повторно, а уникальный индекс
-        // наименования роняет вставку. Идентификатор берётся из свойства, а ссылка на
-        // объект — запасной путь для вызывающего, который задал только навигацию.
+        // попал бы в граф как новый. Ссылка на объект — запасной путь для вызывающего, который
+        // задал только навигацию.
         var planId = session.PlanId ?? session.Plan?.Id;
 
         if (planId is not > 0)
@@ -260,14 +252,11 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
     }
 
     /// <summary>
-    /// Находит в справочнике те упражнения, на которые ссылается запись, и возвращает их
-    /// по идентификатору.
-    /// </summary>
-    /// <remarks>
-    /// Повтор одного упражнения в записи не схлопывается: два подхода одного упражнения — это
-    /// два столбца упражнения в строке дня, а не две одинаковые строки. Проверка повторов
+    /// Находит в справочнике те упражнения, на которые ссылается запись, и возвращает их по
+    /// идентификатору. Повтор одного упражнения не схлопывается: два подхода одного упражнения —
+    /// это два столбца упражнения в строке дня, а не две одинаковые строки. Проверка повторов
     /// живёт в окне добавления дня, где она и видна пользователю.
-    /// </remarks>
+    /// </summary>
     private static async Task<Dictionary<int, Exercise>> ResolveExercisesAsync(
         TrainingLogDbContext context,
         TrainingSession session,
@@ -295,15 +284,11 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
     }
 
     /// <summary>
-    /// Проверяет, что отказ вставки — именно занятая дата, а не что-то другое.
+    /// Проверяет, что отказ вставки — именно занятая дата, а не что-то другое. Раньше любой
+    /// <see cref="DbUpdateException"/> считался занятым числом, и это обернулось ложным диагнозом:
+    /// план, вернувшийся отсоединённым, добавлялся повторно, падал на уникальном индексе
+    /// наименования — и сообщение говорило про дату.
     /// </summary>
-    /// <remarks>
-    /// Раньше любой <see cref="DbUpdateException"/> считался занятым числом, и это обернулось
-    /// ложным диагнозом: план, который вернулся отсоединённым, добавлялся повторно, падал на
-    /// уникальном индексе наименования — и сообщение говорило про дату. Отказ по чужой причине
-    /// (например, упражнение удалили между чтением и записью) должен дойти до вызывающего
-    /// как отказ, а не раствориться в «дата занята».
-    /// </remarks>
     private static bool IsDateTaken(DbUpdateException exception) =>
         exception.InnerException is SqliteException
         {
@@ -313,8 +298,8 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
         && message.Contains($"IX_{SessionsTableName}_{nameof(TrainingSession.Date)}", StringComparison.Ordinal);
 
     /// <summary>
-    /// Собирает упражнения записи заново, подставляя упражнения справочника там, где ссылка
-    /// ещё действительна.
+    /// Собирает упражнения записи заново, подставляя упражнения справочника там, где ссылка ещё
+    /// действительна.
     /// </summary>
     private static IEnumerable<ExerciseEntry> BuildEntries(
         TrainingSession session,
@@ -326,8 +311,7 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
 
             // Ссылка проставляется только тем упражнениям, которые ещё есть в справочнике.
             // Иначе в запись ушёл бы внешний ключ на несуществующую строку и вставка упала бы
-            // на ограничении: упражнение, удалённое из окна правки, выпадает из записи,
-            // остаётся только название.
+            // на ограничении.
             var exerciseId = source.ExerciseId ?? source.Exercise?.Id;
 
             if (exerciseId is > 0 && exercises.TryGetValue(exerciseId.Value, out var stored))

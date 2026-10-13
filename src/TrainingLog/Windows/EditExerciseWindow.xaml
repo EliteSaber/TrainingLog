@@ -21,22 +21,16 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!--
-          Подпись кликабельна: клик по слову ставит фокус в NameBox. Background="Transparent"
-          нужен для попадания кликом, с null-фоном подпись ловит клик только по буквам.
-        -->
+        <!-- Background="Transparent" обязателен: с null-фоном подпись ловит клик только по буквам (ловушка 13). -->
         <TextBlock Grid.Row="0"
                    Background="Transparent"
                    Text="Название упражнения"
                    helpers:ClickToFocus.Target="{Binding ElementName=NameBox}" />
 
         <!--
-          Длинное название переносится по словам, а не уезжает в горизонтальную прокрутку:
-          AcceptsReturn="False" оставляет Enter подтверждением (кнопка IsDefault), а переводы
-          строк при вставке из буфера WPF вычищает сам, поэтому правила имени менять не пришлось.
-          MaxHeight обязателен рядом с Wrap: у переноса по умолчанию
+          AcceptsReturn="False" оставляет Enter подтверждением, а переводы строк при вставке
+          WPF вычищает сам. MaxHeight обязателен рядом с Wrap: у переноса по умолчанию
           VerticalScrollBarVisibility="Hidden", и без предела поле растёт бесконечно.
-          MaxLength ссылается на правило, а не на число в разметке.
         -->
         <TextBox x:Name="NameBox"
                  Grid.Row="1"

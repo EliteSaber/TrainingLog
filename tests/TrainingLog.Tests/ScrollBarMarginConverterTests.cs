@@ -9,10 +9,7 @@ namespace TrainingLog.Tests;
 /// </summary>
 public sealed class ScrollBarMarginConverterTests
 {
-    /// <summary>
-    /// Полоса на месте — правого отступа нет: она стоит у края окна, и воздух между ней и
-    /// таблицей читался бы как разрыв, которого слева нет.
-    /// </summary>
+    /// <summary>Воздух между полосой и таблицей читался бы как разрыв, которого слева нет.</summary>
     [Fact]
     public void Resolve_ПолосаНаМесте_ПравогоОтступаНет()
     {
@@ -28,20 +25,14 @@ public sealed class ScrollBarMarginConverterTests
         Assert.Equal(new Thickness(16, 0, 16, 0), ScrollBarMarginConverter.Resolve(Visibility.Collapsed, 16));
     }
 
-    /// <summary>
-    /// <c>Hidden</c> полосой не считается: скролл отдаёт <c>Visible</c> или <c>Collapsed</c>,
-    /// а на любой другой ответ правило даёт запас с обеих сторон.
-    /// </summary>
+    /// <summary>Скролл отдаёт <c>Visible</c> или <c>Collapsed</c>, на любой другой ответ — запас с обеих сторон.</summary>
     [Fact]
     public void Resolve_ПолосаСкрыта_ОтступыСимметричные()
     {
         Assert.Equal(new Thickness(16, 0, 16, 0), ScrollBarMarginConverter.Resolve(Visibility.Hidden, 16));
     }
 
-    /// <summary>
-    /// Величина отступа приходит из разметки, а не зашита в правило: иначе смена отступа окна
-    /// разъезжалась бы с числом в коде.
-    /// </summary>
+    /// <summary>Иначе смена отступа окна разъезжалась бы с числом в коде.</summary>
     [Fact]
     public void Resolve_ДругойОтступ_УчитываетПереданный()
     {

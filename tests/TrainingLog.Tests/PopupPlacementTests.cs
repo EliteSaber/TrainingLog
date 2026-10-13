@@ -4,7 +4,7 @@ using TrainingLog.Controls;
 namespace TrainingLog.Tests;
 
 /// <summary>
-/// Правило положения подсказки в окне: центры совпадают, а выход за границу сдвигает ровно на
+/// Правило положения подсказки: центры совпадают, а выход за границу сдвигает ровно на
 /// величину выхода. Проверяется чистая функция — сценарий с живым <c>Popup</c> без поднятия окна
 /// не проверяется в принципе.
 /// </summary>
@@ -12,21 +12,14 @@ public sealed class PopupPlacementTests
 {
     private const double Gap = 4;
 
-    /// <summary>
-    /// Поле «Количество дней» в шапке главного окна: окно 900 px минус отступ 16, поле у правого
-    /// края шапки. Числа взяты из разметки — правило проверяется на той геометрии, ради которой
-    /// и написано.
-    /// </summary>
+    /// <summary>Поле «Количество дней» в шапке главного окна. Числа взяты из разметки.</summary>
     private static readonly Rect Field = new(687, 16, 52, 22);
 
     /// <summary>
-    /// Содержимое главного окна в координатах окна: клиентская область без заголовка и рамок.
+    /// Содержимое главного окна в координатах окна. Начало не в нуле — рамка и заголовок сдвигают
+    /// содержимое, и именно поэтому пределы нельзя брать у <c>Window.ActualHeight</c>: это размер
+    /// окна целиком, и подсказка по нему уезжала за нижнюю границу.
     /// </summary>
-    /// <remarks>
-    /// Начало не в нуле — рамка и заголовок сдвигают содержимое вниз и вправо, и именно поэтому
-    /// пределы нельзя брать у <c>Window.ActualHeight</c>: это размер окна целиком, и подсказка по
-    /// нему уезжала за нижнюю границу окна.
-    /// </remarks>
     private static readonly Rect Content = new(0, 0, 900, 520);
 
     /// <summary>Рабочая область: содержимое окна минус отступ 16 по краям.</summary>
@@ -38,17 +31,10 @@ public sealed class PopupPlacementTests
     /// <summary>Предел, ниже которого подсказка уже нечитаема: тест берёт тот же, что контрол.</summary>
     private const double MinimumWidth = 120;
 
-    /// <summary>
-    /// Ширина текста в одну строку, заведомо шире любого предела в этих тестах: проверки предела
-    /// от него не зависят.
-    /// </summary>
+    /// <summary>Ширина текста, заведомо шире любого предела в этих тестах.</summary>
     private const double Width = 900;
 
     /// <summary>Размер рисунка стрелки, тест берёт те же, что контрол.</summary>
-    /// <remarks>
-    /// Правило прижима работает для любой ширины, так что на результат проверок это не влияет и
-    /// нужно только ради единообразия с контролом.
-    /// </remarks>
     private const double ArrowWidth = 18;
 
     /// <summary>Отступ стрелки от краёв блока, тест берёт тот же, что контрол.</summary>
@@ -64,10 +50,7 @@ public sealed class PopupPlacementTests
         Assert.Equal(Field.Left + (Field.Width - popup.Width) / 2, placement.X);
     }
 
-    /// <summary>
-    /// Обычный случай: подсказка шире поля, поэтому она свисает влево от него, но центры всё
-    /// равно совпадают и в окно целиком помещается — сдвигать нечего.
-    /// </summary>
+    /// <summary>Подсказка свисает влево от поля, но центры совпадают и в окно помещается — сдвигать нечего.</summary>
     [Fact]
     public void Resolve_ШирокаяПодсказка_ЦентрВсёЕщёСовпадает()
     {
@@ -97,7 +80,6 @@ public sealed class PopupPlacementTests
         Assert.Equal(Window.Right - popup.Width, placement.X);
     }
 
-    /// <summary>Поле у самого левого края окна — симметрично, сдвиг вправо ровно на выход.</summary>
     [Fact]
     public void Resolve_ВышелЛевыйКрай_СдвигРовноНаВыход()
     {
@@ -109,10 +91,7 @@ public sealed class PopupPlacementTests
         Assert.Equal(Window.Left, placement.X);
     }
 
-    /// <summary>
-    /// Шириной подсказки управляет вызывающий, но если предел не сработал, правило всё равно не
-    /// выпускает её за левый край окна.
-    /// </summary>
+    /// <summary>Шириной подсказки управляет вызывающий, но правило всё равно не выпускает её за левый край.</summary>
     [Fact]
     public void Resolve_ПодсказкаШиреОкна_ПрижатаКЛевомуКраю()
     {
@@ -128,7 +107,6 @@ public sealed class PopupPlacementTests
         Assert.Equal(Field.Bottom + Gap, placement.Y);
     }
 
-    /// <summary>Поле у нижнего края окна: подсказка сдвигается вверх ровно на величину выхода.</summary>
     [Fact]
     public void Resolve_ВышелНижнийКрай_СдвигРовноНаВыход()
     {
@@ -139,10 +117,7 @@ public sealed class PopupPlacementTests
         Assert.Equal(Window.Bottom - Hint.Height, placement.Y);
     }
 
-    /// <summary>
-    /// Подсказка выше окна целиком: сдвигать вверх больше некуда, и она прижимается к верхнему
-    /// краю — накладываться приходится на содержимое окна, но не выходить за его пределы.
-    /// </summary>
+    /// <summary>Сдвигать вверх больше некуда: накладываться приходится на содержимое окна, но не выходить за его пределы.</summary>
     [Fact]
     public void Resolve_ПодсказкаВышеОкна_ПрижатаКВерхнемуКраю()
     {
@@ -153,7 +128,6 @@ public sealed class PopupPlacementTests
         Assert.Equal(Window.Top, placement.Y);
     }
 
-    /// <summary>Зазор между полем и подсказкой задаётся вызывающим и соблюдается.</summary>
     [Theory]
     [InlineData(0d)]
     [InlineData(4d)]
@@ -165,9 +139,6 @@ public sealed class PopupPlacementTests
         Assert.Equal(Field.Bottom + gap, placement.Y);
     }
 
-    /// <summary>
-    /// Места по обе стороны от центра поля хватает — предел ширины не ограничивает ничего.
-    /// </summary>
     [Fact]
     public void ResolveWidth_МестаХватает_ПределНеОграничивает()
     {
@@ -176,10 +147,7 @@ public sealed class PopupPlacementTests
         Assert.True(width > Hint.Width);
     }
 
-    /// <summary>
-    /// Поле у правого края окна: предел равен удвоенному расстоянию от центра поля до края, и
-    /// блок в этих границах центрируется без сдвига.
-    /// </summary>
+    /// <summary>Предел равен удвоенному расстоянию от центра поля до края.</summary>
     [Fact]
     public void ResolveWidth_ПолеУПравогоКрая_ПределОтЦентраДоКрая()
     {
@@ -202,10 +170,7 @@ public sealed class PopupPlacementTests
         Assert.Equal(2 * (center - Window.Left), width);
     }
 
-    /// <summary>
-    /// Поле у самого края: места меньше читаемой ширины, и правило отдаёт пол — центрирование
-    /// тогда уступает, и работает сдвиг по границе.
-    /// </summary>
+    /// <summary>Центрирование уступает, и работает сдвиг по границе.</summary>
     [Fact]
     public void ResolveWidth_МестаПочтиНет_ВозвращаетсяПол()
     {
@@ -214,10 +179,7 @@ public sealed class PopupPlacementTests
         Assert.Equal(MinimumWidth, PopupPlacement.ResolveWidth(target, Window, Width, MinimumWidth));
     }
 
-    /// <summary>
-    /// Смысл предела: с такой шириной правило положения не сдвигает блок, то есть подсказка
-    /// стоит по центру поля. Это и есть требование, ради которого предел и введён.
-    /// </summary>
+    /// <summary>Смысл предела: с такой шириной правило положения не сдвигает блок.</summary>
     [Fact]
     public void ResolveWidth_ПредельныйРазмер_ЦентрСохраняется()
     {
@@ -231,10 +193,7 @@ public sealed class PopupPlacementTests
         Assert.True(placement.X + width <= Window.Right);
     }
 
-    /// <summary>
-    /// Предел высоты — это окно минус зазор до поля и минус собственные поля блока. Проверяется
-    /// числом, а не «помещается ли»: смысл предела ровно в этом равенстве.
-    /// </summary>
+    /// <summary>Предел высоты — окно минус зазор до поля и минус поля блока.</summary>
     [Fact]
     public void ResolveMaxHeight_ОтнимаетЗазорИПоляБлока()
     {
@@ -245,11 +204,7 @@ public sealed class PopupPlacementTests
         Assert.Equal(Window.Height - Gap - chrome, height);
     }
 
-    /// <summary>
-    /// Смысл предела высоты: с блоком такой высоты правило положения влезает в окно целиком,
-    /// то есть нижний край подсказки не уезжает за границу. Без предела блок длиннее окна и
-    /// правило прижимает его к верхнему краю — с уходом низа за окно.
-    /// </summary>
+    /// <summary>Без предела блок длиннее окна и правило прижимает его к верхнему краю — с уходом низа за окно.</summary>
     [Fact]
     public void ResolveMaxHeight_ПредельныйРазмер_БлокВлезаетВОкно()
     {
@@ -262,32 +217,21 @@ public sealed class PopupPlacementTests
         Assert.True(placement.Y + height <= Window.Bottom);
     }
 
-    /// <summary>
-    /// Окно меньше самой подсказки с её полями: правило возвращает ноль, а не отрицательный
-    /// предел, который в разметку не поставить.
-    /// </summary>
+    /// <summary>Ноль, а не отрицательный предел, который в разметку не поставить.</summary>
     [Fact]
     public void ResolveMaxHeight_ОкноМеньшеПодсказки_Ноль()
     {
         Assert.Equal(0, PopupPlacement.ResolveMaxHeight(Window, Gap, chrome: 600));
     }
 
-    /// <summary>
-    /// Отступ отступом: рабочая область начинается на отступ внутрь содержимого по каждой оси, и
-    /// её размер меньше размера содержимого вдвое по отступу. Начало не в нуле — содержимое сдвинуто
-    /// рамкой и заголовком, и этот сдвиг обязан сохраниться.
-    /// </summary>
+    /// <summary>Сдвиг содержимого рамкой и заголовком обязан сохраниться.</summary>
     [Fact]
     public void WorkArea_ОтступСоВсехСторон_НачалоСодержимогоСохраняется()
     {
         Assert.Equal(new Rect(16, 16, 868, 488), PopupPlacement.WorkArea(Content, inset: 16));
     }
 
-    /// <summary>
-    /// Смысл правила: нижняя граница рабочей области — это нижняя граница содержимого окна, а не
-    /// окна. Иначе правило положения прижимает подсказку к низу окна вместе с заголовком и рамкой,
-    /// то есть рисует её за пределами окна.
-    /// </summary>
+    /// <summary>Нижняя граница — это граница содержимого окна, а не окна: иначе правило рисует подсказку за пределами окна.</summary>
     [Fact]
     public void WorkArea_ПределСодержимого_НеЗаходитНаЗаголовок()
     {
@@ -297,10 +241,7 @@ public sealed class PopupPlacementTests
         Assert.True(workArea.Bottom <= Content.Bottom);
     }
 
-    /// <summary>
-    /// Отступ, съедающий содержимое, даёт точку, а не перевёрнутый прямоугольник: правило положения
-    /// всё равно прижмёт блок к краю, и отрицательные размеры испортили бы только сдвиг.
-    /// </summary>
+    /// <summary>Точка, а не перевёрнутый прямоугольник: отрицательные размеры испортили бы сдвиг.</summary>
     [Fact]
     public void WorkArea_ОтступБольшеСодержимого_Точка()
     {
@@ -309,20 +250,14 @@ public sealed class PopupPlacementTests
         Assert.Equal(new Rect(40, 40, 0, 0), workArea);
     }
 
-    /// <summary>
-    /// Текст короче предела: блок получает ширину текста, а не предел — иначе короткое сообщение
-    /// стояло бы с пустым полем сбоку.
-    /// </summary>
+    /// <summary>Иначе короткое сообщение стояло бы с пустым полем сбоку.</summary>
     [Fact]
     public void ResolveWidth_ТекстКорочеПредела_БерётсяТекст()
     {
         Assert.Equal(150, PopupPlacement.ResolveWidth(Field, Window, natural: 150, MinimumWidth));
     }
 
-    /// <summary>
-    /// Текст длиннее предела: блок сужается до предела и переносит текст по словам. Это и есть
-    /// требование «любой текст помещается в окно».
-    /// </summary>
+    /// <summary>Блок сужается до предела и переносит текст по словам — требование «любой текст помещается в окно».</summary>
     [Fact]
     public void ResolveWidth_ТекстДлиннееПредела_БерётсяПредел()
     {
@@ -332,10 +267,7 @@ public sealed class PopupPlacementTests
         Assert.Equal(cap, PopupPlacement.ResolveWidth(Field, Window, Width, MinimumWidth));
     }
 
-    /// <summary>
-    /// Блок не сдвинут: центр блока и центр поля совпадают, значит стрелка по центру поля стоит
-    /// ровно по центру блока — обе формулировки дают одну и ту же точку.
-    /// </summary>
+    /// <summary>Центры совпадают, значит обе формулировки дают одну и ту же точку.</summary>
     [Fact]
     public void ResolveArrowLeft_БлокНеСдвинут_СтрелкаПоЦентруБлокаИПоля()
     {
@@ -347,10 +279,7 @@ public sealed class PopupPlacementTests
         Assert.Equal(block.Left + ((block.Width - ArrowWidth) / 2), left);
     }
 
-    /// <summary>
-    /// Блок сдвинут к краю окна, так что центр поля уже не совпадает с центром блока. Стрелка
-    /// обязана остаться на поле — указывать мимо значило бы указать на пустое место окна.
-    /// </summary>
+    /// <summary>Стрелка обязана остаться на поле: указывать мимо значило бы указать на пустое место окна.</summary>
     [Fact]
     public void ResolveArrowLeft_БлокСДвинут_СтрелкаВсёЕщёНаПоле()
     {
@@ -362,10 +291,7 @@ public sealed class PopupPlacementTests
         Assert.Equal(center - (ArrowWidth / 2), left);
     }
 
-    /// <summary>
-    /// Центр поля почти у края блока: без прижима стрелка свесилась бы с него. Прижим задан
-    /// отступом, и в него же она упирается.
-    /// </summary>
+    /// <summary>Прижим задан отступом, и в него же она упирается.</summary>
     [Fact]
     public void ResolveArrowLeft_ПолеУКраяБлока_СтрелкаВнутри()
     {
@@ -378,10 +304,7 @@ public sealed class PopupPlacementTests
         Assert.True(left + ArrowWidth <= block.Right);
     }
 
-    /// <summary>
-    /// Стрелка по центру поля ни при каких условиях не выходит за пределы блока: иначе у края
-    /// окна она уезжала бы за подсказку и читалась как отдельный предмет.
-    /// </summary>
+    /// <summary>Иначе у края окна стрелка уехала бы за подсказку и читалась как отдельный предмет.</summary>
     [Fact]
     public void ResolveArrowLeft_ПолеЗаБлоком_СтрелкаНеСвешивается()
     {

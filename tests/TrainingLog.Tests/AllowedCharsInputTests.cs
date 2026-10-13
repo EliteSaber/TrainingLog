@@ -45,21 +45,14 @@ public sealed class AllowedCharsInputTests
         Assert.False(AllowedCharsInput.IsAllowed(c, AllowedChars.DigitsWithSeparators));
     }
 
-    /// <summary>
-    /// Полноширинная цифра восточноазиатской раскладки цифрой не считается: <c>char.IsDigit</c>
-    /// её принимает, а <c>int.TryParse</c> не разбирает — и поле получило бы значение, на
-    /// котором сохранение погаснет.
-    /// </summary>
+    /// <summary><c>char.IsDigit</c> её принимает, а <c>int.TryParse</c> не разбирает.</summary>
     [Fact]
     public void IsAllowed_ПолношириннаяЦифра_Запрещена()
     {
         Assert.False(AllowedCharsInput.IsAllowed('６', AllowedChars.DigitsWithSeparators));
     }
 
-    /// <summary>
-    /// Набор не задан — поведение не подключено, и проверять нечего: поле принимает всё,
-    /// иначе фильтр висел бы на каждом поле окна без явного указания.
-    /// </summary>
+    /// <summary>Иначе фильтр висел бы на каждом поле окна без явного указания.</summary>
     [Fact]
     public void IsAllowed_НаборНеЗадан_РазрешеноВсё()
     {
@@ -78,10 +71,7 @@ public sealed class AllowedCharsInputTests
         Assert.True(AllowedCharsInput.IsTextAllowed("60,5", AllowedChars.DigitsWithSeparators));
     }
 
-    /// <summary>
-    /// Проверяется весь кусок, а не первый символ: метод ввода присылает в <c>PreviewTextInput</c>
-    /// сразу несколько символов, и решение принимается по всему тексту.
-    /// </summary>
+    /// <summary>Метод ввода присылает в <c>PreviewTextInput</c> сразу несколько символов.</summary>
     [Fact]
     public void IsTextAllowed_СмешанныйТекст_Запрещён()
     {
@@ -101,10 +91,7 @@ public sealed class AllowedCharsInputTests
         Assert.Equal("60", AllowedCharsInput.TakePaste("60", AllowedChars.Digits));
     }
 
-    /// <summary>
-    /// Копирование числа между окнами обычно приносит с собой перевод строки и пробелы по
-    /// краям — они не должны мешать вставке.
-    /// </summary>
+    /// <summary>Копирование числа между окнами обычно приносит перевод строки и пробелы по краям.</summary>
     [Theory]
     [InlineData("60\r\n", "60")]
     [InlineData("60\n", "60")]
@@ -137,10 +124,7 @@ public sealed class AllowedCharsInputTests
         Assert.Equal("60", AllowedCharsInput.TakePaste("\r\n   \n60", AllowedChars.Digits));
     }
 
-    /// <summary>
-    /// Отказ, а не вырезание символов: из «60 10» вырезание дало бы «6010», то есть вес,
-    /// которого в буфере не было, и это хуже, чем ничего не вставить.
-    /// </summary>
+    /// <summary>Из «60 10» вырезание дало бы «6010» — вес, которого в буфере не было.</summary>
     [Fact]
     public void TakePaste_ЕдиницыИзмеренияВБуфере_Отказ()
     {

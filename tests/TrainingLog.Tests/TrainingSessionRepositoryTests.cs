@@ -5,9 +5,8 @@ using TrainingLog.Core.Repositories;
 namespace TrainingLog.Tests;
 
 /// <summary>
-/// Журнал тренировок. Три вещи проверяются здесь не только как результат, но и как инвариант:
-/// порядок выполнения и порядок подходов (на них держится вся раскладка строки дня) и то,
-/// что удаление упражнения или плана не стирает запись — она хранит копии названий.
+/// Журнал тренировок. Порядок выполнения и порядок подходов проверяются как инвариант: на них
+/// держится вся раскладка строки дня.
 /// </summary>
 public sealed class TrainingSessionRepositoryTests
 {
@@ -28,7 +27,6 @@ public sealed class TrainingSessionRepositoryTests
             PlanName = plan.Name,
         };
 
-        // Порядок задаётся вызывающим, а номера с единицы проставляются при сохранении.
         var legs = session.AddExercise(bench, "сначала жим");
         legs.AddSet(8, 60m);
         legs.AddSet(6, 70m);
@@ -79,10 +77,7 @@ public sealed class TrainingSessionRepositoryTests
             });
     }
 
-    /// <summary>
-    /// Вес — <c>decimal</c>, а SQLite хранит его как текст, поэтому значение обязано
-    /// вернуться тем же самым: тихо обрезанный вес в журнале недопустим.
-    /// </summary>
+    /// <summary>SQLite хранит вес как текст: тихо обрезанный вес в журнале недопустим.</summary>
     [Fact]
     public async Task AddAsync_ДробныйВес_ВозвращаетсяБезОкругления()
     {
@@ -168,10 +163,7 @@ public sealed class TrainingSessionRepositoryTests
         Assert.Null(await database.SessionRepository.GetByDateAsync(new DateOnly(2026, 10, 2)));
     }
 
-    /// <summary>
-    /// Правка дня переписывает запись целиком: ушедшие упражнения и подходы должны исчезнуть
-    /// из базы, а не остаться в ней с прошлой редакции.
-    /// </summary>
+    /// <summary>Ушедшие упражнения и подходы должны исчезнуть из базы, а не остаться с прошлой редакции.</summary>
     [Fact]
     public async Task UpdateAsync_ПравкаДня_ПереписываетСоставИПодходы()
     {
@@ -208,9 +200,8 @@ public sealed class TrainingSessionRepositoryTests
     }
 
     /// <summary>
-    /// Журнал переживает справочники: удаление упражнения обнуляет ссылку, но название
-    /// остаётся, и строка дня по-прежнему подписана. Проверяется именно идентификатор:
-    /// навигация при чтении не грузится, обнуление её ничего бы не доказало.
+    /// Проверяется именно идентификатор: навигация при чтении не грузится, обнуление её ничего бы
+    /// не доказало.
     /// </summary>
     [Fact]
     public async Task УдалениеУпражнения_ЗаписьОстаётсяСКопиейНазвания()
@@ -231,9 +222,6 @@ public sealed class TrainingSessionRepositoryTests
         Assert.Equal("Приседание", entry.ExerciseName);
     }
 
-    /// <summary>
-    /// То же для плана: переименование и удаление не переписывают историю.
-    /// </summary>
     [Fact]
     public async Task УдалениеПлана_ЗаписьОстаётсяСКопиейНазвания()
     {
@@ -254,10 +242,7 @@ public sealed class TrainingSessionRepositoryTests
         Assert.Equal("Приседание", Assert.Single(stored.Exercises).ExerciseName);
     }
 
-    /// <summary>
-    /// Упражнение, удалённое из справочника, пока окно добавления дня открыто, из новой
-    /// записи выпадает — как и у плана: запись собирается по тому, что есть в базе.
-    /// </summary>
+    /// <summary>Запись собирается по тому, что есть в базе, — как и у плана.</summary>
     [Fact]
     public async Task AddAsync_УпражнениеУдаленоПокаОткрыто_ВыпадаетИзЗаписи()
     {
@@ -290,8 +275,7 @@ public sealed class TrainingSessionRepositoryTests
         await AddSessionWithSetsAsync(database, new DateOnly(2026, 10, 8), plan, 8, 60m);
         await AddSessionWithSetsAsync(database, new DateOnly(2026, 10, 10), plan, 5, 80m);
 
-        // Запись с другим планом ближе по дате: она пропускается, план сопоставляется по
-        // идентификатору, а не по дате.
+        // Записи с другим планом пропускаются: план сопоставляется по идентификатору, а не по дате.
         await AddSessionWithSetsAsync(database, new DateOnly(2026, 10, 9), other, 12, 20m);
 
         var previous = await database.SessionRepository.GetPreviousByPlanAsync(plan.Id, new DateOnly(2026, 10, 10));
@@ -306,11 +290,7 @@ public sealed class TrainingSessionRepositoryTests
         Assert.Equal(60m, set.Weight);
     }
 
-    /// <summary>
-    /// Граница строго «раньше»: запись на ту же дату и все более поздние не берутся. Запись
-    /// на дату уникальна, так что при подтягивании к пустому дню это одно и то же — но
-    /// правило проверяется явно, иначе «раньше» незаметно превратилось бы в «не позже».
-    /// </summary>
+    /// <summary>Иначе «раньше» незаметно превратилось бы в «не позже».</summary>
     [Fact]
     public async Task GetPreviousByPlanAsync_ДатаИПозже_НеБерутся()
     {
@@ -351,10 +331,7 @@ public sealed class TrainingSessionRepositoryTests
         Assert.Null(await database.SessionRepository.GetPreviousByPlanAsync(plan.Id, new DateOnly(2026, 10, 10)));
     }
 
-    /// <summary>
-    /// Несохранённый план в журнале не встречается, и запрос по нулевому идентификатору вернул
-    /// бы первую запись без плана — то есть подставил бы веса чужой тренировки.
-    /// </summary>
+    /// <summary>Запрос по нулевому идентификатору вернул бы первую запись без плана — веса чужой тренировки.</summary>
     [Fact]
     public async Task GetPreviousByPlanAsync_ПланНеСохранён_ВозвращаетNull()
     {
@@ -365,10 +342,7 @@ public sealed class TrainingSessionRepositoryTests
         Assert.Null(await database.SessionRepository.GetPreviousByPlanAsync(0, new DateOnly(2026, 10, 10)));
     }
 
-    /// <summary>
-    /// Подходы приходят по порядку выполнения: окно дня показывает их слева направо именно
-    /// в этом порядке, и подтягивание обязано вести себя так же.
-    /// </summary>
+    /// <summary>Подтягивание обязано вести себя так же, как чтение дня.</summary>
     [Fact]
     public async Task GetPreviousByPlanAsync_ПодходыПоПорядку()
     {

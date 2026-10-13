@@ -3,11 +3,7 @@ using TrainingLog.Services;
 
 namespace TrainingLog.Tests;
 
-/// <summary>
-/// Рукописный подменный <see cref="IWindowService"/>: mocking-библиотеки в проекте нет,
-/// а проверять окна в тестах не нужно — достаточно знать, открывалось ли окно и с каким
-/// результатом.
-/// </summary>
+/// <summary>Рукописный подменный <see cref="IWindowService"/>: окон в тестах не нужно.</summary>
 internal sealed class FakeWindowService : IWindowService
 {
     /// <summary>Что <c>ShowAddDay</c> вернёт вызывающему.</summary>
@@ -17,9 +13,9 @@ internal sealed class FakeWindowService : IWindowService
     /// Что сделает <c>ShowAddDay</c>, если задано: обычное действие вызывающего из теста.
     /// </summary>
     /// <remarks>
-    /// Нужно для проверки «сохранил без закрытия, потом закрыл крестиком»: возвращаемое
-    /// значение должно повторять настоящее поведение окна, а <see cref="AddDayResult"/> не
-    /// может выразить «сохранено, но <c>DialogResult</c> не выставлен».
+    /// Нужно для «сохранил без закрытия, потом закрыл крестиком»: возвращаемое значение должно
+    /// повторять настоящее поведение окна, а <see cref="AddDayResult"/> не может выразить
+    /// «сохранено, но <c>DialogResult</c> не выставлен».
     /// </remarks>
     public Func<Task>? OnAddDay { get; set; }
 
@@ -32,19 +28,16 @@ internal sealed class FakeWindowService : IWindowService
     /// <summary>Сколько раз открывали окно правки дня.</summary>
     public int EditDayCalls { get; private set; }
 
-    /// <summary>Дата последней правки дня: какую запись открыли на правку.</summary>
+    /// <summary>Дата последней правки дня.</summary>
     public DateOnly? LastEditDay { get; private set; }
 
     /// <summary>Что <c>ShowSettings</c> вернёт вызывающему.</summary>
     public bool SettingsResult { get; set; }
 
-    /// <summary>
-    /// Что сделает <c>ShowSettings</c>, если задано: обычное действие вызывающего из теста.
-    /// </summary>
+    /// <summary>Что сделает <c>ShowSettings</c>, если задано.</summary>
     /// <remarks>
     /// Нужно, чтобы окно параметров записало в файл то, что потом перечитает главное окно:
-    /// проверяется ровно то, что перечитывание случается по файлу, а не по значению,
-    /// оставшемуся у модели.
+    /// проверяется ровно то, что перечитывание случается по файлу.
     /// </remarks>
     public Action? OnSettings { get; set; }
 

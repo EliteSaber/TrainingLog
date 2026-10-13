@@ -64,11 +64,7 @@ public sealed class ExerciseRepositoryTests
         Assert.Single(await database.Repository.GetAllAsync());
     }
 
-    /// <summary>
-    /// Ключевой тест схемы: сравнение строк в SQLite складывает регистр только для ASCII,
-    /// поэтому «жим» и «Жим» база считает разными. Регистронезависимость обеспечивается
-    /// нормализованной колонкой NameKey, которую заполняет .NET.
-    /// </summary>
+    /// <summary>SQLite складывает регистр только для ASCII, регистронезависимость даёт колонка NameKey.</summary>
     [Theory]
     [InlineData("жим", "Жим")]
     [InlineData("ЖИМ ЛЁЖА", "жим лёжа")]
@@ -238,11 +234,7 @@ public sealed class ExerciseRepositoryTests
         Assert.Equal(3, (await database.Repository.GetAllAsync()).Count);
     }
 
-    /// <summary>
-    /// Порядок определяет вызывающий: контракт GetAllAsync сортировки не обещает.
-    /// Сортировка по кодам Unicode в SQLite совпадает с русским алфавитом, потому что
-    /// блок кириллицы непрерывен и отсортирован по порядку букв.
-    /// </summary>
+    /// <summary>Сортировка по кодам Unicode в SQLite совпадает с русским алфавитом.</summary>
     [Fact]
     public async Task Сортировка_ПоАлфавиту_РаботаетДляКириллицы()
     {
@@ -280,10 +272,7 @@ public sealed class ExerciseRepositoryTests
         });
     }
 
-    /// <summary>
-    /// Событие <see cref="IExerciseRepository.Changed"/> держит окно планов в курсе: без него
-    /// переименование и удаление упражнения остаются в соседнем окне незаметными.
-    /// </summary>
+    /// <summary>Без него переименование и удаление упражнения остались бы в соседнем окне незаметными.</summary>
     [Fact]
     public async Task Changed_УспешныеЗаписи_ПоднимаютСобытие()
     {

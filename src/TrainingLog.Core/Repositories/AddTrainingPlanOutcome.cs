@@ -1,22 +1,14 @@
 namespace TrainingLog.Core.Repositories;
 
-/// <summary>
-/// Результат добавления плана.
-/// </summary>
+/// <summary>Результат добавления плана.</summary>
 public enum AddTrainingPlanOutcome
 {
-    /// <summary>
-    /// План добавлен.
-    /// </summary>
+    /// <summary>План добавлен.</summary>
     Added,
 
-    /// <summary>
-    /// Наименование пустое либо состоит только из пробелов.
-    /// </summary>
+    /// <summary>Наименование пустое либо из одних пробелов.</summary>
     NameIsEmpty,
 
-    /// <summary>
-    /// Наименование уже занято другим планом. Сравнение регистронезависимое.
-    /// </summary>
+    /// <summary>Сравнение с уже существующими регистронезависимое.</summary>
     DuplicateName
 }

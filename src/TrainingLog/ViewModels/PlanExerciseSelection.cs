@@ -21,20 +21,14 @@ public sealed partial class PlanExerciseSelection : ObservableObject
         Exercise = exercise;
     }
 
-    /// <summary>Упражнение из справочника.</summary>
     public Exercise Exercise { get; }
 
-    /// <summary>Наименование упражнения для показа в списке.</summary>
     public string Name => Exercise.Name;
 
-    /// <summary>Входит ли упражнение в план.</summary>
     [ObservableProperty]
     private bool _isChecked;
 
-    /// <summary>
-    /// Место в порядке выполнения, с единицы. Пока строка не добавлена в план, значение
-    /// нулевое — показывать его негде.
-    /// </summary>
+    /// <summary>Пока строка не добавлена в план, значение нулевое — показывать его негде.</summary>
     [ObservableProperty]
     private int _position;
 }

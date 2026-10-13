@@ -30,7 +30,6 @@ public sealed partial class EditExerciseViewModel : ObservableObject
         Name = exercise.Name;
     }
 
-    /// <summary>Название в поле ввода.</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AcceptCommand))]
     private string _name = string.Empty;
@@ -47,9 +46,6 @@ public sealed partial class EditExerciseViewModel : ObservableObject
     /// </summary>
     private bool CanAccept() => NameRules.IsValidEdit(Name, _exercise.Name, _others.Select(exercise => exercise.Name));
 
-    /// <summary>
-    /// Загружает справочник для проверки дубликатов. Вызывается окном при загрузке.
-    /// </summary>
     [RelayCommand]
     private async Task InitializeAsync()
     {

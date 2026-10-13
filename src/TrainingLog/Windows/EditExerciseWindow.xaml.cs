@@ -4,9 +4,6 @@ using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
 
-/// <summary>
-/// Interaction logic for EditExerciseWindow.xaml
-/// </summary>
 public partial class EditExerciseWindow : Window
 {
     private readonly EditExerciseViewModel _viewModel;

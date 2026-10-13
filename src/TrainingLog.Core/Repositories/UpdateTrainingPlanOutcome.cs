@@ -1,27 +1,17 @@
 namespace TrainingLog.Core.Repositories;
 
-/// <summary>
-/// Результат изменения плана.
-/// </summary>
+/// <summary>Результат изменения плана.</summary>
 public enum UpdateTrainingPlanOutcome
 {
-    /// <summary>
-    /// План сохранён вместе с новым составом упражнений.
-    /// </summary>
+    /// <summary>План сохранён вместе с новым составом упражнений.</summary>
     Updated,
 
-    /// <summary>
-    /// Наименование пустое либо состоит только из пробелов.
-    /// </summary>
+    /// <summary>Наименование пустое либо из одних пробелов.</summary>
     NameIsEmpty,
 
-    /// <summary>
-    /// Наименование уже занято другим планом. Сравнение регистронезависимое.
-    /// </summary>
+    /// <summary>Сравнение с уже существующими регистронезависимое.</summary>
     DuplicateName,
 
-    /// <summary>
-    /// Плана с таким идентификатором нет.
-    /// </summary>
+    /// <summary>Плана с таким идентификатором нет.</summary>
     NotFound
 }
