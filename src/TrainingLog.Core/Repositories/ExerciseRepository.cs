@@ -121,6 +121,71 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
         return true;
     }
 
+    public async Task<ImportExercisesOutcome> ImportAsync(
+        IReadOnlyList<string> names,
+        bool replaceExisting,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+
+        // То же правило, что в окне импорта: если что-то отброшено, запись не начинается. Иначе
+        // файл с одной плохой строкой записался бы частично, и пользователь об этом не узнал бы.
+        var accepted = ExerciseImportRules.Read(names);
+
+        if (accepted.Count == 0)
+        {
+            return ImportExercisesOutcome.NothingToImport;
+        }
+
+        if (accepted.Count != names.Count)
+        {
+            return ImportExercisesOutcome.InvalidName;
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await using var transaction = await context.Database
+                .BeginTransactionAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (replaceExisting)
+            {
+                context.Exercises.RemoveRange(
+                    await context.Exercises.ToListAsync(cancellationToken).ConfigureAwait(false));
+
+                // Отдельным сохранением: порядок команд внутри одного SaveChanges такой, что вставка
+                // идёт раньше удаления, а упражнение с тем же названием из файла упёрлось бы в
+                // уникальный индекс прежнего. Транзакция держит обе части вместе — отказ на
+                // вставке не оставил бы справочник пустым.
+                await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var name in accepted)
+            {
+                var exercise = new Exercise { Name = name };
+                context.Exercises.Add(exercise);
+                context.Entry(exercise).Property(TrainingLogDbContext.NameKeyPropertyName).CurrentValue =
+                    TrainingLogDbContext.NormalizeNameKey(name);
+            }
+
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException)
+        {
+            // Тот же уникальный индекс, что у добавления: предварительная проверка разошлась с
+            // базой — файл открыт в двух окнах или упражнение добавили, пока окно импорта ждало.
+            return ImportExercisesOutcome.DuplicateName;
+        }
+
+        NotifyChanged();
+
+        return ImportExercisesOutcome.Imported;
+    }
+
     public async Task<bool> ExistsByNameAsync(
         string name,
         int? excludeId = null,

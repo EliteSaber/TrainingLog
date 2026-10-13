@@ -104,6 +104,25 @@ public sealed partial class ExercisesViewModel : ObservableObject
     private void ToggleSort() => IsDescending = !IsDescending;
 
     /// <summary>
+    /// Открывает окно импорта и перечитывает справочник, если упражнения записаны.
+    /// </summary>
+    /// <remarks>
+    /// Перечитывание обязательно: окно импорта пишет в базу мимо этой модели, и её собственные
+    /// объекты после замены справочника устарели — без перечитывания список остался бы прежним,
+    /// и правка выглядела бы несработавшей.
+    /// </remarks>
+    [RelayCommand]
+    private async Task ImportAsync()
+    {
+        if (!_windowService.ShowImportExercises())
+        {
+            return;
+        }
+
+        await LoadAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
     /// Открывает модальное окно правки. Объект <paramref name="exercise"/> общий с моделью
     /// представления окна справочника: репозиторий записывает новое название прямо в него,
     /// поэтому после успешной правки достаточно перестроить видимый список.

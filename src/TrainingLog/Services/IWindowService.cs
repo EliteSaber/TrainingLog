@@ -17,6 +17,12 @@ public interface IWindowService
     /// <returns><c>true</c>, если изменения приняты и сохранены.</returns>
     bool ShowEditExercise(Exercise exercise);
 
+    /// <summary>
+    /// Импорт упражнений из файла. Окно создаётся заново на каждый вызов, как и окно правки.
+    /// </summary>
+    /// <returns><c>true</c>, если упражнения записаны.</returns>
+    bool ShowImportExercises();
+
     /// <summary>Добавление плана. Окно то же, что и при правке.</summary>
     /// <returns><c>true</c>, если план сохранён.</returns>
     bool ShowAddPlan();

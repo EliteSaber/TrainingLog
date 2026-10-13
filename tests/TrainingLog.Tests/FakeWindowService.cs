@@ -44,6 +44,12 @@ internal sealed class FakeWindowService : IWindowService
     /// <summary>Сколько раз открывали окно параметров.</summary>
     public int SettingsCalls { get; private set; }
 
+    /// <summary>Что <c>ShowImportExercises</c> вернёт вызывающему.</summary>
+    public bool ImportResult { get; set; }
+
+    /// <summary>Сколько раз открывали окно импорта.</summary>
+    public int ImportCalls { get; private set; }
+
     public void OpenExercises()
     {
     }
@@ -62,6 +68,13 @@ internal sealed class FakeWindowService : IWindowService
     }
 
     public bool ShowEditExercise(Exercise exercise) => false;
+
+    public bool ShowImportExercises()
+    {
+        ImportCalls++;
+
+        return ImportResult;
+    }
 
     public bool ShowAddPlan() => false;
 

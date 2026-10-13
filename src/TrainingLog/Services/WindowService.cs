@@ -14,6 +14,7 @@ namespace TrainingLog.Services;
 public sealed class WindowService(
     Func<ExercisesWindow> exercisesWindowFactory,
     Func<Exercise, EditExerciseWindow> editExerciseWindowFactory,
+    Func<ImportExercisesWindow> importExercisesWindowFactory,
     Func<PlansWindow> plansWindowFactory,
     Func<EditPlanWindow> addPlanWindowFactory,
     Func<TrainingPlan, EditPlanWindow> editPlanWindowFactory,
@@ -38,6 +39,9 @@ public sealed class WindowService(
 
         return ShowDialog(window, _exercises.Current ?? Application.Current?.MainWindow);
     }
+
+    public bool ShowImportExercises() =>
+        ShowDialog(importExercisesWindowFactory(), _exercises.Current ?? Application.Current?.MainWindow);
 
     public bool ShowAddPlan() => ShowDialog(addPlanWindowFactory(), PlansOwner);
 

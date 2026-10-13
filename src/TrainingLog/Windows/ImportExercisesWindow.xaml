@@ -1,0 +1,165 @@
+<Window x:Class="TrainingLog.Windows.ImportExercisesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:TrainingLog.ViewModels"
+        xmlns:helpers="clr-namespace:TrainingLog.Controls"
+        xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
+        d:DataContext="{d:DesignInstance Type=vm:ImportExercisesViewModel}"
+        mc:Ignorable="d"
+        Title="Импорт упражнений"
+        Width="560"
+        Height="520"
+        MinWidth="460"
+        MinHeight="360"
+        AllowDrop="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        DragOver="OnDragOver"
+        Drop="OnDrop">
+    <!--
+      Ресурсы объявлены в окне, а не в App.xaml: окно должно создаваться без приложения (ловушка 6).
+
+      Файл можно перетащить в любое место окна, поэтому DragOver и Drop висят на самом Window, а не
+      на рамке подсказки: зона приёма совпадает с окном и не требует прицеливания.
+    -->
+    <Window.Resources>
+        <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--
+          Путь в колонке `*`, а не в Auto: путь длинный, и в Auto-колонке он раздвинул бы окно, а
+          переноса у него нет (ловушка 38). Полный путь — в подсказке поля.
+
+          Высота поля равна высоте ряда, а ряд задаёт кнопка «Выбрать файл…»: VerticalAlignment
+          не задан, иначе поле оказалось бы на пару пикселей короче (ловушка 39).
+        -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Background="Transparent" обязателен: с null-фоном подпись ловит клик только по буквам (ловушка 13). -->
+            <TextBlock Grid.Column="0"
+                       Background="Transparent"
+                       VerticalAlignment="Center"
+                       Text="Файл"
+                       helpers:ClickToFocus.Target="{Binding ElementName=PathBox}" />
+
+            <TextBox x:Name="PathBox"
+                     Grid.Column="1"
+                     Margin="8,0,0,0"
+                     Padding="4,3"
+                     IsReadOnly="True"
+                     VerticalContentAlignment="Center"
+                     Text="{Binding SourcePath}"
+                     ToolTip="{Binding SourcePath}" />
+
+            <Button Grid.Column="2"
+                    Margin="8,0,0,0"
+                    Padding="14,4"
+                    VerticalAlignment="Center"
+                    Click="OnBrowseClick"
+                    Content="Выбрать файл…" />
+        </Grid>
+
+        <!--
+          Сводка о загрузке. Отдельной строкой, а не подсказкой у поля: она объясняет, куда делись
+          строки файла, и обязана дождаться, пока её прочитают.
+        -->
+        <TextBlock Grid.Row="1"
+                   Margin="0,8,0,0"
+                   Foreground="Gray"
+                   TextWrapping="Wrap"
+                   Text="{Binding Summary}"
+                   Visibility="{Binding HasSummary, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+        <!--
+          Примечание в `*`-колонке: оно длинное и переносится по словам, а горизонтальная панель
+          меряет содержимое бесконечной шириной и перенос сломала бы (ловушка 29).
+        -->
+        <Grid Grid.Row="2"
+              Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <CheckBox Grid.Column="0"
+                      VerticalAlignment="Center"
+                      Content="Очистить справочник"
+                      IsChecked="{Binding ClearExisting}" />
+
+            <TextBlock Grid.Column="1"
+                       Margin="8,0,0,0"
+                       VerticalAlignment="Center"
+                       Foreground="Gray"
+                       TextWrapping="Wrap"
+                       Text="Текущие упражнения будут удалены: из планов они тоже исчезнут, а в журнале тренировок останутся только названия." />
+        </Grid>
+
+        <TextBlock Grid.Row="3"
+                   Margin="0,12,0,4"
+                   FontWeight="SemiBold"
+                   Text="Упражнения, по одному в строке" />
+
+        <!--
+          Список в строке `*`: предел высоты задаёт контейнер, а не содержимое, поэтому MaxHeight
+          здесь вреден и отменяет растяжение (ловушка 12). Перенос выключен намеренно — одна строка
+          это одно упражнение, и перенос сбил бы это соответствие.
+        -->
+        <TextBox Grid.Row="4"
+                 Padding="4,3"
+                 AcceptsReturn="True"
+                 TextWrapping="NoWrap"
+                 HorizontalScrollBarVisibility="Auto"
+                 VerticalScrollBarVisibility="Auto"
+                 Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+
+        <!-- Отказ живёт до успеха, а не пять секунд в подсказке: упражнения не записаны. -->
+        <TextBlock Grid.Row="5"
+                   Margin="0,10,0,0"
+                   Foreground="Firebrick"
+                   TextWrapping="Wrap"
+                   Text="{Binding Status}"
+                   Visibility="{Binding HasStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+        <!--
+          IsDefault один в окне: иначе Enter звал бы обе кнопки. При этом в списке Enter вставляет
+          строку — AcceptsReturn перехватывает его раньше кнопки, как в поле примечания окна дня.
+
+          «Сохранить» без привязки Command намеренно: перед записью с очисткой окно спрашивает
+          подтверждение и может отказать, а команда выполнилась бы в любом случае.
+          Серое состояние задано IsEnabled, а не CanExecute.
+        -->
+        <StackPanel Grid.Row="6"
+                    Margin="0,16,0,0"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <Button Padding="14,4"
+                    Click="OnSaveClick"
+                    Content="Сохранить"
+                    IsDefault="True"
+                    IsEnabled="{Binding CanSave}" />
+
+            <Button Margin="8,0,0,0"
+                    Padding="14,4"
+                    Content="Отменить"
+                    IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</Window>

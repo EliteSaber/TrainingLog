@@ -34,12 +34,57 @@
 
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <!-- MaxHeight ниже, чем в окне правки: поле стоит над списком и не должно сильно сдвигать его при вводе. -->
-            <TextBox Grid.Column="0"
+            <!--
+              Кнопки-иконки слева от поля: импорт, а следом экспорт — действия над справочником
+              целиком, а не над одной строкой. Панель горизонтальная, чтобы вторая кнопка
+              добавилась рядом первой и не трогала колонки.
+
+              Иконка штрихом, а не заливкой, как шестерёнка: готовых значков в проекте нет, а
+              геометрия из трёх линий — это стрелка в подставку, то есть импорт.
+
+              Высоты в ряду нет ни у кого: высоту задаёт «Добавить», остальные растягиваются под
+              неё, поэтому панель VerticalAlignment не задаёт. Горизонтальная панель отдаёт детям
+              всю высоту слота, и кнопка становится ровно такой же, как поле и «Добавить»
+              (ловушка 39).
+
+              Отступ по вертикали меньше, чем по горизонтали — намеренно: у растянутой кнопки он
+              в высоту не идёт, но задаёт её желаемый размер, и он должен остаться ниже высоты
+              ряда. С отступом 8 кнопка-иконка стала бы выше «Добавить» и подняла весь ряд.
+            -->
+            <StackPanel Grid.Column="0"
+                        Margin="0,0,8,0"
+                        Orientation="Horizontal">
+                <Button Padding="8,4"
+                        Command="{Binding ImportCommand}"
+                        ToolTip="Импорт упражнений из файла">
+                    <Button.Content>
+                        <Path Width="16"
+                              Height="16"
+                              Stretch="Uniform"
+                              Fill="Transparent"
+                              Stroke="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"
+                              StrokeThickness="3"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round"
+                              Data="M 12,3 L 12,12 M 8,8 L 12,12 L 16,8 M 4,15 L 4,20 L 20,20 L 20,15" />
+                    </Button.Content>
+                </Button>
+            </StackPanel>
+
+            <!--
+              MaxHeight ниже, чем в окне правки: поле стоит над списком и не должно сильно сдвигать его при вводе.
+
+              VerticalAlignment не задан, как и у соседей по ряду: высоту ряда задаёт «Добавить», а
+              поле растягивается под неё. С VerticalAlignment поле стало бы своей высоты и
+              разошлось с кнопками на пару пикселей (ловушка 39).
+            -->
+            <TextBox Grid.Column="1"
                      AcceptsReturn="False"
                      MaxHeight="60"
                      MaxLength="{x:Static core:NameRules.MaxNameLength}"
@@ -49,7 +94,7 @@
                      VerticalScrollBarVisibility="Auto"
                      Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" />
 
-            <Button Grid.Column="1"
+            <Button Grid.Column="2"
                     Margin="8,0,0,0"
                     Padding="14,4"
                     VerticalAlignment="Center"

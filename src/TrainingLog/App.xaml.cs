@@ -53,6 +53,8 @@ public partial class App : Application
             () => provider.GetRequiredService<ExercisesWindow>(),
             exercise => new EditExerciseWindow(
                 new EditExerciseViewModel(exercise, provider.GetRequiredService<IExerciseRepository>())),
+            () => new ImportExercisesWindow(new ImportExercisesViewModel(
+                provider.GetRequiredService<IExerciseRepository>())),
             () => provider.GetRequiredService<PlansWindow>(),
             // Добавление и правка плана открывают одно окно, поэтому фабрики две: отличаются они
             // планом и тем, новый он или уже сохранённый.
