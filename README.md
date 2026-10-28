@@ -1,6 +1,29 @@
 # TrainingLog
 
-WPF-заготовка (.NET 10) под будущее приложение журнала тренировок.
+<div align="center">
+
+  <img src="docs/logo.png" width="180" alt="TrainingLog" />
+
+</div>
+
+[![Release](https://img.shields.io/github/v/release/EliteSaber/TrainingLog.svg)](https://github.com/EliteSaber/TrainingLog/releases/latest)
+
+Приложение журнала тренировок (WPF, .NET 10).
+
+## Скачать
+
+Готовые сборки лежат на странице релизов:
+https://github.com/EliteSaber/TrainingLog/releases/latest
+
+- `TrainingLog-1.0.0-win-x64.exe` — один файл, нужен .NET 10 Desktop Runtime;
+- `TrainingLog-1.0.0-win-x64-selfcontained.zip` — ничего доустанавливать не надо.
+
+Настройки `settings.json` пишутся рядом с программой и при отсутствии создаются при
+первом запуске. База SQLite лежит в `%LOCALAPPDATA%\TrainingLog\exercises.db`,
+миграции применяются при старте.
+
+exe не подписан, поэтому Windows может показать предупреждение SmartScreen: «Подробнее» →
+«Выполнить».
 
 ## Требования
 
@@ -18,6 +41,9 @@ src/TrainingLog.Core/        net10.0 — доменная модель, EF Core 
 src/TrainingLog/             net10.0-windows — WPF-приложение (MVVM, CommunityToolkit.Mvvm)
 tests/TrainingLog.Tests/     тесты xUnit
 .vscode/                     tasks.json, launch.json, extensions.json
+docs/logo.png                логотип для шапки этого файла
+docs/releases/               заметки к релизам: их читает публикация на GitHub
+.github/workflows/           тесты на каждом коммите и сборка релиза по тегу
 ```
 
 MVVM: `CommunityToolkit.Mvvm` 8.2.2 — свойства через `[ObservableProperty]`, команды через `[RelayCommand]`.
