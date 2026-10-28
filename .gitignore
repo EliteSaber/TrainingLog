@@ -490,3 +490,8 @@ opencode.jsonc
 
 # Local notes: DB schema reference. The tracked artifact is docs/db-schema-er.md
 docs/db-schema.md
+
+# Release notes live in docs\releases, but the .gitignore template above hides any
+# releases folder - bring ours back.
+!docs/releases/
+!docs/releases/**
