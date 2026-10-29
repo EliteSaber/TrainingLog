@@ -144,7 +144,6 @@ public sealed class HintStateTests
         Assert.Equal(TimeSpan.FromSeconds(5), hint.Lifetime);
     }
 
-    /// <summary>Принятый ввод гасит подсказку, но не вычищает её текст.</summary>
     [Fact]
     public void DismissCommand_ПослеПоказа_ГаситПоказИОставляетТекст()
     {

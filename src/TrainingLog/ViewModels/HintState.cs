@@ -52,7 +52,6 @@ public sealed partial class HintState : ObservableObject
     [ObservableProperty]
     private string _text = string.Empty;
 
-    /// <summary>Показана ли подсказка.</summary>
     [ObservableProperty]
     private bool _isVisible;
 
@@ -101,14 +100,14 @@ public sealed partial class HintState : ObservableObject
     /// Гасит показ, оставляя текст.
     /// </summary>
     /// <remarks>
-    /// Текст не трогается намеренно: он должен дожить конца затухания и убирается по
+    /// Текст не трогается намеренно: он должен дожить до конца затухания и убирается по
     /// <see cref="ClearCommand"/>. Зовут это действие крестик, таймер и закрытие окна подсказки, и все
     /// три пути должны приводить к одному состоянию.
     /// </remarks>
     [RelayCommand]
     public void Dismiss() => IsVisible = false;
 
-    /// <summary>Убирает текст. Зовется после того, как подсказка исчезла.</summary>
+    /// <summary>Убирает текст. Зовётся после того, как подсказка исчезла.</summary>
     [RelayCommand]
     public void Clear() => Text = string.Empty;
 }

@@ -34,7 +34,6 @@ public sealed class DayRowViewModel
         PlanName = planName;
     }
 
-    /// <summary>Дата тренировки.</summary>
     public DateOnly Date { get; }
 
     /// <summary>Дата с сокращённым днём недели: «08 октября 2026 (вс)».</summary>

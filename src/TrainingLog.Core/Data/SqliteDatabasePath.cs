@@ -21,7 +21,6 @@ public static class SqliteDatabasePath
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "TrainingLog");
 
-    /// <summary>Умолчание директории: база по умолчанию лежит здесь.</summary>
     public static string Resolve() => Resolve(DefaultDirectory, FileName);
 
     /// <summary>

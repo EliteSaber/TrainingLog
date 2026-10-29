@@ -29,7 +29,7 @@ public sealed partial class PlanExerciseViewModel : ObservableObject
     /// <summary>Упражнение из справочника.</summary>
     public Exercise Exercise { get; }
 
-    /// <summary>Название упражнения: показывается и по кнопкой, и по центру окна.</summary>
+    /// <summary>Название упражнения: показывается и под кнопкой, и по центру окна.</summary>
     public string Name => Exercise.Name;
 
     /// <summary>Номер кнопки в плане, с единицы.</summary>

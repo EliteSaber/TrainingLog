@@ -13,7 +13,6 @@ namespace TrainingLog.Core.Settings;
 /// </remarks>
 public sealed class AppSettingsStore
 {
-    /// <summary>Имя файла настроек.</summary>
     public const string FileName = "settings.json";
 
     // Отступы при записи: в файл заглядывают глазами, когда правят его руками.
@@ -21,7 +20,6 @@ public sealed class AppSettingsStore
 
     private readonly string _path;
 
-    /// <summary>Хранилище файла настроек рядом с программой.</summary>
     public AppSettingsStore()
         : this(Resolve())
     {
@@ -53,8 +51,8 @@ public sealed class AppSettingsStore
     /// недописанное.
     ///
     /// Поля базы — исключение из правила «не переписывать»: их места в файле не ждут, и отсутствие
-    /// значения означает брошенное на середине редактирование, а не правку руками. Пустой
-    /// (или пробельный) директория и наименование заменяются умолчанием и дописываются в файл,
+    /// значения означает брошенное на середине редактирование, а не правку руками. Пустые
+    /// (или пробельные) директория и наименование заменяются умолчанием и дописываются в файл,
     /// как требовал набор настроек целиком.
     /// </remarks>
     public AppSettings Load()

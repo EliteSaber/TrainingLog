@@ -7,10 +7,8 @@ namespace TrainingLog.Core.Models;
 /// </remarks>
 public sealed class PlanExercise
 {
-    /// <summary>Часть составного ключа связи.</summary>
     public int TrainingPlanId { get; set; }
 
-    /// <summary>Часть составного ключа связи.</summary>
     public int ExerciseId { get; set; }
 
     /// <summary>Место в порядке выполнения, с единицы — чтобы номер показывался без конвертера.</summary>

@@ -57,7 +57,7 @@ public sealed partial class MainViewModel : ObservableObject
     ///
     /// Место базы докладывается событием только тогда, когда оно изменилось: соединение
     /// перестраивается при старте, и прочитанное окном сегодня вложить в него нельзя. Сообщение
-    /// на каждый запуск параметров мешало бы своим постоянством.
+    /// на каждое открытие окна параметров мешало бы своим постоянством.
     /// </remarks>
     [RelayCommand]
     private async Task OpenSettingsAsync()
@@ -111,7 +111,6 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Дни, показанные в окне: самый свежий сверху.</summary>
     public ObservableCollection<DayRowViewModel> Days { get; } = [];
 
-    /// <summary>Признак, что показывать нечего.</summary>
     public bool IsEmpty => Days.Count == 0;
 
     /// <summary>Показывает последние записи, не более <paramref name="count"/>.</summary>

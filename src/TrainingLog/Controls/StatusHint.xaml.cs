@@ -154,49 +154,42 @@ public partial class StatusHint : UserControl
         _timer.Tick += OnTimerTick;
     }
 
-    /// <summary>Текст отказа.</summary>
     public string Text
     {
         get => (string)GetValue(TextProperty);
         set => SetValue(TextProperty, value);
     }
 
-    /// <summary>Вид показа: отказ по вводу или примечание упражнения.</summary>
     public HintState.HintKind Kind
     {
         get => (HintState.HintKind)GetValue(KindProperty);
         set => SetValue(KindProperty, value);
     }
 
-    /// <summary>Сколько живёт подсказка.</summary>
     public TimeSpan Lifetime
     {
         get => (TimeSpan)GetValue(LifetimeProperty);
         set => SetValue(LifetimeProperty, value);
     }
 
-    /// <summary>Показана ли подсказка.</summary>
     public bool IsOpen
     {
         get => (bool)GetValue(IsOpenProperty);
         set => SetValue(IsOpenProperty, value);
     }
 
-    /// <summary>Элемент, под которым показывается подсказка.</summary>
     public FrameworkElement? Target
     {
         get => (FrameworkElement?)GetValue(TargetProperty);
         set => SetValue(TargetProperty, value);
     }
 
-    /// <summary>Команда гашения показа.</summary>
     public ICommand? DismissCommand
     {
         get => (ICommand?)GetValue(DismissCommandProperty);
         set => SetValue(DismissCommandProperty, value);
     }
 
-    /// <summary>Команда, зовёмая после исчезновения подсказки.</summary>
     public ICommand? ClosedCommand
     {
         get => (ICommand?)GetValue(ClosedCommandProperty);

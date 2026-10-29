@@ -124,7 +124,7 @@ public partial class MainWindow : Window
     private void ShowRestartFailure(string reason) =>
         MessageBox.Show(
             this,
-            $"Закрыть приложение и запуск заново не удался ({reason}). Работа продолжается со старой базой, к новой подключение произойдёт при следующем запуске.",
+            $"Не удалось закрыть приложение и запустить заново ({reason}). Работа продолжается со старой базой, к новой подключение произойдёт при следующем запуске.",
             "Параметры",
             MessageBoxButton.OK,
             MessageBoxImage.Warning);

@@ -64,7 +64,6 @@ public sealed class DatabaseNameRulesTests
         Assert.Equal("журнал.2026.db", DatabaseNameRules.ToFileName("журнал.2026"));
     }
 
-    /// <summary>Круг «сохранили — показали» возвращает ровно то, что было в поле.</summary>
     [Fact]
     public void Круг_ПолеФайлПоле_БезИзменений()
     {

@@ -24,7 +24,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         // Из файла, а не из умолчания: пустое поле означало бы потерю настройки первым же
         // нажатием «Сохранить». Наименование переводится правилом: в файле настроек имя файла с
-        // расширением, а поле показывает его без хвостого .db.
+        // расширением, а поле показывает его без хвостового .db.
         var settings = store.Load();
         DaysCount = settings.DaysCount;
         DatabaseDirectory = settings.DatabaseDirectory;

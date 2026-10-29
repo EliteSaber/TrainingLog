@@ -19,7 +19,6 @@ public sealed class DaySetCell
     /// <summary>Вес подхода в килограммах.</summary>
     public string WeightText { get; }
 
-    /// <summary>Количество повторений.</summary>
     public string RepetitionText { get; }
 
     /// <summary>Ширина столбца подхода — одинаковая у всех подходов и всех упражнений.</summary>

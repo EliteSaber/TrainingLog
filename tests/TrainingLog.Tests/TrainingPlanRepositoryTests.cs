@@ -182,7 +182,7 @@ public sealed class TrainingPlanRepositoryTests
         Assert.DoesNotContain(stored.Exercises, e => e.Id == squat.Id);
     }
 
-    /// <summary>Сохранение без изменений дубликатом не считается.</summary>
+    /// <summary>Порядок в плане и в базе совпадает: чтение сортирует по номеру строки связи.</summary>
     [Fact]
     public async Task UpdateAsync_ПерестановкаУпражнений_СохраняетНовыйПорядок()
     {

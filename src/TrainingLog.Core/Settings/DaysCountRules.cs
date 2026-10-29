@@ -9,7 +9,7 @@ public static class DaysCountRules
     /// <summary>Меньше одного дня журнал не показывает: пустой список ничего не говорит.</summary>
     public const int MinDaysCount = 1;
 
-    /// <summary>Списка длиннее года на экране всё равно не помещается.</summary>
+    /// <summary>Список длиннее года на экране всё равно не помещается.</summary>
     public const int MaxDaysCount = 366;
 
     /// <summary>
