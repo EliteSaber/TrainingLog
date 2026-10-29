@@ -54,16 +54,30 @@ public sealed partial class MainViewModel : ObservableObject
     /// «Применить» нужен, чтобы поле не перечитывало журнал на каждый символ, а сохранённое
     /// число уже применено, и оставить список прежним значило бы показать результат настройки и
     /// скрыть его.
+    ///
+    /// Место базы докладывается событием только тогда, когда оно изменилось: соединение
+    /// перестраивается при старте, и прочитанное окном сегодня вложить в него нельзя. Сообщение
+    /// на каждый запуск параметров мешало бы своим постоянством.
     /// </remarks>
     [RelayCommand]
     private async Task OpenSettingsAsync()
     {
+        var addressBefore = _settingsStore.Load().DatabasePath;
+
         if (!_windowService.ShowSettings())
         {
             return;
         }
 
-        DaysCount = _settingsStore.Load().DaysCount;
+        var settings = _settingsStore.Load();
+
+        DaysCount = settings.DaysCount;
+
+        if (settings.DatabasePath != addressBefore)
+        {
+            DatabaseAddressChanged?.Invoke(
+                "Место базы данных изменено. Подключение к новой базе произойдёт при следующем запуске.");
+        }
 
         await RefreshAsync().ConfigureAwait(true);
     }
@@ -85,6 +99,14 @@ public sealed partial class MainViewModel : ObservableObject
     /// Отказов о сохранении в главном окне нет, поэтому состояние целиком уходит в подсказку.
     /// </remarks>
     public HintState Hint { get; } = new();
+
+    /// <summary>Место базы изменилось: окно показывает примечание рядом с кнопкой параметров.</summary>
+    /// <remarks>
+    /// Показ зовёт окно, а не модель: подсказке нужен якорь, и его знает только окно — так же, как
+    /// примечание упражнения показывает обработчик кнопки «Показать». Модель решает, случилось ли
+    /// изменение и каким текстом об этом сказать.
+    /// </remarks>
+    public event Action<string>? DatabaseAddressChanged;
 
     /// <summary>Дни, показанные в окне: самый свежий сверху.</summary>
     public ObservableCollection<DayRowViewModel> Days { get; } = [];

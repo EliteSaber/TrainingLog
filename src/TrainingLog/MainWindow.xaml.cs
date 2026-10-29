@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -28,6 +30,9 @@ public partial class MainWindow : Window
         // Окно живёт до конца работы приложения, поэтому отписка в Closed — формальность.
         AllowedCharsInput.AddRejectedHandler(this, OnInputRejected);
         AllowedCharsInput.AddAcceptedHandler(this, OnInputAccepted);
+
+        // Изменение места базы: модель докладывает событием, якорь и показ — здесь.
+        _viewModel.DatabaseAddressChanged += OnDatabaseAddressChanged;
 
         Closed += OnClosed;
         Loaded += OnLoaded;
@@ -62,10 +67,73 @@ public partial class MainWindow : Window
     private void OnInputAccepted(object sender, RoutedEventArgs e) =>
         _viewModel.Hint.DismissCommand.Execute(null);
 
+    /// <summary>
+    /// Модель сообщила об изменении места базы: предложение перезапустить приложение сейчас.
+    /// </summary>
+    /// <remarks>
+    /// <c>MessageBox</c> здесь, как и во всех окнах: это работа интерфейса, а модели ей не место.
+    /// Вопрос модальный — переключение соединения «на лету» нужно отменять целиком, поэтому
+    /// решение остаётся за пользователем; после «Нет» приложение тихо продолжает работать со
+    /// старой базой до следующего изменения адреса.
+    ///
+    /// Перезапуск — новый процесс и закрытие текущего: соединение с базой строится один раз при
+    /// старте, и «на лету» его не поменять. Путь берётся у запущенного процесса, а не рабочим
+    /// каталогом: тот зависит от способа запуска, а свой exe приложение знает всегда.
+    /// </remarks>
+    private void OnDatabaseAddressChanged(string message)
+    {
+        var restart = MessageBox.Show(
+            this,
+            "Место базы данных изменено. Подключение к новой базе произойдёт после перезапуска. Перезапустить сейчас?",
+            "Параметры",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (restart != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var path = Environment.ProcessPath;
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            ShowRestartFailure("не определён путь к запущенному файлу приложения");
+
+            return;
+        }
+
+        try
+        {
+            if (Process.Start(path) is null)
+            {
+                ShowRestartFailure("процесс не запустился");
+            }
+            else
+            {
+                Application.Current.Shutdown();
+            }
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or IOException)
+        {
+            ShowRestartFailure(exception.Message);
+        }
+    }
+
+    /// <summary>Перезапуск не удался до закрытия: приложение продолжает работать со старой базой.</summary>
+    private void ShowRestartFailure(string reason) =>
+        MessageBox.Show(
+            this,
+            $"Закрыть приложение и запуск заново не удался ({reason}). Работа продолжается со старой базой, к новой подключение произойдёт при следующем запуске.",
+            "Параметры",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+
     private void OnClosed(object? sender, EventArgs e)
     {
         AllowedCharsInput.RemoveRejectedHandler(this, OnInputRejected);
         AllowedCharsInput.RemoveAcceptedHandler(this, OnInputAccepted);
+        _viewModel.DatabaseAddressChanged -= OnDatabaseAddressChanged;
     }
 
     /// <summary>

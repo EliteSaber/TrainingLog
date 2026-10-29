@@ -4,10 +4,12 @@ using TrainingLog.Core.Settings;
 
 namespace TrainingLog.ViewModels;
 
-/// <summary>Окно параметров: сколько дней показывать в журнале.</summary>
+/// <summary>Окно параметров: число дней и адрес файла базы данных.</summary>
 /// <remarks>
-/// Настройка одна, и её же показывает главное окно: живёт она в файле рядом с программой, а
-/// это окно — её редактор.
+/// Настройки живут в файле рядом с программой, это окно — их редактор. Новые директория и
+/// наименование базы применяются при следующем запуске: соединение строится один раз, при старте
+/// приложения. Диалоги выбора адресов адресуются окном, а не моделью — по тем же причинам,
+/// по которым здесь нет <c>MessageBox</c>.
 /// </remarks>
 public sealed partial class SettingsViewModel : ObservableObject
 {
@@ -21,8 +23,12 @@ public sealed partial class SettingsViewModel : ObservableObject
         _store = store;
 
         // Из файла, а не из умолчания: пустое поле означало бы потерю настройки первым же
-        // нажатием «Сохранить».
-        DaysCount = store.Load().DaysCount;
+        // нажатием «Сохранить». Наименование переводится правилом: в файле настроек имя файла с
+        // расширением, а поле показывает его без хвостого .db.
+        var settings = store.Load();
+        DaysCount = settings.DaysCount;
+        DatabaseDirectory = settings.DatabaseDirectory;
+        DatabaseName = DatabaseNameRules.ForDisplay(settings.DatabaseName);
     }
 
     /// <summary>Сколько дней показывать.</summary>
@@ -33,6 +39,25 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private int _daysCount;
+
+    /// <summary>Где лежит база, включая диск: путь к каталогу без имени файла.</summary>
+    /// <remarks>
+    /// Подставляется и диалогом выбора папки, и каталогом выбранного файла базы — тогда оба
+    /// поля согласованы между собой и с диском.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private string _databaseDirectory = string.Empty;
+
+    /// <summary>Как называется файл базы без каталога, диска и расширения.</summary>
+    /// <remarks>
+    /// Расширение <see cref="DatabaseNameRules.Extension"/> дописывается при сохранении всегда и
+    /// в поле не показывается: пользователь видит и вводит только имя. Впечатанный вручную хвост
+    /// <c>.db</c> правилом снимается, чтобы при сохранении не удвоиться.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private string _databaseName = string.Empty;
 
     /// <summary>Подсказка об отказе по вводу.</summary>
     public HintState Hint { get; } = new();
@@ -52,24 +77,33 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Показывать ли объяснение отказа.</summary>
     public bool HasStatus => !string.IsNullOrEmpty(Status);
 
-    private bool CanSave() => DaysCountRules.IsValid(DaysCount);
+    private bool CanSave() =>
+        DaysCountRules.IsValid(DaysCount)
+        && !string.IsNullOrWhiteSpace(DatabaseDirectory)
+        && !string.IsNullOrWhiteSpace(DatabaseName);
 
     /// <summary>
-    /// Записывает количество дней в файл настроек.
+    /// Записывает количество дней и адрес базы в файл настроек.
     /// </summary>
     /// <remarks>
-    /// Проверка значения повторяется в теле команды, а не только в предикате: предикат гасит
+    /// Проверка значений повторяется в теле команды, а не только в предикате: предикат гасит
     /// кнопку, но <c>Execute</c> его не спрашивает и зовёт метод (ловушка 46).
     /// </remarks>
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
-        if (!DaysCountRules.IsValid(DaysCount))
+        if (!CanSave())
         {
             return;
         }
 
-        if (!_store.Save(new AppSettings { DaysCount = DaysCount }))
+        if (!_store.Save(new AppSettings
+            {
+                DaysCount = DaysCount,
+                DatabaseDirectory = DatabaseDirectory,
+                // Расширение живёт в файле, а не в поле: настоящим именем файла владеет файл настроек.
+                DatabaseName = DatabaseNameRules.ToFileName(DatabaseName),
+            }))
         {
             Status = "Не удалось записать файл настроек. Программа стоит в папке без права записи?";
 

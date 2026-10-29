@@ -9,7 +9,7 @@
         d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
         mc:Ignorable="d"
         Title="Параметры"
-        Width="380"
+        Width="420"
         SizeToContent="Height"
         MinWidth="320"
         ShowInTaskbar="False"
@@ -25,6 +25,8 @@
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -72,11 +74,79 @@
         </Grid>
 
         <!--
+          Две строки адреса базы. Кнопка у директории открывает выбор папки, у наименования —
+          выбор файла *.db: одного диалога «и папка, и файл» в стандартных окнах нет, а файл заодно
+          подставляет директорию целиком — оба поля остаются согласованы.
+          Обработчики живут в code-behind: диалоги — работа интерфейса, модели представления им не место.
+
+          Средняя колонка `*`: путь длиннее подписи и кнопки, нехватку ширины забирает поле.
+        -->
+        <Grid Grid.Row="1" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       Background="Transparent"
+                       TextWrapping="Wrap"
+                       Text="Директория БД"
+                       helpers:ClickToFocus.Target="{Binding ElementName=DirectoryBox}" />
+
+            <TextBox x:Name="DirectoryBox"
+                     Grid.Column="1"
+                     Margin="8,0,0,0"
+                     VerticalAlignment="Center"
+                     Padding="4,3"
+                     helpers:OverflowTip.Enabled="True"
+                     Text="{Binding DatabaseDirectory, UpdateSourceTrigger=PropertyChanged}" />
+
+            <Button Grid.Column="2"
+                    Margin="8,0,0,0"
+                    Padding="8,3"
+                    VerticalAlignment="Center"
+                    Content="Обзор…"
+                    Click="OnPickDirectory" />
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       Background="Transparent"
+                       TextWrapping="Wrap"
+                       Text="Наименование БД"
+                       helpers:ClickToFocus.Target="{Binding ElementName=NameBox}" />
+
+            <TextBox x:Name="NameBox"
+                     Grid.Column="1"
+                     Margin="8,0,0,0"
+                     VerticalAlignment="Center"
+                     Padding="4,3"
+                     helpers:OverflowTip.Enabled="True"
+                     Text="{Binding DatabaseName, UpdateSourceTrigger=PropertyChanged}" />
+
+            <Button Grid.Column="2"
+                    Margin="8,0,0,0"
+                    Padding="8,3"
+                    VerticalAlignment="Center"
+                    Content="Выбрать файл…"
+                    Click="OnPickDatabaseFile" />
+        </Grid>
+
+        <!--
           Отказ записи — красной строкой до успеха, а не подсказкой: подсказка живёт пять секунд,
           а настройка не записана. Строка в сетке, а не в панели: панель отдаёт бесконечную
           ширину, и перенос перестал бы работать (ловушка 29).
         -->
-        <TextBlock Grid.Row="1"
+        <TextBlock Grid.Row="3"
                    Margin="0,12,0,0"
                    TextWrapping="Wrap"
                    Foreground="Firebrick"
@@ -86,7 +156,7 @@
         <!--
           IsDefault один в окне: иначе Enter звал бы обе кнопки.
         -->
-        <StackPanel Grid.Row="2"
+        <StackPanel Grid.Row="4"
                     Margin="0,16,0,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">

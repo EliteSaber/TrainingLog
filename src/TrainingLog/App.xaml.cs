@@ -19,7 +19,11 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        _services = BuildServices();
+        // Настройки до сборки контейнера: адрес базы живёт в них, и соединение уже строится по нему.
+        var settingsStore = new AppSettingsStore();
+        var settings = settingsStore.Load();
+
+        _services = BuildServices(settingsStore, settings);
         ApplyMigrations();
 
         var mainWindow = _services.GetRequiredService<MainWindow>();
@@ -33,20 +37,22 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    private static ServiceProvider BuildServices()
+    private static ServiceProvider BuildServices(AppSettingsStore settingsStore, AppSettings settings)
     {
         var services = new ServiceCollection();
 
+        // Path.Combine в AppSettings.DatabasePath мог бы собрать адрес и сам, но каталог может не
+        // существовать: Resolve его создаёт, иначе Migrate() упёрся бы в несуществующий каталог.
         services.AddDbContextFactory<TrainingLogDbContext>(options =>
-            options.UseSqlite($"Data Source={SqliteDatabasePath.Resolve()}"));
+            options.UseSqlite($"Data Source={SqliteDatabasePath.Resolve(settings.DatabaseDirectory, settings.DatabaseName)}"));
 
         services.AddSingleton<IExerciseRepository, ExerciseRepository>();
         services.AddSingleton<ITrainingPlanRepository, TrainingPlanRepository>();
         services.AddSingleton<ITrainingSessionRepository, TrainingSessionRepository>();
 
-        // Экземпляр, а не AddSingleton<T>: у хранилища конструктор без параметров один — тот,
-        // что ищет файл рядом с программой.
-        services.AddSingleton(new AppSettingsStore());
+        // Тот же экземпляр, чьи настройки прочтены выше: окно параметров правит один файл, а не
+        // второй, найденный по тому же адресу.
+        services.AddSingleton(settingsStore);
 
         // Синглтон, потому что окна справочников единственные и состояние их хоста переиспользуется.
         services.AddSingleton<IWindowService>(provider => new WindowService(

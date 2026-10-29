@@ -1,3 +1,4 @@
+using TrainingLog.Core.Data;
 using TrainingLog.Core.Settings;
 using TrainingLog.ViewModels;
 
@@ -8,17 +9,24 @@ public sealed class SettingsViewModelTests
 {
     /// <summary>
     /// Поле открывается на сохранённом значении: пустое поле снесло бы настройку первым же
-    /// сохранением.
+    /// сохранением. Имя базы в файле хранится с расширением, поле показывает его без хвоста.
     /// </summary>
     [Fact]
-    public void Поле_ОткрываетсяНаСохранённомЗначении()
+    public void Поля_ОткрываютсяНаСохранённыхЗначениях()
     {
         using var settings = new TemporarySettings();
-        settings.Store.Save(new AppSettings { DaysCount = 12 });
+        settings.Store.Save(new AppSettings
+            {
+                DaysCount = 12,
+                DatabaseDirectory = @"D:\журнал\базы",
+                DatabaseName = "спорт.db",
+            });
 
         var viewModel = new SettingsViewModel(settings.Store);
 
         Assert.Equal(12, viewModel.DaysCount);
+        Assert.Equal(@"D:\журнал\базы", viewModel.DatabaseDirectory);
+        Assert.Equal("спорт", viewModel.DatabaseName);
     }
 
     /// <summary>По <c>Accepted</c> окно выставляет <c>DialogResult</c>, а главное окно перечитывает файл.</summary>
@@ -26,12 +34,51 @@ public sealed class SettingsViewModelTests
     public void Save_ПишетВФайл_ИОтмечаетПринятым()
     {
         using var settings = new TemporarySettings();
-        var viewModel = new SettingsViewModel(settings.Store) { DaysCount = 6 };
+        var viewModel = new SettingsViewModel(settings.Store)
+        {
+            DaysCount = 6,
+            DatabaseDirectory = @"D:\журнал\базы",
+            DatabaseName = "спорт",
+        };
 
         viewModel.SaveCommand.Execute(null);
 
         Assert.True(viewModel.Accepted);
-        Assert.Equal(6, new AppSettingsStore(settings.FilePath).Load().DaysCount);
+
+        var loaded = new AppSettingsStore(settings.FilePath).Load();
+
+        Assert.Equal(6, loaded.DaysCount);
+        Assert.Equal(@"D:\журнал\базы", loaded.DatabaseDirectory);
+        Assert.Equal("спорт.db", loaded.DatabaseName);
+    }
+
+    /// <summary>
+    /// Расширение дописывается всегда и в файл попадает один раз: впечатав его вручную, получили
+    /// бы «база.db.db», собирая имя конкатенацией.
+    /// </summary>
+    [Fact]
+    public void Save_ХвостРасширениеВПоле_ФайлБезУдвоения()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store) { DatabaseName = "спорт.db" };
+
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.Equal("спорт.db", new AppSettingsStore(settings.FilePath).Load().DatabaseName);
+    }
+
+    /// <summary>После сохранения поле снова показывает имя без расширения: показ и хранение разведены.</summary>
+    [Fact]
+    public void Круг_SaveОткрыть_FieldБезРасширения()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store) { DatabaseName = "спорт.2026" };
+
+        viewModel.SaveCommand.Execute(null);
+
+        var opened = new SettingsViewModel(new AppSettingsStore(settings.FilePath));
+
+        Assert.Equal("спорт.2026", opened.DatabaseName);
     }
 
     /// <summary>
@@ -63,6 +110,43 @@ public sealed class SettingsViewModelTests
         var viewModel = new SettingsViewModel(settings.Store) { DaysCount = daysCount };
 
         Assert.False(viewModel.SaveCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// База собирается из двух полей, и оба должны быть заполнены: пробельный адрес соединение
+    /// построило бы, а базу — нет.
+    /// </summary>
+    [Theory]
+    [InlineData("", "база.db")]
+    [InlineData("  ", "база.db")]
+    [InlineData(@"D:\базы", "")]
+    [InlineData(@"D:\базы", "  ")]
+    public void SaveCommand_АдресБазыНеполный_КнопкаГасится(string directory, string name)
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store)
+        {
+            DatabaseDirectory = directory,
+            DatabaseName = name,
+        };
+
+        Assert.False(viewModel.SaveCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// Проверка полей повторяется и в теле команды: <c>Execute</c> предикат не спрашивает
+    /// (ловушка 46).
+    /// </summary>
+    [Fact]
+    public void Save_ДиректорияПустаПриВызовеПрограммно_НеЗаписывает()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store) { DatabaseDirectory = "" };
+
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.False(viewModel.Accepted);
+        Assert.Equal(SqliteDatabasePath.DefaultDirectory, new AppSettingsStore(settings.FilePath).Load().DatabaseDirectory);
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using TrainingLog.Core.Data;
 
 namespace TrainingLog.Core.Settings;
 
@@ -6,8 +7,9 @@ namespace TrainingLog.Core.Settings;
 /// Чтение и запись файла настроек рядом с программой.
 /// </summary>
 /// <remarks>
-/// Файл принадлежит копии программы, а база — машине, и специально они не связаны: база
-/// остаётся в <c>%LOCALAPPDATA%</c> (<c>SqliteDatabasePath</c>).
+/// Файл принадлежит копии программы, а база — машине. По умолчанию база лежит в
+/// <c>%LOCALAPPDATA%</c>, но директория и наименование файла вынесены в настройки, откуда
+/// адрес собирает <see cref="AppSettings.DatabasePath"/>.
 /// </remarks>
 public sealed class AppSettingsStore
 {
@@ -46,9 +48,14 @@ public sealed class AppSettingsStore
     /// показа окон, и негодный файл превратился бы в отказ запуска.
     /// </summary>
     /// <remarks>
-    /// Значение вне <see cref="DaysCountRules"/>, нечитаемый файл и отсутствующий ключ дают
-    /// значение по умолчанию. Файл при этом не переписывается: его правят руками, и молчаливая
-    /// замена испортила бы недописанное.
+    /// Значение вне <see cref="DaysCountRules"/> и нечитаемый файл дают значение по умолчанию.
+    /// Файл при этом не переписывается: его правят руками, и молчаливая замена испортила бы
+    /// недописанное.
+    ///
+    /// Поля базы — исключение из правила «не переписывать»: их места в файле не ждут, и отсутствие
+    /// значения означает брошенное на середине редактирование, а не правку руками. Пустой
+    /// (или пробельный) директория и наименование заменяются умолчанием и дописываются в файл,
+    /// как требовал набор настроек целиком.
     /// </remarks>
     public AppSettings Load()
     {
@@ -60,10 +67,36 @@ public sealed class AppSettingsStore
             return new AppSettings();
         }
 
-        var loaded = TryRead();
+        var settings = TryRead();
 
-        return loaded is not null && DaysCountRules.IsValid(loaded.DaysCount) ? loaded : new AppSettings();
+        if (settings is null)
+        {
+            return new AppSettings();
+        }
+
+        if (!DaysCountRules.IsValid(settings.DaysCount))
+        {
+            settings.DaysCount = AppSettings.DefaultDaysCount;
+        }
+
+        if (IsMissing(settings.DatabaseDirectory) || IsMissing(settings.DatabaseName))
+        {
+            settings.DatabaseDirectory = IsMissing(settings.DatabaseDirectory)
+                ? SqliteDatabasePath.DefaultDirectory
+                : settings.DatabaseDirectory;
+            settings.DatabaseName = IsMissing(settings.DatabaseName)
+                ? SqliteDatabasePath.FileName
+                : settings.DatabaseName;
+
+            Save(settings);
+        }
+
+        return settings;
     }
+
+    // Пробельный каталог или имя — тоже «нет значения»: база по такому адресу не соберётся,
+    // а отфильтровывать пробелы второй раз, уже на подключении, значило бы держать правило в двух местах.
+    private static bool IsMissing(string? value) => string.IsNullOrWhiteSpace(value);
 
     /// <summary>
     /// Записывает настройки в файл и отвечает, записались ли они.

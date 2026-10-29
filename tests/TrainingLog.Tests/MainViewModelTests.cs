@@ -100,6 +100,77 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Equal(3, viewModel.Days.Count);
     }
 
+    /// <summary>
+    /// Место базы изменилось, пока окно параметров было открыто: модель докладывает событием, а
+    /// показ остаётся окну — у подсказки нет якоря, пока окно его не выставит.
+    /// </summary>
+    [Fact]
+    public async Task OpenSettingsCommand_АдресБазыИзменился_СобытиеСТекстом()
+    {
+        using var database = new TemporaryDatabase();
+
+        var windowService = new FakeWindowService
+        {
+            SettingsResult = true,
+            OnSettings = () => _settings.Store.Save(new AppSettings { DatabaseDirectory = @"D:\базы" }),
+        };
+
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
+
+        var messages = new List<string>();
+        viewModel.DatabaseAddressChanged += message => messages.Add(message);
+
+        await viewModel.OpenSettingsCommand.ExecuteAsync(null);
+
+        var message = Assert.Single(messages);
+
+        Assert.Contains("следующем запуске", message);
+    }
+
+    /// <summary>Адрес не менялся — события нет: сообщение на каждый запуск параметров мешало бы.</summary>
+    [Fact]
+    public async Task OpenSettingsCommand_АдресБазыНеИзменился_СобытияНет()
+    {
+        using var database = new TemporaryDatabase();
+
+        var windowService = new FakeWindowService
+        {
+            SettingsResult = true,
+            OnSettings = () => _settings.Store.Save(new AppSettings { DaysCount = 7 }),
+        };
+
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
+
+        var raised = false;
+        viewModel.DatabaseAddressChanged += _ => raised = true;
+
+        await viewModel.OpenSettingsCommand.ExecuteAsync(null);
+
+        Assert.False(raised);
+    }
+
+    /// <summary>Отказ окна параметров — и когда файл менялся, событие не поднимается: правку не приняли.</summary>
+    [Fact]
+    public async Task OpenSettingsCommand_Отменено_СобытияНеБывает()
+    {
+        using var database = new TemporaryDatabase();
+
+        var windowService = new FakeWindowService
+        {
+            SettingsResult = false,
+            OnSettings = () => _settings.Store.Save(new AppSettings { DatabaseDirectory = @"D:\базы" }),
+        };
+
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
+
+        var raised = false;
+        viewModel.DatabaseAddressChanged += _ => raised = true;
+
+        await viewModel.OpenSettingsCommand.ExecuteAsync(null);
+
+        Assert.False(raised);
+    }
+
     [Fact]
     public void TakeLatest_БерётПоследниеСверху()
     {

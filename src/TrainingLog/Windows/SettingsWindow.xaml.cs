@@ -1,11 +1,14 @@
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
+using Microsoft.Win32;
 using TrainingLog.Controls;
+using TrainingLog.Core.Settings;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
 
-/// <summary>Окно параметров: сколько дней показывать в журнале.</summary>
+/// <summary>Окно параметров: число дней и адрес файла базы данных.</summary>
 public partial class SettingsWindow : Window
 {
     private readonly SettingsViewModel _viewModel;
@@ -81,6 +84,51 @@ public partial class SettingsWindow : Window
     /// <summary>Допустимый ввод гасит висящее объяснение. Отказ сюда не приводит: мигал бы.</summary>
     private void OnInputAccepted(object sender, RoutedEventArgs e) =>
         _viewModel.Hint.DismissCommand.Execute(null);
+
+    /// <summary>
+    /// Диалоги адреса базы живут здесь, а не в модели: это работа интерфейса, как и
+    /// <c>MessageBox</c>. Стартовый каталог диалогов — текущее поле, иначе каждый выбор заново
+    /// начинался бы с «Документов» среди незнакомых дисков.
+    /// </summary>
+    private void OnPickDirectory(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog
+        {
+            InitialDirectory = _viewModel.DatabaseDirectory,
+        };
+
+        if (dialog.ShowDialog(this) is true)
+        {
+            _viewModel.DatabaseDirectory = dialog.FolderName;
+        }
+    }
+
+    /// <summary>
+    /// Файл отвечает на оба поля: директория берётся у выбранного файла, наименование — его имя.
+    /// Раздельная подстановка полей вместо целого пути: окончание диска и каталога в поле адреса
+    /// разъехалось бы с наименованием при следующей правке одного из них.
+    /// </summary>
+    /// <remarks>
+    /// Наименование переводится тем же правилом, что и в модели: в поле имя живёт без хвостового
+    /// <c>.db</c>, а расширение дописывается при сохранении всегда. Поэтому файл с чужим
+    /// расширением (например <c>старая.sqlite</c>) возвращается в настройках как
+    /// <c>старая.db</c> — единственного расширения у файла базы по договору нет и второго не будет.
+    /// </remarks>
+    private void OnPickDatabaseFile(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            InitialDirectory = _viewModel.DatabaseDirectory,
+            FileName = _viewModel.DatabaseName,
+            Filter = "База данных (*.db)|*.db|Все файлы (*.*)|*.*",
+        };
+
+        if (dialog.ShowDialog(this) is true)
+        {
+            _viewModel.DatabaseDirectory = Path.GetDirectoryName(dialog.FileName) ?? string.Empty;
+            _viewModel.DatabaseName = DatabaseNameRules.ForDisplay(Path.GetFileName(dialog.FileName));
+        }
+    }
 
     private void OnClosed(object? sender, EventArgs e)
     {
