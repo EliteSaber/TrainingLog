@@ -339,6 +339,9 @@
                                       AllowedCharsInput отбрасывает всё, кроме цифр и разделителей, — и
                                       при наборе, и при вставке. Разбор в модели остаётся: «5,5.5»
                                       фильтр пропустит, а TryParse отвергнет.
+
+                                      Part задаёт Tab-переход: поля идут по единой цепочке
+                                      «все веса, затем все повторения», а не по порядку дерева.
                                     -->
                                     <TextBox Grid.Row="0"
                                              Width="84"
@@ -346,12 +349,14 @@
                                              HorizontalContentAlignment="Center"
                                              Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"
                                              helpers:AllowedCharsInput.Allowed="DigitsWithSeparators"
+                                             helpers:SetFieldNavigation.Part="Weight"
                                              ToolTip="Вес, кг"
                                              Text="{Binding WeightText, UpdateSourceTrigger=PropertyChanged}" />
 
                                     <!--
                                       Поле повторений — целое неотрицательное число, поэтому
-                                      разделителей здесь нет: только цифры.
+                                      разделителей здесь нет: только цифры. По Tab поле идёт по той же
+                                      единой цепочке, что и вес: сначала все веса, затем все повторения.
 
                                       Плейсхолдер рисуется ПОВЕРХ поля: фон у TextBox непрозрачный, и
                                       подложка под ним была бы не видна, поэтому блок объявлен после
@@ -366,6 +371,7 @@
                                         <TextBox Padding="4,3"
                                                  HorizontalContentAlignment="Center"
                                                  helpers:AllowedCharsInput.Allowed="Digits"
+                                                 helpers:SetFieldNavigation.Part="Repetitions"
                                                  ToolTip="Повторения"
                                                  Text="{Binding RepetitionText, UpdateSourceTrigger=PropertyChanged}" />
 
