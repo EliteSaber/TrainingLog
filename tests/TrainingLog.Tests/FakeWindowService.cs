@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using TrainingLog.Core.Models;
 using TrainingLog.Services;
 
@@ -6,24 +7,8 @@ namespace TrainingLog.Tests;
 /// <summary>Рукописный подменный <see cref="IWindowService"/>: окон в тестах не нужно.</summary>
 internal sealed class FakeWindowService : IWindowService
 {
-    /// <summary>Что <c>ShowAddDay</c> вернёт вызывающему.</summary>
-    public bool AddDayResult { get; set; }
-
-    /// <summary>
-    /// Что сделает <c>ShowAddDay</c>, если задано: обычное действие вызывающего из теста.
-    /// </summary>
-    /// <remarks>
-    /// Нужно для «сохранил без закрытия, потом закрыл крестиком»: возвращаемое значение должно
-    /// повторять настоящее поведение окна, а <see cref="AddDayResult"/> не может выразить
-    /// «сохранено, но <c>DialogResult</c> не выставлен».
-    /// </remarks>
-    public Func<Task>? OnAddDay { get; set; }
-
     /// <summary>Сколько раз открывали окно добавления дня.</summary>
     public int AddDayCalls { get; private set; }
-
-    /// <summary>Что <c>ShowEditDay</c> вернёт вызывающему.</summary>
-    public bool EditDayResult { get; set; }
 
     /// <summary>Сколько раз открывали окно правки дня.</summary>
     public int EditDayCalls { get; private set; }
@@ -49,6 +34,11 @@ internal sealed class FakeWindowService : IWindowService
 
     /// <summary>Сколько раз открывали окно импорта.</summary>
     public int ImportCalls { get; private set; }
+
+    /// <summary>Сколько раз окно дня сообщило о сохранении.</summary>
+    public int DaySavedRises { get; private set; }
+
+    public event Func<Task>? DaySaved;
 
     public void OpenExercises()
     {
@@ -80,22 +70,24 @@ internal sealed class FakeWindowService : IWindowService
 
     public bool ShowEditPlan(TrainingPlan plan) => false;
 
-    public bool ShowAddDay()
-    {
-        AddDayCalls++;
+    public void ShowAddDay() => AddDayCalls++;
 
-        // Синхронная блокировка допустима только в тесте: вызывающий в приложении — команда
-        // MainViewModel, и она тоже синхронна по контракту IWindowService.
-        OnAddDay?.Invoke().GetAwaiter().GetResult();
-
-        return AddDayResult;
-    }
-
-    public bool ShowEditDay(DateOnly day)
+    public void ShowEditDay(DateOnly day)
     {
         EditDayCalls++;
         LastEditDay = day;
+    }
 
-        return EditDayResult;
+    /// <summary>Окно дня сообщило о сохранении.</summary>
+    /// <remarks>
+    /// Возвращает задачу подписчика, чтобы тест дождался перечитывания журнала await'ом, а не
+    /// полем в надежде на порядок выполнения. Без подписчика возвращает уже исполненную задачу:
+    /// тест этого случая не ждёт, а null'ом await'ить нельзя.
+    /// </remarks>
+    public Task RaiseDaySaved()
+    {
+        DaySavedRises++;
+
+        return DaySaved?.Invoke() ?? Task.CompletedTask;
     }
 }

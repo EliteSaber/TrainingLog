@@ -31,9 +31,20 @@ public sealed partial class MainViewModel : ObservableObject
         _sessionRepository = sessionRepository;
         _settingsStore = settingsStore;
 
+        // День записан открытым окном дня — журнал перечитывается, независимо от того, закрыто
+        // после этого окно или осталось открытым: оно немодальное.
+        _windowService.DaySaved += OnDaySaved;
+
         // Из файла, а не из константы: настройка живёт рядом с программой.
         DaysCount = settingsStore.Load().DaysCount;
     }
+
+    /// <summary>День записан открытым окном: журнал перечитывается.</summary>
+    /// <remarks>
+    /// Возвращается Task, а не async void: сервис раздаёт задания подписчика из события, и тест
+    /// таким образом дожидается перечитывания await'ом.
+    /// </remarks>
+    private Task OnDaySaved() => RefreshAsync();
 
     [ObservableProperty]
     private string _title = "Журнал тренировок";
@@ -134,15 +145,13 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanApply))]
     private Task ApplyAsync() => RefreshAsync();
 
-    /// <summary>День сохранён — список перечитывается: запись могла добавиться на любую дату.</summary>
+    /// <summary>Открывает окно добавления дня: немодальное, при открытом — выводит существующее вперёд.</summary>
+    /// <remarks>
+    /// Перечитывание журнала после сохранения живёт в <see cref="OnDaySaved"/>, а не здесь: окно
+    /// может сохранить день и остаться открытым, поэтому ответа «диалог закрылся» больше нет.
+    /// </remarks>
     [RelayCommand]
-    private async Task AddDayAsync()
-    {
-        if (_windowService.ShowAddDay())
-        {
-            await RefreshAsync().ConfigureAwait(true);
-        }
-    }
+    private void AddDay() => _windowService.ShowAddDay();
 
     /// <summary>Правка дня из строки журнала: дабл-клик по строке или пункт меню.</summary>
     /// <remarks>
@@ -151,20 +160,20 @@ public sealed partial class MainViewModel : ObservableObject
     ///
     /// Без строки команда не открывает ничего: правки несуществующего дня не бывает, а падать на
     /// <c>null</c> пользователю не за что.
+    ///
+    /// При открытом окне дня попытка править другой день не меняет открытую дату: существующее
+    /// окно выводится вперёд с оповещением, а решение, какой день править, остаётся за датой в нём.
     /// </remarks>
     /// <param name="day">Строка журнала, день которой открывается на правку.</param>
     [RelayCommand]
-    private async Task EditDayAsync(DayRowViewModel? day)
+    private void EditDay(DayRowViewModel? day)
     {
         if (day is null)
         {
             return;
         }
 
-        if (_windowService.ShowEditDay(day.Date))
-        {
-            await RefreshAsync().ConfigureAwait(true);
-        }
+        _windowService.ShowEditDay(day.Date);
     }
 
     /// <summary>

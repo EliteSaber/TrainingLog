@@ -1,7 +1,13 @@
 ﻿<Application x:Class="TrainingLog.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:TrainingLog">
+             xmlns:local="clr-namespace:TrainingLog"
+             ShutdownMode="OnMainWindowClose">
+    <!--
+      Завершение по закрытию главного окна. Режимом по умолчанию («по последнему окну») окно
+      дня после закрытия журнала оставляло бы приложение жить: окно дня немодальное и без
+      владельца, «последним окном» закончится оно, а не журнал.
+    -->
     <Application.Resources>
 
     </Application.Resources>

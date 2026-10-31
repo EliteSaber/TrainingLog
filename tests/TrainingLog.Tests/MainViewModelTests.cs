@@ -264,8 +264,8 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     /// <summary>
-    /// Сохранённый день появляется в списке без перезапуска окна: главное окно перечитывает
-    /// журнал после диалога.
+    /// Сохранённый день появляется в списке без перезапуска окна: окно дня оповещает о записи
+    /// событием, и главное окно перечитывает журнал.
     /// </summary>
     [Fact]
     public async Task AddDayCommand_ДеньСохранён_СписокПеречитан()
@@ -273,57 +273,67 @@ public sealed class MainViewModelTests : IDisposable
         using var database = new TemporaryDatabase();
         await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
 
-        var windowService = new FakeWindowService { AddDayResult = true };
+        var windowService = new FakeWindowService();
         var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
+        // Пользователь сохранил день (запись появилась в базе) — окно дня оповестило об этом.
         await database.SessionRepository.AddAsync(
             Session(new DateOnly(2026, 10, 6), "День 6"));
 
-        await viewModel.AddDayCommand.ExecuteAsync(null);
+        viewModel.AddDayCommand.Execute(null);
+        await windowService.RaiseDaySaved();
 
         Assert.Equal(1, windowService.AddDayCalls);
+        Assert.Equal(1, windowService.DaySavedRises);
         Assert.Equal(["День 6", "День 5"], viewModel.Days.Select(day => day.PlanName));
     }
 
     /// <summary>
-/// «Сохранить» в окне дня не закрывает его: <c>DialogResult</c> остаётся <c>null</c>, и окно
-/// закрывают крестиком или Esc. Ответ <c>ShowAddDay</c> собирается из обоих состояний окна,
-/// иначе сохранённый день не появился бы в журнале до перезапуска.
-/// </summary>
-[Fact]
-public async Task AddDayCommand_СохраненоБезЗакрытия_СписокПеречитан()
-{
-    using var database = new TemporaryDatabase();
-    await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
-
-    // Окно сохранило день и закрылось крестиком: DialogResult не выставлен, но день записан.
-    var windowService = new FakeWindowService
-    {
-        OnAddDay = () => database.SessionRepository.AddAsync(Session(new DateOnly(2026, 10, 6), "День 6")),
-        AddDayResult = true,
-    };
-
-    var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
-    await viewModel.LoadCommand.ExecuteAsync(null);
-
-    await viewModel.AddDayCommand.ExecuteAsync(null);
-
-    Assert.Equal(1, windowService.AddDayCalls);
-    Assert.Equal(["День 6", "День 5"], viewModel.Days.Select(day => day.PlanName));
-}
-
-[Fact]
-public async Task AddDayCommand_Отменено_СписокНеПеречитывается()
+    /// День, сохранённый открытым окном, перечитывается и тогда, когда окно ещё живо: окно
+    /// дня немодальное, и «Сохранить» без закрытия не отменяет перечитывание.
+    /// </summary>
+    [Fact]
+    public async Task AddDayCommand_СохраненоБезЗакрытия_СписокПеречитан()
     {
         using var database = new TemporaryDatabase();
         await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
 
-        var viewModel = new MainViewModel(new FakeWindowService { AddDayResult = false }, database.SessionRepository, _settings.Store);
+        var windowService = new FakeWindowService();
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
-        await viewModel.AddDayCommand.ExecuteAsync(null);
+        // Окно сохранило день и осталось открытым — оповещение всё равно приходит.
+        await database.SessionRepository.AddAsync(
+            Session(new DateOnly(2026, 10, 6), "День 6"));
 
+        viewModel.AddDayCommand.Execute(null);
+        await windowService.RaiseDaySaved();
+        viewModel.AddDayCommand.Execute(null);
+        await windowService.RaiseDaySaved();
+
+        Assert.Equal(2, windowService.AddDayCalls);
+        Assert.Equal(2, windowService.DaySavedRises);
+        Assert.Equal(["День 6", "День 5"], viewModel.Days.Select(day => day.PlanName));
+    }
+
+    /// <summary>
+    /// Журнал перечитывается только по оповещению о записи: открытие окна само по себе ничего
+    /// не меняет.
+    /// </summary>
+    [Fact]
+    public async Task AddDayCommand_Отменено_СписокНеПеречитывается()
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
+
+        var windowService = new FakeWindowService();
+        var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        viewModel.AddDayCommand.Execute(null);
+
+        Assert.Equal(1, windowService.AddDayCalls);
         Assert.Equal(["День 5"], viewModel.Days.Select(day => day.PlanName));
     }
 
@@ -442,15 +452,15 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
 
         var row = Assert.Single(viewModel.Days);
 
-        await viewModel.EditDayCommand.ExecuteAsync(row);
+        viewModel.EditDayCommand.Execute(row);
 
         Assert.Equal(1, windowService.EditDayCalls);
         Assert.Equal(new DateOnly(2026, 10, 5), windowService.LastEditDay);
     }
 
     /// <summary>
-    /// Правка дня, как и добавление, перечитывает журнал: пока окно открыто, день могли
-    /// поправить, и без перечитки строка осталась бы старой.
+    /// Правка дня, как и добавление, перечитывает журнал по оповещению о записи: пока окно
+    /// открыто, день могли поправить, и без перечитки строка осталась бы старой.
     /// </summary>
     [Fact]
     public async Task EditDayCommand_ДеньПоправлен_СписокПеречитан()
@@ -458,7 +468,7 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
         using var database = new TemporaryDatabase();
         await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
 
-        var windowService = new FakeWindowService { EditDayResult = true };
+        var windowService = new FakeWindowService();
         var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
@@ -466,7 +476,8 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
 
         var row = Assert.Single(viewModel.Days);
 
-        await viewModel.EditDayCommand.ExecuteAsync(row);
+        viewModel.EditDayCommand.Execute(row);
+        await windowService.RaiseDaySaved();
 
         Assert.Equal(["День 6", "День 5"], viewModel.Days.Select(day => day.PlanName));
     }
@@ -481,11 +492,11 @@ public async Task AddDayCommand_Отменено_СписокНеПеречит�
         using var database = new TemporaryDatabase();
         await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
 
-        var windowService = new FakeWindowService { EditDayResult = true };
+        var windowService = new FakeWindowService();
         var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
-        await viewModel.EditDayCommand.ExecuteAsync(null);
+        viewModel.EditDayCommand.Execute(null);
 
         Assert.Equal(0, windowService.EditDayCalls);
     }
