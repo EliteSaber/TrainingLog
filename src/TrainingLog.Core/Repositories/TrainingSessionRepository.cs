@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using TrainingLog.Core.Data;
 using TrainingLog.Core.Models;
@@ -8,11 +7,9 @@ namespace TrainingLog.Core.Repositories;
 public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbContext> contextFactory)
     : ITrainingSessionRepository
 {
-    /// <summary>Код SQLite для нарушения ограничения: уникальный индекс, внешний ключ, NOT NULL.</summary>
-    private const int SqliteConstraintErrorCode = 19;
-
     /// <summary>Нужна, чтобы отличить отказ по дате от отказа по другой причине.</summary>
     private const string SessionsTableName = "TrainingSessions";
+
     public async Task<IReadOnlyList<TrainingSession>> GetAsync(
         DateOnly? fromInclusive = null,
         DateOnly? toInclusive = null,
@@ -36,6 +33,29 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
 
         return await query
             .OrderByDescending(session => session.Date)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<TrainingSession>> GetLatestAsync(
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        if (count <= 0)
+        {
+            return [];
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+        // Take до Include: база отдаёт только показанные дни, а не весь журнал. Раздельный запрос
+        // убирает дублирование колонок упражнений по подходам; дата уникальна, поэтому порядок
+        // однозначен и для Skip/Take.
+        return await Readable(context.TrainingSessions.AsNoTracking())
+            .OrderByDescending(session => session.Date)
+            .Take(count)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -151,7 +171,6 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
 
         var stored = await context.TrainingSessions
             .Include(item => item.Exercises)
-                .ThenInclude(entry => entry.Sets)
             .FirstOrDefaultAsync(item => item.Id == session.Id, cancellationToken)
             .ConfigureAwait(false);
 
@@ -179,7 +198,17 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
 
         stored.NormalizeOrder();
 
-        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException exception) when (IsDateTaken(exception))
+        {
+            // Дату могли занять, пока окно правки было открыто: уникальный индекс — последний
+            // рубеж, ровно как в AddAsync. Без этой проверки исключение ушло бы наверх и окно
+            // упало бы вместо сообщения.
+            return UpdateTrainingSessionOutcome.DateTaken;
+        }
 
         return UpdateTrainingSessionOutcome.Updated;
     }
@@ -290,12 +319,10 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
     /// наименования — и сообщение говорило про дату.
     /// </summary>
     private static bool IsDateTaken(DbUpdateException exception) =>
-        exception.InnerException is SqliteException
-        {
-            SqliteErrorCode: SqliteConstraintErrorCode,
-            Message: var message,
-        }
-        && message.Contains($"IX_{SessionsTableName}_{nameof(TrainingSession.Date)}", StringComparison.Ordinal);
+        SqliteConstraintErrors.IsUniqueViolation(
+            exception,
+            SessionsTableName,
+            nameof(TrainingSession.Date));
 
     /// <summary>
     /// Собирает упражнения записи заново, подставляя упражнения справочника там, где ссылка ещё

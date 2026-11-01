@@ -180,13 +180,17 @@ public sealed partial class MainViewModel : ObservableObject
     /// Перечитывает журнал и пересобирает строки дней.
     /// </summary>
     /// <remarks>
+    /// Читаются только показанные дни, а не вся история: отбор «последние N» идёт в базе, иначе
+    /// каждое применение тянуло бы упражнения и подходы за все годы. <see cref="TakeLatest"/>
+    /// остаётся на месте как правило показа, не зависящее от того, что сегодня вернула база.
+    ///
     /// Коллекция пересобирается целиком, а не приводится к порядку через <c>Move</c>: там у строк
     /// есть состояние контейнера — раскрытый план, — а здесь строка дня состоит из текста и
     /// чисел и меняется целиком при смене количества дней.
     /// </remarks>
     private async Task RefreshAsync()
     {
-        var sessions = await _sessionRepository.GetAsync().ConfigureAwait(true);
+        var sessions = await _sessionRepository.GetLatestAsync(DaysCount).ConfigureAwait(true);
 
         Days.Clear();
 

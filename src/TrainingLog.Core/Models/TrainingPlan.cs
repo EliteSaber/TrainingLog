@@ -55,7 +55,6 @@ public sealed class TrainingPlan : INotifyPropertyChanged
             .OrderBy(link => link.Order)
             .ThenBy(link => link.Exercise.Name)
             .Select(link => link.Exercise)
-            .Where(exercise => exercise is not null)
             .ToList();
 
     public override string ToString() => Name;

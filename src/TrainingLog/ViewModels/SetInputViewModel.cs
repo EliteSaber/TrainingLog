@@ -15,6 +15,9 @@ public sealed partial class SetInputViewModel : ObservableObject
 {
     private const NumberStyles NumberStyle = NumberStyles.Number | NumberStyles.AllowDecimalPoint;
 
+    /// <summary>Результат последнего разбора полей. Пустые поля пригодны.</summary>
+    private bool _isValid = true;
+
     /// <summary>Вес подхода в килограммах. Пусто — вес не указан.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsValid))]
@@ -55,7 +58,18 @@ public sealed partial class SetInputViewModel : ObservableObject
         RepetitionPlaceholder.Length > 0 && RepetitionText.Length == 0;
 
     /// <summary>Пригодны ли оба поля для сохранения.</summary>
-    public bool IsValid => TryParseWeight(out _) && TryParseRepetitions(out _);
+    /// <remarks>
+    /// Разбор кэшируется: геттер читают и привязка, и проверка сохранения на каждый символ, а
+    /// <see cref="TryParseWeight"/> и <see cref="TryParseRepetitions"/> — единственное место, где
+    /// текст превращается в числа. Пересчёт идёт в сеттерах обоих полей.
+    /// </remarks>
+    public bool IsValid => _isValid;
+
+    partial void OnWeightTextChanged(string value) => RefreshValidity();
+
+    partial void OnRepetitionTextChanged(string value) => RefreshValidity();
+
+    private void RefreshValidity() => _isValid = TryParseWeight(out _) && TryParseRepetitions(out _);
 
     /// <summary>
     /// Заполнено ли хоть одно из двух значений: пустой подход в день не попадает, иначе «Сохранить»

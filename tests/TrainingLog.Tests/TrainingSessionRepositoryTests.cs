@@ -154,6 +154,40 @@ public sealed class TrainingSessionRepositoryTests
     }
 
     [Fact]
+    public async Task GetLatestAsync_БерётТолькоПоследниеСоСставом()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = await AddExerciseAsync(database, "Приседание");
+
+        foreach (var day in new[] { 1, 3, 5 })
+        {
+            var session = new TrainingSession { Date = new DateOnly(2026, 10, day), PlanName = "День" };
+            session.AddExercise(squat).AddSet(8, 60m);
+            await database.SessionRepository.AddAsync(session);
+        }
+
+        var latest = await database.SessionRepository.GetLatestAsync(2);
+
+        Assert.Equal(
+            [new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 3)],
+            latest.Select(session => session.Date));
+
+        // Граф приходит целиком: строка дня без подходов показывать нечего.
+        Assert.All(latest, session => Assert.Single(Assert.Single(session.Exercises).Sets));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task GetLatestAsync_НольЗаписей_Пусто(int count)
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5));
+
+        Assert.Empty(await database.SessionRepository.GetLatestAsync(count));
+    }
+
+    [Fact]
     public async Task GetByDateAsync_ЗаписиНет_ВозвращаетNull()
     {
         using var database = new TemporaryDatabase();
@@ -197,6 +231,35 @@ public sealed class TrainingSessionRepositoryTests
         await using var context = await database.Factory.CreateDbContextAsync();
         Assert.Equal(2, await context.TrainingSets.CountAsync());
         Assert.Equal(1, await context.ExerciseEntries.CountAsync());
+    }
+
+    /// <summary>
+    /// Дату могли занять, пока окно правки было открыто: отказ возвращается значением, а не
+    /// исключением — иначе окно падало бы вместо сообщения.
+    /// </summary>
+    [Fact]
+    public async Task UpdateAsync_НоваяДатаЗанята_ВозвращаетDateTaken()
+    {
+        using var database = new TemporaryDatabase();
+        var first = new TrainingSession { Date = new DateOnly(2026, 10, 5), PlanName = "День" };
+        var second = new TrainingSession { Date = new DateOnly(2026, 10, 6), PlanName = "День" };
+
+        await database.SessionRepository.AddAsync(first);
+        await database.SessionRepository.AddAsync(second);
+
+        var edit = new TrainingSession
+        {
+            Id = first.Id,
+            Date = second.Date,
+            PlanName = first.PlanName,
+        };
+
+        Assert.Equal(
+            UpdateTrainingSessionOutcome.DateTaken,
+            await database.SessionRepository.UpdateAsync(edit));
+
+        // Прежняя дата осталась за записью: неудачная правка ничего не переписала.
+        Assert.NotNull(await database.SessionRepository.GetByDateAsync(first.Date));
     }
 
     /// <summary>

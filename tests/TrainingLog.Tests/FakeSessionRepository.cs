@@ -53,6 +53,11 @@ internal sealed class FakeSessionRepository(ITrainingSessionRepository inner) : 
         CancellationToken cancellationToken = default) =>
         inner.GetAsync(fromInclusive, toInclusive, cancellationToken);
 
+    public Task<IReadOnlyList<TrainingSession>> GetLatestAsync(
+        int count,
+        CancellationToken cancellationToken = default) =>
+        inner.GetLatestAsync(count, cancellationToken);
+
     public Task<TrainingSession?> GetByDateAsync(DateOnly targetDate, CancellationToken cancellationToken = default) =>
         inner.GetByDateAsync(targetDate, cancellationToken);
 

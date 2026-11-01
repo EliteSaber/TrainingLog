@@ -81,6 +81,24 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// </summary>
     private DateOnly? _pulledFromDate;
 
+    /// <summary>
+    /// Пригодность дня к сохранению, посчитанная последним <see cref="Refresh"/>.
+    /// </summary>
+    /// <remarks>
+    /// Кэш, а не вычисление в предикате: обе команды сохранения спрашивают <c>CanExecute</c> на
+    /// каждый символ, и полный перебор подходов с разбором строк повторялся бы дважды за удар.
+    /// </remarks>
+    private bool _canAccept;
+
+    /// <summary>
+    /// Отличается ли набранное от базы, посчитано последним <see cref="Refresh"/>.
+    /// </summary>
+    /// <remarks>
+    /// Кэш по той же причине, что <see cref="_canAccept"/>: привязка читает геттер на каждый
+    /// символ, а сравнение с базой требует сборки всей записи.
+    /// </remarks>
+    private bool _hasUnsavedChanges;
+
     /// <param name="sessionRepository">Журнал тренировок.</param>
     /// <param name="planRepository">Планы тренировок: состав дня берётся из плана.</param>
     /// <param name="day">Дата, на которую открывается окно. <c>null</c> — добавляется сегодня.</param>
@@ -204,23 +222,11 @@ public sealed partial class AddDayViewModel : ObservableObject
     ///
     /// Негодный текст тоже считается изменением, иначе надпись молчала бы ровно тогда, когда
     /// кнопки погасли: <see cref="BuildSession"/> на мусоре возвращает <c>null</c>.
+    ///
+    /// Само сравнение живёт в <see cref="Refresh"/>: оно собирает всю запись, а геттер читается
+    /// привязкой на каждый символ.
     /// </remarks>
-    public bool HasUnsavedChanges
-    {
-        get
-        {
-            if (SelectedPlan is not { } plan)
-            {
-                return false;
-            }
-
-            var current = BuildSession(plan);
-
-            return current is null
-                ? Exercises.Any(row => row.HasData)
-                : Differs(_savedSnapshot, current);
-        }
-    }
+    public bool HasUnsavedChanges => _hasUnsavedChanges;
 
     /// <summary>Дата в доменном виде. Пустое поле даёт сегодняшний день: записать день некуда.</summary>
     public DateOnly Day => DateOnly.FromDateTime(Date ?? DateTime.Today);
@@ -670,14 +676,24 @@ public sealed partial class AddDayViewModel : ObservableObject
         Refresh();
     }
 
-    /// <summary>Любое изменение подхода пересчитывает окно целиком.</summary>
+    /// <summary>Изменение подхода пересчитывает окно.</summary>
     /// <remarks>
-    /// Безусловно, а не по списку свойств: подход хранит значения строками, меняются
-    /// <c>WeightText</c> и <c>RepetitionText</c>, а <c>IsValid</c> и <c>HasData</c> — их
-    /// производные. Перечислить проверяемые свойства значило бы забыть новое поле и получить
-    /// молчащую надпись на «+» или «−».
+    /// Производные признаки пропускаются: <c>IsValid</c>, <c>HasData</c> и
+    /// <c>HasRepetitionPlaceholder</c> поднимаются вслед за самими полями и пересчёт не требуют,
+    /// а реакция на них считала бы состояние трижды за один удар. Незнакомое свойство, наоборот,
+    /// пересчитывает: новое поле не останется без обновления, даже если его забудут перечислить.
     /// </remarks>
-    private void OnSetPropertyChanged(object? sender, PropertyChangedEventArgs e) => Refresh();
+    private void OnSetPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(SetInputViewModel.IsValid)
+            or nameof(SetInputViewModel.HasData)
+            or nameof(SetInputViewModel.HasRepetitionPlaceholder))
+        {
+            return;
+        }
+
+        Refresh();
+    }
 
     /// <summary>Правка примечания пересчитывает окно целиком.</summary>
     /// <remarks>
@@ -722,6 +738,10 @@ public sealed partial class AddDayViewModel : ObservableObject
         AddSetCommand.NotifyCanExecuteChanged();
         RemoveSetCommand.NotifyCanExecuteChanged();
 
+        // Пригодность и признак несохранённого считаются здесь один раз: оба зависят от одного и
+        // того же собранного дня, а предикаты и привязки читаются на каждый символ.
+        UpdateSaveState();
+
         // Обе кнопки сохранения проверяют одно и то же условие, поэтому обновляются вместе:
         // «Сохранить» на Ctrl+S не обновлять нельзя — иначе после негодного ввода горячая клавиша
         // звала бы сохранение при серой кнопке.
@@ -740,6 +760,31 @@ public sealed partial class AddDayViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(HasUnsavedChanges));
         }
+    }
+
+    /// <summary>Пересчитывает пригодность сохранения и признак несохранённого за один проход.</summary>
+    /// <remarks>
+    /// Обе величины зависят от одного и того же собранного дня, поэтому запись собирается здесь
+    /// один раз, а геттеры только читают результат. Иначе на каждый символ приходилось бы три
+    /// полные сборки: две из предикатов команд и одна из привязки.
+    /// </remarks>
+    private void UpdateSaveState()
+    {
+        if (SelectedPlan is not { } plan)
+        {
+            _canAccept = false;
+            _hasUnsavedChanges = false;
+            return;
+        }
+
+        var current = BuildSession(plan);
+
+        _canAccept = Exercises.Any(row => row.HasData)
+            && Exercises.All(row => row.Sets.All(set => set.IsValid));
+
+        _hasUnsavedChanges = current is null
+            ? Exercises.Any(row => row.HasData)
+            : Differs(_savedSnapshot, current);
     }
 
     /// <summary>
@@ -842,11 +887,11 @@ public sealed partial class AddDayViewModel : ObservableObject
     ///
     /// Упражнение с одним примечанием и без подходов день наполняет — по тому же решению, что и
     /// <see cref="BuildSession"/>.
+    ///
+    /// Предикат только читает посчитанное в <see cref="UpdateSaveState"/>: обе команды
+    /// спрашивают его на каждый символ, и перебор подходов с разбором строк был бы двойной работой.
     /// </remarks>
-    private bool CanAccept() =>
-        SelectedPlan is not null
-        && Exercises.Any(row => row.HasData)
-        && Exercises.All(row => row.Sets.All(set => set.IsValid));
+    private bool CanAccept() => _canAccept;
 
     /// <summary>Сохраняет день и закрывает окно.</summary>
     [RelayCommand(CanExecute = nameof(CanAccept))]
@@ -1089,12 +1134,18 @@ public sealed partial class AddDayViewModel : ObservableObject
     {
         var outcome = await _sessionRepository.UpdateAsync(session).ConfigureAwait(true);
 
-        if (outcome == UpdateTrainingSessionOutcome.Updated)
+        switch (outcome)
         {
-            return true;
-        }
+            case UpdateTrainingSessionOutcome.Updated:
+                return true;
 
-        Status = "Запись за эту дату удалили, пока окно было открыто. Сохраните её заново.";
-        return false;
+            case UpdateTrainingSessionOutcome.DateTaken:
+                Status = "За эту дату уже есть запись. Выберите другую дату.";
+                return false;
+
+            default:
+                Status = "Запись за эту дату удалили, пока окно было открыто. Сохраните её заново.";
+                return false;
+        }
     }
 }

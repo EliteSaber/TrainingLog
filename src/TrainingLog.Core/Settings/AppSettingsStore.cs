@@ -102,21 +102,44 @@ public sealed class AppSettingsStore
     /// <remarks>
     /// Отказ возвращается значением, а не исключением: программа может стоять в папке без права
     /// записи, и падать на введённом числе там нельзя.
+    ///
+    /// Запись идёт через временный файл рядом и подмену: оборванная запись не должна оставить
+    /// обрезанный JSON. <see cref="Load"/> на нечитаемом файле молча берёт умолчания, и
+    /// пользователь вместо своей базы открыл бы другую — со стороны это выглядело бы как
+    /// пропавшая история.
     /// </remarks>
     public bool Save(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
+        var temporary = _path + ".tmp";
+
         try
         {
-            File.WriteAllText(_path, JsonSerializer.Serialize(settings, WriteOptions));
+            File.WriteAllText(temporary, JsonSerializer.Serialize(settings, WriteOptions));
+            File.Move(temporary, _path, overwrite: true);
         }
         catch (Exception exception) when (IsFileProblem(exception))
         {
+            TryDelete(temporary);
             return false;
         }
 
         return true;
+    }
+
+    /// <summary>Убирает временный файл после неудачной записи, не подменяя исходную ошибку.</summary>
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception exception) when (IsFileProblem(exception))
+        {
+            // Файл настроек остался прежним; неубранный .tmp — меньшее зло, чем исключение
+            // из уборки, которое скрыло бы настоящую причину отказа.
+        }
     }
 
     private AppSettings? TryRead()

@@ -6,6 +6,9 @@ namespace TrainingLog.Core.Repositories;
 
 public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> contextFactory) : IExerciseRepository
 {
+    /// <summary>Имя таблицы для сверки отказа по уникальности наименования.</summary>
+    private const string ExercisesTableName = "Exercises";
+
     /// <inheritdoc />
     public event EventHandler? Changed;
 
@@ -44,7 +47,11 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
         {
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (
+            SqliteConstraintErrors.IsUniqueViolation(
+                exception,
+                ExercisesTableName,
+                TrainingLogDbContext.NameKeyPropertyName))
         {
             // Предварительная проверка могла разойтись с базой: ту же проверку из другого окна
             // или процесса успели выполнить раньше. Уникальный индекс — последний рубеж.
@@ -89,7 +96,11 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
         {
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (
+            SqliteConstraintErrors.IsUniqueViolation(
+                exception,
+                ExercisesTableName,
+                TrainingLogDbContext.NameKeyPropertyName))
         {
             return UpdateExerciseOutcome.DuplicateName;
         }
@@ -174,7 +185,11 @@ public sealed class ExerciseRepository(IDbContextFactory<TrainingLogDbContext> c
 
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (
+            SqliteConstraintErrors.IsUniqueViolation(
+                exception,
+                ExercisesTableName,
+                TrainingLogDbContext.NameKeyPropertyName))
         {
             // Тот же уникальный индекс, что у добавления: предварительная проверка разошлась с
             // базой — файл открыт в двух окнах или упражнение добавили, пока окно импорта ждало.

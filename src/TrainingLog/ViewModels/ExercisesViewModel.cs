@@ -214,6 +214,14 @@ public sealed partial class ExercisesViewModel : ObservableObject
         ExportCommand.NotifyCanExecuteChanged();
     }
 
+    /// <summary>
+    /// Пересобирает видимый список, не поднимая <c>Reset</c>: общие строки остаются на месте.
+    /// </summary>
+    /// <remarks>
+    /// <c>Clear</c> + <c>Add</c> заставлял WPF пересоздать контейнеры всех строк на каждый символ
+    /// фильтра. Здесь удаляются только ушедшие строки, новые вставляются на свои места, а
+    /// перестановки идут через <c>Move</c> — контейнеры сохранившихся упражнений переиспользуются.
+    /// </remarks>
     private void RebuildVisible()
     {
         var filter = FilterText?.Trim();
@@ -231,11 +239,37 @@ public sealed partial class ExercisesViewModel : ObservableObject
             ? query.OrderByDescending(exercise => exercise.Name, StringComparer.Ordinal)
             : query.OrderBy(exercise => exercise.Name, StringComparer.Ordinal);
 
-        Visible.Clear();
+        var target = query.ToList();
 
-        foreach (var exercise in query)
+        // Ушедшие из фильтра — удаляются, сохранившиеся остаются на своих местах.
+        for (var index = Visible.Count - 1; index >= 0; index--)
         {
-            Visible.Add(exercise);
+            if (!target.Contains(Visible[index]))
+            {
+                Visible.RemoveAt(index);
+            }
+        }
+
+        // Остальные ставятся по порядку: перестановка — Move, появление — Insert.
+        for (var index = 0; index < target.Count; index++)
+        {
+            var exercise = target[index];
+
+            if (index < Visible.Count && ReferenceEquals(Visible[index], exercise))
+            {
+                continue;
+            }
+
+            var currentIndex = Visible.IndexOf(exercise);
+
+            if (currentIndex >= 0)
+            {
+                Visible.Move(currentIndex, index);
+            }
+            else
+            {
+                Visible.Insert(index, exercise);
+            }
         }
     }
 }

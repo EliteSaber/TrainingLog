@@ -17,6 +17,15 @@ public interface ITrainingSessionRepository
         DateOnly? toInclusive = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Последние <paramref name="count"/> записей по дате, свежие сверху.</summary>
+    /// <remarks>
+    /// Отбор идёт в базе, а не после чтения всего журнала: окну нужны только показанные дни, и
+    /// тянуть историю целиком с упражнениями и подходами ради нескольких строк незачем.
+    /// </remarks>
+    Task<IReadOnlyList<TrainingSession>> GetLatestAsync(
+        int count,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Запись за дату вместе с упражнениями и подходами либо <c>null</c>. Нужна окну добавления
     /// дня: на ту же дату запись уже есть — значит открывается правка, а не добавление.
@@ -48,7 +57,8 @@ public interface ITrainingSessionRepository
     /// <summary>Переписывает дату, план, упражнения и подходы, не меняя идентификатор записи.</summary>
     /// <remarks>
     /// Упражнение или план, удалённые из справочников, пока окно было открыто, молча выпадают
-    /// из записи, а названия остаются — историю не переписываем.
+    /// из записи, а названия остаются — историю не переписываем. Новая дата уникальна: если её
+    /// заняли, пока окно было открыто, возвращается <see cref="UpdateTrainingSessionOutcome.DateTaken"/>.
     /// </remarks>
     Task<UpdateTrainingSessionOutcome> UpdateAsync(
         TrainingSession session,

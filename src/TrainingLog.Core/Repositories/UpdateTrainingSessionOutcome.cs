@@ -8,4 +8,7 @@ public enum UpdateTrainingSessionOutcome
 
     /// <summary>Записи удалили, пока окно правки было открыто.</summary>
     NotFound,
+
+    /// <summary>На новую дату уже есть другая запись.</summary>
+    DateTaken,
 }

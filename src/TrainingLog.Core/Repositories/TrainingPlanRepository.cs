@@ -7,6 +7,9 @@ namespace TrainingLog.Core.Repositories;
 public sealed class TrainingPlanRepository(IDbContextFactory<TrainingLogDbContext> contextFactory)
     : ITrainingPlanRepository
 {
+    /// <summary>Имя таблицы для сверки отказа по уникальности наименования.</summary>
+    private const string TrainingPlansTableName = "TrainingPlans";
+
     public async Task<IReadOnlyList<TrainingPlan>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -78,7 +81,11 @@ public sealed class TrainingPlanRepository(IDbContextFactory<TrainingLogDbContex
         {
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (
+            SqliteConstraintErrors.IsUniqueViolation(
+                exception,
+                TrainingPlansTableName,
+                TrainingLogDbContext.NameKeyPropertyName))
         {
             // Предварительная проверка могла разойтись с базой: ту же проверку из другого окна
             // или процесса успели выполнить раньше. Уникальный индекс — последний рубеж.
@@ -129,7 +136,11 @@ public sealed class TrainingPlanRepository(IDbContextFactory<TrainingLogDbContex
         {
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (
+            SqliteConstraintErrors.IsUniqueViolation(
+                exception,
+                TrainingPlansTableName,
+                TrainingLogDbContext.NameKeyPropertyName))
         {
             return UpdateTrainingPlanOutcome.DuplicateName;
         }
