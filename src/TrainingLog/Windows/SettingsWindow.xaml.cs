@@ -1,27 +1,34 @@
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using Microsoft.Win32;
 using TrainingLog.Controls;
 using TrainingLog.Core.Settings;
+using TrainingLog.Services;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
 
-/// <summary>Окно параметров: число дней и адрес файла базы данных.</summary>
+/// <summary>Окно параметров: число дней, адрес базы и горячие клавиши.</summary>
 public partial class SettingsWindow : Window
 {
     private readonly SettingsViewModel _viewModel;
+    private readonly HotkeyService _hotkeys;
 
     /// <param name="viewModel">Параметры приложения.</param>
-    public SettingsWindow(SettingsViewModel viewModel)
+    /// <param name="hotkeys">Сервис назначений: уведомляет живущие окна после записи файла.</param>
+    public SettingsWindow(SettingsViewModel viewModel, HotkeyService hotkeys)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(hotkeys);
 
         InitializeComponent();
         DataContext = viewModel;
 
         _viewModel = viewModel;
+        _hotkeys = hotkeys;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         // Подписка в окне, а не в модели: событие приходит от поля ввода и живёт в Controls.
@@ -54,8 +61,144 @@ public partial class SettingsWindow : Window
     {
         if (e.PropertyName == nameof(SettingsViewModel.Accepted) && _viewModel.Accepted)
         {
+            // Файл переписан: сервис перечитает его и соберёт живущие окна пересборкой привязок.
+            // Windows-диалоги привязки пересоздают при показе, поэтому здесь только живущие.
+            _hotkeys.NotifyChanged();
+
             DialogResult = true;
         }
+    }
+
+    /// <summary>Фокус попал в поле захвата: запомнить действующее значение для Esc.</summary>
+    private void OnCaptureGotFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: HotkeyRowViewModel row })
+        {
+            row.BeginCapture();
+        }
+    }
+
+    /// <summary>Уход фокуса без подтверждения (Tab, клик мимо): вернуть значение до захвата.</summary>
+    /// <remarks>
+    /// После подтверждения обмен «сохранено — ушёл» отыгрывается честно: <see cref="HotkeyRowViewModel.CommitCapture"/>
+    /// ставит «до захвата» равным подтверждённому, и возврат возвращает то же самое.
+    /// </remarks>
+    private void OnCaptureLostFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: HotkeyRowViewModel row })
+        {
+            row.CancelCapture();
+        }
+    }
+
+    /// <summary>Захват комбинации клавиатурой: поле печатает только клавиатура, не пользователь.</summary>
+    /// <remarks>
+    /// Чистые модификаторы показываются прогрессом «Ctrl+…»; обычная клавиша завершает набор.
+    /// Esc возвращает захваченное до фокуса и гасит событие — иначе диалог бы закрылся, потому
+    /// что Esc всплывает до <c>IsCancel</c>. Enter подтверждает и остаётся в поле: следующую
+    /// комбинацию правят без повторного фокуса.
+    ///
+    /// Буквы без модификаторов подтверждением не становятся: WPF-жест их не переварит, и
+    /// назначение было бы мёртвым — лучше молчаливо дождаться модификатора, чем сохранить
+    /// клавишу, которая никогда не сработает.
+    /// </remarks>
+    private void OnCaptureKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: HotkeyRowViewModel row })
+        {
+            return;
+        }
+
+        var modifiers = Keyboard.Modifiers;
+
+        // Keyboard.Modifiers флага Windows не отдаёт (ловушка 28): клавиша нажата физически,
+        // а модификаторной сводки её нет — Win-одиночка рисовалась одним многоточием, а
+        // Win+буква уходила в ветку «буква без модификаторов» без комита. Опрашиваем напрямую.
+        if (Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin))
+        {
+            modifiers |= ModifierKeys.Windows;
+        }
+
+        // Alt-сочетания WPF относит к системным: в e.Key приходит Key.System, а настоящая
+        // клавиша лежит в e.SystemKey (ловушка 27). Без подмены ветка модификаторов
+        // (там перечислены LeftAlt/RightAlt, но не System) служило бы мимо, и Alt
+        // сам по себе комитился бы как «Alt+System» — жест, который никогда не сработает.
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+
+        switch (key)
+        {
+            // Esc не станет частью комбинации никогда: она возвращает захваченное до фокуса.
+            case Key.Escape:
+                row.CancelCapture();
+                e.Handled = true;
+                return;
+
+            // Enter ничего не подтверждает: комбинация подтверждается нажатой клавишей. Его
+            // задача — остаться в поле и не закрыть диалог (IsDefault внизу ждал бы нажатия).
+            // Key.Enter и Key.Return — один и тот же член перечисления, второй case был бы дублем.
+            case Key.Enter:
+                e.Handled = true;
+                return;
+        }
+
+        if (key is Key.LeftCtrl or Key.RightCtrl
+            or Key.LeftShift or Key.RightShift
+            or Key.LeftAlt or Key.RightAlt
+            or Key.LWin or Key.RWin)
+        {
+            // Модификатор сам по себе — промежуточный набор: показываем, что наели.
+            row.CapturePreview(CombineText(modifiers, "…"));
+
+            e.Handled = true;
+
+            return;
+        }
+
+        // Буква без модификаторов не подтверждает: комбинация не собрана, поле ждёт модификатора.
+        if (modifiers == ModifierKeys.None && key is >= Key.A and <= Key.Z)
+        {
+            e.Handled = true;
+
+            return;
+        }
+
+        row.CommitCapture(CombineText(modifiers, key.ToString()));
+
+        e.Handled = true;
+    }
+
+    /// <summary>Canonical набор: модификаторы в порядке Ctrl, Shift, Alt, Win, за ними клавиша.</summary>
+    /// <remarks>
+    /// Порядок совпадает с <see cref="HotkeyRules.ToString(HotkeyCombo)"/>, но правило Core
+    /// вызываться не может: поле захвата оперирует WPF-перечислениями.
+    /// </remarks>
+    private static string CombineText(ModifierKeys modifiers, string key)
+    {
+        List<string> parts = [];
+
+        if (modifiers.HasFlag(ModifierKeys.Control))
+        {
+            parts.Add("Ctrl");
+        }
+
+        if (modifiers.HasFlag(ModifierKeys.Shift))
+        {
+            parts.Add("Shift");
+        }
+
+        if (modifiers.HasFlag(ModifierKeys.Alt))
+        {
+            parts.Add("Alt");
+        }
+
+        if (modifiers.HasFlag(ModifierKeys.Windows))
+        {
+            parts.Add("Win");
+        }
+
+        parts.Add(key);
+
+        return string.Join("+", parts);
     }
 
     /// <summary>

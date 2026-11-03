@@ -1,22 +1,78 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Microsoft.Win32;
 using TrainingLog.Core;
 using TrainingLog.Core.Models;
+using TrainingLog.Services;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
 
 public partial class ExercisesWindow : Window
 {
-    public ExercisesWindow(ExercisesViewModel viewModel)
+    private readonly HotkeyBinder _binder;
+
+    public ExercisesWindow(ExercisesViewModel viewModel, HotkeyService hotkeys)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(hotkeys);
 
         InitializeComponent();
         DataContext = viewModel;
 
+        // Строки справочника работают через выделение: без него клавиши правки и удаления молчат.
+        _binder = new HotkeyBinder(this, hotkeys)
+            .Row("Exercises.Edit", ExerciseList, row =>
+            {
+                if (row is Exercise exercise)
+                {
+                    Run(viewModel.EditCommand, exercise);
+                }
+            })
+            .Row("Exercises.Delete", ExerciseList, row =>
+            {
+                if (row is Exercise exercise)
+                {
+                    ConfirmDelete(exercise);
+                }
+            });
+
+        _binder.Rebuild();
+
         Loaded += OnLoaded;
+    }
+
+    /// <summary>Выполняет команду, если её CanExecute разрешает: RelayCommand.Execute проверку
+    /// CanExecute не делает, и командное поведение кнопки обязано сохраниться.</summary>
+    private static void Run(ICommand command, object? parameter)
+    {
+        if (command.CanExecute(parameter))
+        {
+            command.Execute(parameter);
+        }
+    }
+
+    /// <summary>Удаление упражнения с подтверждением: как клику по кнопке из строки.</summary>
+    private async void ConfirmDelete(Exercise exercise)
+    {
+        if (DataContext is not ExercisesViewModel viewModel)
+        {
+            return;
+        }
+
+        var answer = MessageBox.Show(
+            this,
+            $"Удалить упражнение «{exercise.Name}» из справочника?",
+            "Удаление упражнения",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+
+        if (answer == MessageBoxResult.Yes && viewModel.DeleteCommand.CanExecute(exercise))
+        {
+            await viewModel.DeleteCommand.ExecuteAsync(exercise);
+        }
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -35,23 +91,9 @@ public partial class ExercisesWindow : Window
     /// </summary>
     private async void OnDeleteClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { CommandParameter: Exercise exercise }
-            || DataContext is not ExercisesViewModel viewModel)
+        if (sender is Button { CommandParameter: Exercise exercise })
         {
-            return;
-        }
-
-        var answer = MessageBox.Show(
-            this,
-            $"Удалить упражнение «{exercise.Name}» из справочника?",
-            "Удаление упражнения",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No);
-
-        if (answer == MessageBoxResult.Yes && viewModel.DeleteCommand.CanExecute(exercise))
-        {
-            await viewModel.DeleteCommand.ExecuteAsync(exercise);
+            ConfirmDelete(exercise);
         }
     }
 

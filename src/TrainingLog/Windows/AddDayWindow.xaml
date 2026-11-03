@@ -80,17 +80,7 @@
         </Style>
     </Window.Resources>
 
-    <!--
-      Ctrl+S зовёт «Сохранить», а не «Сохранить и закрыть»: горячая клавиша означает «сохранить
-      то, что набрано», и ждать после неё закрытия окна не должен никто. Объявлено в разметке
-      же, а не в code-behind: KeyBinding не требует обработчика, и при смене команды привязка
-      меняется в одном месте.
-    -->
-    <Window.InputBindings>
-        <KeyBinding Key="S"
-                    Modifiers="Control"
-                    Command="{Binding SaveCommand}" />
-    </Window.InputBindings>
+    <!-- Ctrl+S теперь живёт в HotkeyService: умолчание «Сохранить» переписывается в параметрах. -->
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
@@ -209,6 +199,7 @@
                     VerticalAlignment="Stretch"
                     Command="{Binding PreviousCommand}"
                     Template="{StaticResource ArrowButtonTemplate}"
+                    helpers:Hotkey.Id="Day.Previous"
                     ToolTip="Предыдущее упражнение">
                 <Path Height="22"
                       Stretch="Uniform"
@@ -299,6 +290,7 @@
                             VerticalAlignment="Stretch"
                             Command="{Binding RemoveSetCommand}"
                             Template="{StaticResource ArrowButtonTemplate}"
+                            helpers:Hotkey.Id="Day.RemoveSet"
                             ToolTip="Убрать подход">
                         <Path Width="22"
                               Height="22"
@@ -399,6 +391,7 @@
                             VerticalAlignment="Stretch"
                             Command="{Binding AddSetCommand}"
                             Template="{StaticResource ArrowButtonTemplate}"
+                            helpers:Hotkey.Id="Day.AddSet"
                             ToolTip="Добавить подход">
                         <Path Width="22"
                               Height="22"
@@ -579,6 +572,7 @@
                     VerticalAlignment="Stretch"
                     Command="{Binding NextCommand}"
                     Template="{StaticResource ArrowButtonTemplate}"
+                    helpers:Hotkey.Id="Day.Next"
                     ToolTip="Следующее упражнение">
                 <Path Height="22"
                       Stretch="Uniform"
@@ -658,6 +652,7 @@
                         Padding="14,4"
                         VerticalAlignment="Center"
                         Command="{Binding SaveCommand}"
+                        helpers:Hotkey.Id="Day.Save"
                         Content="Сохранить"
                         IsDefault="True" />
 
@@ -708,11 +703,13 @@
                             VerticalAlignment="Center">
                     <Button Padding="14,4"
                             Command="{Binding SaveAndCloseCommand}"
+                            helpers:Hotkey.Id="Day.SaveAndClose"
                             Content="Сохранить и закрыть" />
 
                     <Button Margin="8,0,0,0"
                             Padding="14,4"
                             Click="OnCancelClick"
+                            helpers:Hotkey.Id="Day.Cancel"
                             Content="Отменить" />
                 </StackPanel>
             </Grid>

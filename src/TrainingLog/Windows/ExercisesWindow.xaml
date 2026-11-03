@@ -64,6 +64,7 @@
                         Orientation="Horizontal">
                 <Button Padding="8,4"
                         Command="{Binding ImportCommand}"
+                        helpers:Hotkey.Id="Exercises.Import"
                         ToolTip="Импорт упражнений из файла">
                     <Button.Content>
                         <Path Width="16"
@@ -83,6 +84,7 @@
                         Padding="8,4"
                         Click="OnExportClick"
                         IsEnabled="{Binding CanExport}"
+                        helpers:Hotkey.Id="Exercises.Export"
                         ToolTip="Выгрузить упражнения в файл">
                     <Button.Content>
                         <Path Width="16"
@@ -121,6 +123,7 @@
                     Padding="14,4"
                     VerticalAlignment="Center"
                     Command="{Binding AddCommand}"
+                    helpers:Hotkey.Id="Exercises.Add"
                     Content="Добавить" />
         </Grid>
 
@@ -157,6 +160,7 @@
                     Background="Transparent"
                     BorderThickness="0"
                     Command="{Binding ToggleSortCommand}"
+                    helpers:Hotkey.Id="Exercises.ToggleSort"
                     ToolTip="Изменить направление сортировки">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="Название" />
@@ -174,7 +178,9 @@
               Margin="-12,0,-12,0">
             <ScrollViewer helpers:ScrollBarGutter.Left="2"
                           VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Visible}">
+                <ItemsControl x:Name="ExerciseList"
+                              ItemsSource="{Binding Visible}"
+                              helpers:RowSelection.Enabled="True">
                     <ItemsControl.ItemContainerStyle>
                         <!--
                           Отступ живёт на контейнере, а не на содержимом скролла: ScrollBarGutter
@@ -195,6 +201,15 @@
                                     Padding="0,4"
                                     BorderBrush="#E0E0E0"
                                     BorderThickness="0,0,0,1">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Path=(helpers:RowSelection.IsSelected), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
+                                                <Setter Property="Background" Value="#F3F3F3" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using TrainingLog.Services;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
@@ -7,16 +8,23 @@ namespace TrainingLog.Windows;
 public partial class EditExerciseWindow : Window
 {
     private readonly EditExerciseViewModel _viewModel;
+    private readonly HotkeyBinder _binder;
 
-    public EditExerciseWindow(EditExerciseViewModel viewModel)
+    public EditExerciseWindow(EditExerciseViewModel viewModel, HotkeyService hotkeys)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(hotkeys);
 
         InitializeComponent();
         DataContext = viewModel;
 
         _viewModel = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        // Явных исполнителей у окна нет: обе кнопки найдутся по Id в дереве окна.
+        _binder = new HotkeyBinder(this, hotkeys);
+
+        _binder.Rebuild();
 
         Closed += OnClosed;
         Loaded += OnLoaded;

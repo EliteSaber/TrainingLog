@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Input;
+using TrainingLog.Services;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
@@ -11,10 +13,12 @@ namespace TrainingLog.Windows;
 public partial class EditPlanWindow : Window
 {
     private readonly EditPlanViewModel _viewModel;
+    private readonly HotkeyBinder _binder;
 
-    public EditPlanWindow(EditPlanViewModel viewModel)
+    public EditPlanWindow(EditPlanViewModel viewModel, HotkeyService hotkeys)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(hotkeys);
 
         InitializeComponent();
         DataContext = viewModel;
@@ -22,8 +26,26 @@ public partial class EditPlanWindow : Window
         _viewModel = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
+        // Строки состава работают через выделение: без него клавиши порядка и убирания молчат.
+        _binder = new HotkeyBinder(this, hotkeys)
+            .Row("EditPlan.MoveUp", SelectedList, row => Run(_viewModel.MoveUpCommand, row))
+            .Row("EditPlan.MoveDown", SelectedList, row => Run(_viewModel.MoveDownCommand, row))
+            .Row("EditPlan.Remove", SelectedList, row => Run(_viewModel.RemoveCommand, row));
+
+        _binder.Rebuild();
+
         Closed += OnClosed;
         Loaded += OnLoaded;
+    }
+
+    /// <summary>Выполняет команду, если её CanExecute разрешает: RelayCommand.Execute проверку
+    /// CanExecute не делает, и командное поведение кнопки обязано сохраниться.</summary>
+    private static void Run(ICommand command, object? parameter)
+    {
+        if (command.CanExecute(parameter))
+        {
+            command.Execute(parameter);
+        }
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)

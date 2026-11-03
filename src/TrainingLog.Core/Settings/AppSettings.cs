@@ -30,4 +30,12 @@ public sealed class AppSettings
 
     /// <summary>Полный адрес файла базы: сохранённые директория и наименование вместе.</summary>
     public string DatabasePath => Path.Combine(DatabaseDirectory, DatabaseName);
+
+    /// <summary>Горячие клавиши: id действия к canonical-строке комбинации.</summary>
+    /// <remarks>
+    /// Пригодность строки проверяет <see cref="HotkeyRules"/>, выбор между назначенным и
+    /// умолчанием — WPF-слой. Словарь годится, а не массив записей: секцию «Hotkeys»
+    /// System.Text.Json читает без конвертеров, и порядок строк в файле значения не имеет.
+    /// </remarks>
+    public Dictionary<string, string> Hotkeys { get; set; } = new();
 }

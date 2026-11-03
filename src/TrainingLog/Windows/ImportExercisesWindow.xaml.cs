@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using Microsoft.Win32;
+using TrainingLog.Services;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
@@ -9,16 +10,23 @@ namespace TrainingLog.Windows;
 public partial class ImportExercisesWindow : Window
 {
     private readonly ImportExercisesViewModel _viewModel;
+    private readonly HotkeyBinder _binder;
 
-    public ImportExercisesWindow(ImportExercisesViewModel viewModel)
+    public ImportExercisesWindow(ImportExercisesViewModel viewModel, HotkeyService hotkeys)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(hotkeys);
 
         InitializeComponent();
         DataContext = viewModel;
 
         _viewModel = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        // Явных исполнителей у окна нет: все три кнопки найдутся по Id в дереве окна.
+        _binder = new HotkeyBinder(this, hotkeys);
+
+        _binder.Rebuild();
 
         Closed += OnClosed;
         Loaded += OnLoaded;

@@ -37,6 +37,7 @@
                 Padding="14,4"
                 HorizontalAlignment="Stretch"
                 Command="{Binding AddCommand}"
+                helpers:Hotkey.Id="Plans.Add"
                 Content="Добавить" />
 
         <Grid Grid.Row="1">
@@ -70,6 +71,7 @@
                     Background="Transparent"
                     BorderThickness="0"
                     Command="{Binding ToggleSortCommand}"
+                    helpers:Hotkey.Id="Plans.ToggleSort"
                     ToolTip="Изменить направление сортировки">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="Название" />
@@ -84,7 +86,9 @@
               Margin="-12,0,-12,0">
             <ScrollViewer helpers:ScrollBarGutter.Left="2"
                           VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Visible}">
+                <ItemsControl x:Name="PlanList"
+                              ItemsSource="{Binding Visible}"
+                              helpers:RowSelection.Enabled="True">
                     <ItemsControl.ItemContainerStyle>
                         <!--
                           Отступ живёт на контейнере, а не на содержимом скролла: ScrollBarGutter
@@ -120,6 +124,15 @@
                                     Padding="4,3"
                                     BorderBrush="#D0D0D0"
                                     BorderThickness="1">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Path=(helpers:RowSelection.IsSelected), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
+                                                <Setter Property="Background" Value="#F3F3F3" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />

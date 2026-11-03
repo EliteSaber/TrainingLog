@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using TrainingLog.Controls;
+using TrainingLog.Services;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog;
@@ -15,16 +16,38 @@ namespace TrainingLog;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private readonly HotkeyBinder _binder;
 
-    public MainWindow(MainViewModel viewModel)
+    public MainWindow(MainViewModel viewModel, HotkeyService hotkeys)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(hotkeys);
 
         InitializeComponent();
 
         DataContext = viewModel;
 
         _viewModel = viewModel;
+
+        // Пункты меню шестерёнки живут в отдельном логическом дереве, и биндер дерева окна их
+        // не найдёт — исполнители заданы явно. «Редактировать» и «Показать» работают с
+        // выделенной строкой, поэтому регистрируются строками, а не кнопками.
+        _binder = new HotkeyBinder(this, hotkeys)
+            .Invoke("Main.OpenExercises", () => Run(_viewModel.OpenExercisesCommand))
+            .Invoke("Main.OpenPlans", () => Run(_viewModel.OpenPlansCommand))
+            .Invoke("Main.OpenSettings", () => Run(_viewModel.OpenSettingsCommand))
+            .Invoke("Main.Apply", () => Run(_viewModel.ApplyCommand))
+            .Invoke("Main.AddDay", () => Run(_viewModel.AddDayCommand))
+            .Row("Main.EditDay", DaysList, row =>
+            {
+                if (row is DayRowViewModel day)
+                {
+                    Run(_viewModel.EditDayCommand, day);
+                }
+            })
+            .Row("Main.ShowNote", DaysList, ShowNote);
+
+        _binder.Rebuild();
 
         // Отказ по вводу приходит от поля количества дней, и подсказкой его показывает StatusHint.
         // Окно живёт до конца работы приложения, поэтому отписка в Closed — формальность.
@@ -36,6 +59,64 @@ public partial class MainWindow : Window
 
         Closed += OnClosed;
         Loaded += OnLoaded;
+    }
+
+    /// <summary>Выполняет команду, если её CanExecute разрешает: горячая клавиша обязана
+    /// вести себя как кнопка, а RelayCommand.Execute CanExecute не проверяет (ловушка 46).</summary>
+    private static void Run(ICommand command, object? parameter = null)
+    {
+        if (command.CanExecute(parameter))
+        {
+            command.Execute(parameter);
+        }
+    }
+
+    /// <summary>Горячая клавиша «Показать примечание»: работает с выделенной строкой журнала.</summary>
+    /// <remarks>
+    /// Логика та же, что у клика по кнопке, и якорь тоже нужен: имя у кнопок в строке данных
+    /// отсутствует — кнопка находится поиском внутри выделенного дня. Примечание у найденной
+    /// кнопки есть по построению поиска, и показывается оно так же, как по клику.
+    /// </remarks>
+    private void ShowNote(object row)
+    {
+        if (DaysList.ItemContainerGenerator.ContainerFromItem(row) is not FrameworkElement container)
+        {
+            return;
+        }
+
+        if (FindShowNoteButton(container) is not { } button)
+        {
+            return;
+        }
+
+        var cell = (DayExerciseCell)button.DataContext;
+
+        InputHint.Target = button;
+
+        _viewModel.Hint.ShowNoteCommand.Execute(cell.Note);
+
+        InputHint.RestartCountdown();
+    }
+
+    /// <summary>Ищет кнопку «Показать» внутри строки дня: примечание есть — она видима.</summary>
+    private static Button? FindShowNoteButton(DependencyObject root)
+    {
+        if (root is Button { DataContext: DayExerciseCell { HasNote: true } })
+        {
+            return (Button)root;
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(root);
+
+        for (var i = 0; i < count; i++)
+        {
+            if (FindShowNoteButton(VisualTreeHelper.GetChild(root, i)) is { } child)
+            {
+                return child;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>В поле количества дней введено или вставлено недопустимое.</summary>

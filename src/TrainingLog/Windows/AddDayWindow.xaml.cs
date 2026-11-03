@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using TrainingLog.Controls;
+using TrainingLog.Services;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
@@ -22,6 +23,9 @@ public partial class AddDayWindow : Window
 {
     private readonly AddDayViewModel _viewModel;
 
+    /// <summary>Собирает и пересобирает горячие клавиши окна по событию сервиса.</summary>
+    private readonly HotkeyBinder _binder;
+
     /// <summary>День записан в базу: журнал в главном окне надо перечитать.</summary>
     /// <remarks>
     /// Источник — <see cref="AddDayViewModel.Saved"/>: модель поднимает PropertyChanged при
@@ -30,15 +34,26 @@ public partial class AddDayWindow : Window
     /// </remarks>
     public event Action? SavedChanged;
 
-    public AddDayWindow(AddDayViewModel viewModel)
+    public AddDayWindow(AddDayViewModel viewModel, HotkeyService hotkeys)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(hotkeys);
 
         InitializeComponent();
         DataContext = viewModel;
 
         _viewModel = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        // Слоты — единственные назначения, у которых исполнитель не кнопка: клавиша выбирает
+        // упражнение по его номеру, как клик по кнопке-номеру. Упражнения пересобираются при
+        // каждой загрузке плана, поэтому номер ищется в момент нажатия, а не в момент бинда.
+        _binder = new HotkeyBinder(this, hotkeys)
+            .Slots(
+                HotkeyCatalog.SlotIdPrefix,
+                number => SelectSlot(number));
+
+        _binder.Rebuild();
 
         // Подписка на отказ в окне, а не в модели: событие приходит от поля ввода, живёт в
         // поведении Controls, и модель о нём знать не должна. Отписка в Closed обязательна —
@@ -48,6 +63,15 @@ public partial class AddDayWindow : Window
 
         Closed += OnClosed;
         Loaded += OnLoaded;
+    }
+
+    /// <summary>Выбирает упражнение дня по номеру кнопки-слота.</summary>
+    private void SelectSlot(int number)
+    {
+        if (_viewModel.Exercises.FirstOrDefault(row => row.Number == number) is { } exercise)
+        {
+            _viewModel.SelectExerciseCommand.Execute(exercise);
+        }
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)

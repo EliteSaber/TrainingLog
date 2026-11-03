@@ -126,6 +126,7 @@
                     VerticalAlignment="Center"
                     IsDefault="True"
                     Command="{Binding ApplyCommand}"
+                    helpers:Hotkey.Id="Main.Apply"
                     Content="Применить" />
 
             <Button x:Name="SettingsButton"
@@ -135,6 +136,7 @@
                     Focusable="False"
                     ToolTip="Параметры"
                     Click="OnSettingsButtonClick"
+                    helpers:Hotkey.Id="Main.SettingsMenu"
                     ContextMenu="{StaticResource SettingsMenu}">
                 <Button.Content>
                     <Path Width="16"
@@ -177,7 +179,9 @@
         <ScrollViewer helpers:ScrollBarGutter.Left="2"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Days}"
+                <ItemsControl x:Name="DaysList"
+                              ItemsSource="{Binding Days}"
+                              helpers:RowSelection.Enabled="True"
                               MouseDoubleClick="OnDayDoubleClick">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -226,6 +230,16 @@
                                         Padding="0,10,0,10"
                                         BorderBrush="#E0E0E0"
                                         BorderThickness="0,0,0,1">
+                                    <!-- Выделение строки кликом: фон светлее границы, но заметней её. -->
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Path=(helpers:RowSelection.IsSelected), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
+                                                    <Setter Property="Background" Value="#F3F3F3" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
@@ -489,7 +503,8 @@
                                                         <Grid>
                                                             <Button Padding="1,1"
                                                                     FontSize="11"
-                                                                    Click="OnShowNoteClick">
+                                                                    Click="OnShowNoteClick"
+                                                                    helpers:Hotkey.Id="Main.ShowNote">
                                                                 <Button.Style>
                                                                     <Style TargetType="Button">
                                                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -564,6 +579,7 @@
                 HorizontalAlignment="Left"
                 Padding="14,4"
                 Command="{Binding AddDayCommand}"
+                helpers:Hotkey.Id="Main.AddDay"
                 Content="Добавить день" />
 
 <!--

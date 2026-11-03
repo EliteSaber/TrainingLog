@@ -67,6 +67,58 @@ public sealed class AppSettingsStoreTests
         Assert.Equal(@"D:\журнал\базы\спорт.db", loaded.DatabasePath);
     }
 
+    /// <summary>Секция Hotkeys: круг «сохранили — прочитали» вместе с остальными полями.</summary>
+    /// <remarks>
+    /// Словарь сериализуется штатным System.Text.Json, но проверяется не сериализатор: та же
+    /// запись обязана вернуться из файла целиком, а не только из памяти хранилища.
+    /// </remarks>
+    [Fact]
+    public void Save_ПотоЧитаетсяСекцияГорячихКлавиш()
+    {
+        using var settings = new TemporarySettings();
+
+        Assert.True(settings.Store.Save(new AppSettings
+        {
+            DaysCount = 7,
+            DatabaseDirectory = @"D:\журнал\базы",
+            DatabaseName = "спорт.db",
+            Hotkeys = new Dictionary<string, string>
+            {
+                ["Day.Save"] = "Ctrl+Shift+S",
+                ["Exercises.Add"] = "F2",
+            },
+        }));
+
+        var loaded = settings.Store.Load();
+
+        Assert.Equal("Ctrl+Shift+S", loaded.Hotkeys["Day.Save"]);
+        Assert.Equal("F2", loaded.Hotkeys["Exercises.Add"]);
+
+        // Отдельным хранилищем: секция лежит в файле, а не только в памяти.
+        var reread = new AppSettingsStore(settings.FilePath).Load();
+
+        Assert.Equal("Ctrl+Shift+S", reread.Hotkeys["Day.Save"]);
+        Assert.Equal("F2", reread.Hotkeys["Exercises.Add"]);
+    }
+
+    /// <summary>Секции нет, она пустая или негодное содержимое файла — словарь пуст, не null.</summary>
+    /// <remarks>
+    /// Пустой словарь, а не null: разбор назначений и умолчаний живёт в WPF-слое, и «отсутствует»
+    /// и «пусто» обязаны объясняться там одним значением.
+    /// </remarks>
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""{"DaysCount": 5}""")]
+    [InlineData("""{"Hotkeys": {}}""")]
+    [InlineData("{ это не json")]
+    public void Load_СекцииГорячихКлавишНет_ПустойСловарь(string content)
+    {
+        using var settings = new TemporarySettings();
+        settings.Write(content);
+
+        Assert.Empty(settings.Store.Load().Hotkeys);
+    }
+
     /// <summary>Отступы при записи: в файл заглядывают глазами, когда правят руками.</summary>
     [Fact]
     public void Save_ПишетJsonСОтступами()

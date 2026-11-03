@@ -54,13 +54,25 @@ public partial class App : Application
         // второй, найденный по тому же адресу.
         services.AddSingleton(settingsStore);
 
+        // То же правило единственности, что у настроек: назначения правятся одним файлом, и
+        // живущие окна пересобирают привязки по событию единственного сервиса.
+        services.AddSingleton<HotkeyService>();
+
         // Синглтон, потому что окна справочников единственные и состояние их хоста переиспользуется.
-        services.AddSingleton<IWindowService>(provider => new WindowService(
+        services.AddSingleton<IWindowService>(provider =>
+        {
+            // Окна создаются лениво, и сервис горячих клавиш читается из контейнера в момент
+            // создания окна: раньше него он всё равно не используется.
+            var hotkeys = provider.GetRequiredService<HotkeyService>();
+
+            return new WindowService(
             () => provider.GetRequiredService<ExercisesWindow>(),
             exercise => new EditExerciseWindow(
-                new EditExerciseViewModel(exercise, provider.GetRequiredService<IExerciseRepository>())),
+                new EditExerciseViewModel(exercise, provider.GetRequiredService<IExerciseRepository>()),
+                hotkeys),
             () => new ImportExercisesWindow(new ImportExercisesViewModel(
-                provider.GetRequiredService<IExerciseRepository>())),
+                provider.GetRequiredService<IExerciseRepository>()),
+                hotkeys),
             () => provider.GetRequiredService<PlansWindow>(),
             // Добавление и правка плана открывают одно окно, поэтому фабрики две: отличаются они
             // планом и тем, новый он или уже сохранённый.
@@ -68,20 +80,25 @@ public partial class App : Application
                 new TrainingPlan(),
                 isNew: true,
                 provider.GetRequiredService<ITrainingPlanRepository>(),
-                provider.GetRequiredService<IExerciseRepository>())),
+                provider.GetRequiredService<IExerciseRepository>()),
+                hotkeys),
             plan => new EditPlanWindow(new EditPlanViewModel(
                 plan,
                 isNew: false,
                 provider.GetRequiredService<ITrainingPlanRepository>(),
-                provider.GetRequiredService<IExerciseRepository>())),
+                provider.GetRequiredService<IExerciseRepository>()),
+                hotkeys),
             // Окно дня одно на добавление и на правку: какая это запись, модель узнаёт по дате,
             // поэтому фабрика одна, а null означает сегодняшний день.
             day => new AddDayWindow(new AddDayViewModel(
                 provider.GetRequiredService<ITrainingSessionRepository>(),
                 provider.GetRequiredService<ITrainingPlanRepository>(),
-                day)),
+                day),
+                hotkeys),
             () => new SettingsWindow(new SettingsViewModel(
-                provider.GetRequiredService<AppSettingsStore>()))));
+                provider.GetRequiredService<AppSettingsStore>()),
+                provider.GetRequiredService<HotkeyService>()));
+        });
 
         services.AddTransient<ExercisesViewModel>();
         services.AddTransient<ExercisesWindow>();

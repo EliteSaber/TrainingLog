@@ -1,7 +1,9 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using TrainingLog.Core.Models;
 using TrainingLog.Core.Repositories;
+using TrainingLog.Services;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
@@ -9,16 +11,37 @@ namespace TrainingLog.Windows;
 public partial class PlansWindow : Window
 {
     private readonly IExerciseRepository _exerciseRepository;
+    private readonly HotkeyBinder _binder;
 
-    public PlansWindow(PlansViewModel viewModel, IExerciseRepository exerciseRepository)
+    public PlansWindow(PlansViewModel viewModel, IExerciseRepository exerciseRepository, HotkeyService hotkeys)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(exerciseRepository);
+        ArgumentNullException.ThrowIfNull(hotkeys);
 
         InitializeComponent();
         DataContext = viewModel;
 
         _exerciseRepository = exerciseRepository;
+
+        // Строки планов работают через выделение: без него клавиши правки и удаления молчат.
+        _binder = new HotkeyBinder(this, hotkeys)
+            .Row("Plans.Edit", PlanList, row =>
+            {
+                if (row is TrainingPlan plan)
+                {
+                    Run(viewModel.EditCommand, plan);
+                }
+            })
+            .Row("Plans.Delete", PlanList, row =>
+            {
+                if (row is TrainingPlan plan)
+                {
+                    ConfirmDelete(plan);
+                }
+            });
+
+        _binder.Rebuild();
 
         Loaded += OnLoaded;
         Closed += OnClosed;
@@ -59,14 +82,20 @@ public partial class PlansWindow : Window
 
     private void OnClosed(object? sender, EventArgs e) => _exerciseRepository.Changed -= OnExercisesChanged;
 
-    /// <summary>
-    /// Удаление необратимо, поэтому спрашиваем подтверждение здесь, а не в модели представления:
-    /// <see cref="MessageBox"/> — работа с интерфейсом, и в представлении ей не место.
-    /// </summary>
-    private async void OnDeleteClick(object sender, RoutedEventArgs e)
+    /// <summary>Выполняет команду, если её CanExecute разрешает: RelayCommand.Execute проверку
+    /// CanExecute не делает, и командное поведение кнопки обязано сохраниться.</summary>
+    private static void Run(ICommand command, object? parameter)
     {
-        if (sender is not Button { CommandParameter: TrainingPlan plan }
-            || DataContext is not PlansViewModel viewModel)
+        if (command.CanExecute(parameter))
+        {
+            command.Execute(parameter);
+        }
+    }
+
+    /// <summary>Удаление плана с подтверждением: как клику по кнопке из строки.</summary>
+    private async void ConfirmDelete(TrainingPlan plan)
+    {
+        if (DataContext is not PlansViewModel viewModel)
         {
             return;
         }
@@ -82,6 +111,18 @@ public partial class PlansWindow : Window
         if (answer == MessageBoxResult.Yes && viewModel.DeleteCommand.CanExecute(plan))
         {
             await viewModel.DeleteCommand.ExecuteAsync(plan);
+        }
+    }
+
+    /// <summary>
+    /// Удаление необратимо, поэтому спрашиваем подтверждение здесь, а не в модели представления:
+    /// <see cref="MessageBox"/> — работа с интерфейсом, и в представлении ей не место.
+    /// </summary>
+    private async void OnDeleteClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { CommandParameter: TrainingPlan plan })
+        {
+            ConfirmDelete(plan);
         }
     }
 }

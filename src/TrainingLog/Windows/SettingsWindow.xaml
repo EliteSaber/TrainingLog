@@ -9,15 +9,15 @@
         d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
         mc:Ignorable="d"
         Title="Параметры"
-        Width="420"
-        SizeToContent="Height"
-        MinWidth="320"
+        Width="520"
+        Height="560"
+        MinWidth="420"
+        MinHeight="420"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
     <!--
-      Поле устроено и настроено как на главном окне: та же ширина, те же отступы и
-      центрирование, тот же фильтр цифр. Одно и то же число в двух окнах иначе читалось бы как
-      два разных счётчика.
+      SizeToContent заменён фиксированной высотой: список горячих клавиш длинный, и окно,
+      растущее по содержимому, вылезло бы за экран. Содержимым в пределах окна правит прокрутка.
     -->
     <Window.Resources>
         <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -25,128 +25,272 @@
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!--
-          Подпись и поле в одну строку, две Auto-колонки. Не горизонтальная панель: она меряет
-          содержимое бесконечной шириной, и перенос у подписи перестал бы работать (ловушка 29).
-          Не колонка `*` под подпись при Auto под поле: `*` заберёт весь остаток и уведёт поле к
-          правому краю, оставив дыру между подписью и полем.
+        <TabControl Grid.Row="0">
 
-          MinWidth у поля — пол колонки, ниже которого она не сжимается: нехватку ширины забирает
-          подпись и переносится по словам, а поле остаётся прежним. Без него нехватка делилась бы
-          между ними поровну (ловушка 38) и поле обрезало бы цифру.
-        -->
-        <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+            <TabItem Header="Общие">
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-            <!--
-              Background="Transparent" обязателен: с null-фоном подпись ловит клик только по
-              буквам, и клик по пробелу не передал бы фокус (ловушка 13). HorizontalAlignment не
-              задан намеренно — центрированный элемент не переносится (ловушка 29).
-            -->
-            <TextBlock Grid.Column="0"
-                       VerticalAlignment="Center"
-                       Background="Transparent"
-                       TextWrapping="Wrap"
-                       Text="Количество отображаемых дней"
-                       helpers:ClickToFocus.Target="{Binding ElementName=DaysCountBox}" />
+                    <!--
+                      Поле устроено и настроено как на главном окне: та же ширина, те же отступы и
+                      центрирование, тот же фильтр цифр. Одно и то же число в двух окнах иначе читалось бы как
+                      два разных счётчика.
 
-            <TextBox x:Name="DaysCountBox"
-                     Grid.Column="1"
-                     Width="52"
-                     MinWidth="52"
-                     Margin="8,0,0,0"
-                     VerticalAlignment="Center"
-                     Padding="4,3"
-                     HorizontalContentAlignment="Center"
-                     VerticalContentAlignment="Center"
-                     helpers:AllowedCharsInput.Allowed="Digits"
-                     Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
-        </Grid>
+                      Подпись и поле в одну строку, две Auto-колонки. Не горизонтальная панель: она меряет
+                      содержимое бесконечной шириной, и перенос у подписи перестал бы работать (ловушка 29).
 
-        <!--
-          Две строки адреса базы. Кнопка у директории открывает выбор папки, у наименования —
-          выбор файла *.db: одного диалога «и папка, и файл» в стандартных окнах нет, а файл заодно
-          подставляет директорию целиком — оба поля остаются согласованы.
-          Обработчики живут в code-behind: диалоги — работа интерфейса, модели представления им не место.
+                      MinWidth у поля — пол колонки, ниже которого она не сжимается: нехватку ширины забирает
+                      подпись и переносится по словам, а поле остаётся прежним. Без него нехватка делилась бы
+                      между ними поровну (ловушка 38) и поле обрезало бы цифру.
+                    -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-          Средняя колонка `*`: путь длиннее подписи и кнопки, нехватку ширины забирает поле.
-        -->
-        <Grid Grid.Row="1" Margin="0,12,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+                        <!--
+                          Background="Transparent" обязателен: с null-фоном подпись ловит клик только по
+                          буквам, и клик по пробелу не передал бы фокус (ловушка 13).
+                        -->
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Background="Transparent"
+                                   TextWrapping="Wrap"
+                                   Text="Количество отображаемых дней"
+                                   helpers:ClickToFocus.Target="{Binding ElementName=DaysCountBox}" />
 
-            <TextBlock Grid.Column="0"
-                       VerticalAlignment="Center"
-                       Background="Transparent"
-                       TextWrapping="Wrap"
-                       Text="Директория БД"
-                       helpers:ClickToFocus.Target="{Binding ElementName=DirectoryBox}" />
+                        <TextBox x:Name="DaysCountBox"
+                                 Grid.Column="1"
+                                 Width="52"
+                                 MinWidth="52"
+                                 Margin="8,0,0,0"
+                                 VerticalAlignment="Center"
+                                 Padding="4,3"
+                                 HorizontalContentAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 helpers:AllowedCharsInput.Allowed="Digits"
+                                 Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
+                    </Grid>
 
-            <TextBox x:Name="DirectoryBox"
-                     Grid.Column="1"
-                     Margin="8,0,0,0"
-                     VerticalAlignment="Center"
-                     Padding="4,3"
-                     helpers:OverflowTip.Enabled="True"
-                     Text="{Binding DatabaseDirectory, UpdateSourceTrigger=PropertyChanged}" />
+                    <!--
+                      Две строки адреса базы. Кнопка у директории открывает выбор папки, у наименования —
+                      выбор файла *.db: одного диалога «и папка, и файл» в стандартных окнах нет, а файл заодно
+                      подставляет директорию целиком — оба поля остаются согласованы.
+                      Обработчики живут в code-behind: диалоги — работа интерфейса, модели представления им не место.
 
-            <Button Grid.Column="2"
-                    Margin="8,0,0,0"
-                    Padding="8,3"
-                    VerticalAlignment="Center"
-                    Content="Обзор…"
-                    Click="OnPickDirectory" />
-        </Grid>
+                      Средняя колонка `*`: путь длиннее подписи и кнопки, нехватку ширины забирает поле.
+                    -->
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-        <Grid Grid.Row="2" Margin="0,12,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Background="Transparent"
+                                   TextWrapping="Wrap"
+                                   Text="Директория БД"
+                                   helpers:ClickToFocus.Target="{Binding ElementName=DirectoryBox}" />
 
-            <TextBlock Grid.Column="0"
-                       VerticalAlignment="Center"
-                       Background="Transparent"
-                       TextWrapping="Wrap"
-                       Text="Наименование БД"
-                       helpers:ClickToFocus.Target="{Binding ElementName=NameBox}" />
+                        <TextBox x:Name="DirectoryBox"
+                                 Grid.Column="1"
+                                 Margin="8,0,0,0"
+                                 VerticalAlignment="Center"
+                                 Padding="4,3"
+                                 helpers:OverflowTip.Enabled="True"
+                                 Text="{Binding DatabaseDirectory, UpdateSourceTrigger=PropertyChanged}" />
 
-            <TextBox x:Name="NameBox"
-                     Grid.Column="1"
-                     Margin="8,0,0,0"
-                     VerticalAlignment="Center"
-                     Padding="4,3"
-                     helpers:OverflowTip.Enabled="True"
-                     Text="{Binding DatabaseName, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="2"
+                                Margin="8,0,0,0"
+                                Padding="8,3"
+                                VerticalAlignment="Center"
+                                Content="Обзор…"
+                                helpers:Hotkey.Id="Settings.PickDirectory"
+                                Click="OnPickDirectory" />
+                    </Grid>
 
-            <Button Grid.Column="2"
-                    Margin="8,0,0,0"
-                    Padding="8,3"
-                    VerticalAlignment="Center"
-                    Content="Выбрать файл…"
-                    Click="OnPickDatabaseFile" />
-        </Grid>
+                    <Grid Grid.Row="2" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Background="Transparent"
+                                   TextWrapping="Wrap"
+                                   Text="Наименование БД"
+                                   helpers:ClickToFocus.Target="{Binding ElementName=NameBox}" />
+
+                        <TextBox x:Name="NameBox"
+                                 Grid.Column="1"
+                                 Margin="8,0,0,0"
+                                 VerticalAlignment="Center"
+                                 Padding="4,3"
+                                 helpers:OverflowTip.Enabled="True"
+                                 Text="{Binding DatabaseName, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <Button Grid.Column="2"
+                                Margin="8,0,0,0"
+                                Padding="8,3"
+                                VerticalAlignment="Center"
+                                Content="Выбрать файл…"
+                                helpers:Hotkey.Id="Settings.PickFile"
+                                Click="OnPickDatabaseFile" />
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Горячие клавиши">
+                <!--
+                  Одна колонка: группы друг под другом, каждая — список строк своего окна.
+                  Прокрутка одна на вкладку: комбинаций десятки, и fixed высот вложенных списков
+                  не было бы видно, какая группа длинная.
+                -->
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!--
+                      Конфликт — красной строкой и до исправления, а не подсказкой: «Сохранить»
+                      с конфликтом молчит, и причину обязано быть видно, пока не исправят.
+                    -->
+                    <TextBlock Grid.Row="0"
+                               Margin="0,0,0,8"
+                               TextWrapping="Wrap"
+                               Foreground="Firebrick"
+                               Visibility="{Binding HasHotkeyConflict, Converter={StaticResource BooleanToVisibilityConverter}}"
+                               Text="{Binding HotkeyConflict}" />
+
+                    <!--
+                      Плоский перечень (заголовки окон вперемешку со строками), а не группа-в-группе:
+                      вложенность строила бы все ~60 строк разом, и первый показ вкладки этим
+                      стоил задержки.
+                      ScrollViewer живёт в шаблоне самого перечня: ScrollViewer над ItemsControl'ом
+                      бездействует для виртуализации — панель получает меру без границ и строит
+                      весь список разом (замер тестом: 52 строки разом). Внутри шаблона связка
+                      ScrollViewer + ItemsPresenter + CanContentScroll работает как у ListBox'а:
+                      строится только видимое. Recycling переиспользует контейнеры при прокрутке,
+                      попиксельная единица держит прокрутку плавной.
+                    -->
+                    <ItemsControl Grid.Row="1"
+                                  ItemsSource="{Binding HotkeyListing}"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Recycling"
+                                  VirtualizingPanel.ScrollUnit="Pixel">
+
+                        <ItemsControl.Template>
+                            <ControlTemplate TargetType="ItemsControl">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              CanContentScroll="True"
+                                              helpers:ScrollBarGutter.Left="2">
+                                    <ItemsPresenter />
+                                </ScrollViewer>
+                            </ControlTemplate>
+                        </ItemsControl.Template>
+
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+
+                        <ItemsControl.Resources>
+
+                            <!--
+                              Заголовок = то же название окна, что было у группы. Отступ сверху 10px
+                              подбирает прежнюю межгрупповую четверть: у самого первого заголовка
+                              появляется незаметный 10px над списком.
+                            -->
+                            <DataTemplate DataType="{x:Type vm:HotkeySectionViewModel}">
+                                <TextBlock Margin="0,10,0,4"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding WindowName}" />
+                            </DataTemplate>
+
+                            <!--
+                              Строка списка: Имя + TextBox захвата + «Убрать». Сами строки
+                              в grid-колонках, а не в панели: поле захвата честно правится
+                              колонкой Auto, и имя в колонке * переносится вместо того, чтобы
+                              сдвигать поле захвата с места (ловушка 29).
+                            -->
+                            <DataTemplate DataType="{x:Type vm:HotkeyRowViewModel}">
+                                <Grid Margin="0,0,0,4"
+                                      SnapsToDevicePixels="True">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding DisplayText}" />
+
+                                    <!--
+                                      Поле захвата только для чтения: комбинацию вводит клавиатура,
+                                      а печатная правка «Ctrl+» руками — источник негодных значений.
+                                      Mode=OneWay обязателен: модель пишет в строку сама
+                                      промежуточный набор, а привязка по умолчанию двусторонняя.
+                                    -->
+                                    <TextBox Grid.Column="1"
+                                             Width="120"
+                                             MinWidth="120"
+                                             Margin="0,0,6,0"
+                                             IsReadOnly="True"
+                                             IsReadOnlyCaretVisible="False"
+                                             Padding="4,3"
+                                             HorizontalContentAlignment="Center"
+                                             VerticalAlignment="Center"
+                                             Text="{Binding GestureText, Mode=OneWay}"
+                                             GotKeyboardFocus="OnCaptureGotFocus"
+                                             PreviewKeyDown="OnCaptureKeyDown"
+                                             PreviewLostKeyboardFocus="OnCaptureLostFocus"
+                                             ToolTip="Нажмите комбинацию; Enter — подтвердить, Esc — вернуть предыдущую" />
+
+                                    <!--
+                                      «Убрать» возвращает умолчание или пусто. Новая кнопка, не
+                                      IconButtonTemplate чужого окна: ресурсы окна живут в окне (ловушка 6).
+                                    -->
+                                    <Button Grid.Column="2"
+                                            Padding="6,1"
+                                            VerticalAlignment="Center"
+                                            Command="{Binding ClearCommand}"
+                                            Content="✕"
+                                            ToolTip="Убрать назначение (вернуть умолчание)" />
+                                </Grid>
+                            </DataTemplate>
+
+                        </ItemsControl.Resources>
+                    </ItemsControl>
+                </Grid>
+            </TabItem>
+        </TabControl>
 
         <!--
           Отказ записи — красной строкой до успеха, а не подсказкой: подсказка живёт пять секунд,
           а настройка не записана. Строка в сетке, а не в панели: панель отдаёт бесконечную
-          ширину, и перенос перестал бы работать (ловушка 29).
+          ширину, и перенос перестал бы работать (ловушка 29). Стоит вне вкладок: отказ записи
+          может случиться и из вкладки горячих клавиш.
         -->
-        <TextBlock Grid.Row="3"
+        <TextBlock Grid.Row="1"
                    Margin="0,12,0,0"
                    TextWrapping="Wrap"
                    Foreground="Firebrick"
@@ -154,29 +298,32 @@
                    Text="{Binding Status}" />
 
         <!--
-          IsDefault один в окне: иначе Enter звал бы обе кнопки.
+          IsDefault один в окне: иначе Enter звал бы обе кнопки. Кнопки вне вкладок: сохраняется
+          и число дней, и назначения сразу — два разных «Сохранить» разъехались бы.
         -->
-        <StackPanel Grid.Row="4"
+        <StackPanel Grid.Row="2"
                     Margin="0,16,0,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
             <Button Padding="14,4"
                     Command="{Binding SaveCommand}"
+                    helpers:Hotkey.Id="Settings.Save"
                     Content="Сохранить"
                     IsDefault="True" />
 
             <Button Margin="8,0,0,0"
                     Padding="14,4"
                     Content="Отменить"
+                    helpers:Hotkey.Id="Settings.Cancel"
                     IsCancel="True" />
         </StackPanel>
 
         <!--
           Та же подсказка, что в главном окне и в окне дня, — один контрол на три окна, иначе вид
-          и срок разошлись бы. Рисуется элементом поверх содержимого, а не окном Popup: второе
-          окно отнимает у окна наведение и курсор (ловушка 34). Target задаёт code-behind: привязку
-          на свойстве, которым пишет окно, ставить нельзя — она заменяется локальным значением
-          навсегда (ловушка 11).
+          и срок разошлись бы. Рисуется элементом поверх содержимого, а не в отдельном окне:
+          второе окно отнимает у окна наведение и курсор (ловушка 34). Target задаёт code-behind:
+          привязка на свойстве, которым пишет окно, заменяется локальным значением навсегда
+          (ловушка 11).
         -->
         <helpers:StatusHint x:Name="InputHint"
                             Panel.ZIndex="10"
