@@ -38,23 +38,23 @@ public sealed class HotkeyCatalogTests
                 group.Actions.Select(action => action.Name).Distinct().Count()));
     }
 
-    /// <summary>Умолчание — единственное, у «Сохранить» окна дня: Ctrl+S историческая клавиша.</summary>
+    /// <summary>Умолчания — только «Сохранить» окна дня и стрелки выделения журнала.</summary>
     /// <remarks>
     /// Второе умолчание памятью держится плохо: у пользователя нет вкладки «какие клавиши из
     /// коробки», кроме этой самой строки умолчания.
     /// </remarks>
     [Fact]
-    public void Умолчание_ТолькоУСохранитьОкнаДня()
+    public void Умолчания_ТолькоУСохранитьИСтрелокЖурнала()
     {
-        var defaulted = HotkeyCatalog.Groups
+        var defaults = HotkeyCatalog.Groups
             .SelectMany(group => group.Actions)
             .Where(action => action.DefaultGesture is not null)
-            .ToList();
+            .ToDictionary(action => action.Id, action => action.DefaultGesture!);
 
-        var action = Assert.Single(defaulted);
-
-        Assert.Equal("Day.Save", action.Id);
-        Assert.Equal("Ctrl+S", action.DefaultGesture);
+        Assert.Equal(3, defaults.Count);
+        Assert.Equal("Ctrl+S", defaults["Day.Save"]);
+        Assert.Equal("Up", defaults["Main.SelectedUp"]);
+        Assert.Equal("Down", defaults["Main.SelectedDown"]);
     }
 
     /// <summary>Слотам каталогом обещаны все номера подряд от 1 до 12.</summary>

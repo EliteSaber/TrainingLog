@@ -94,6 +94,29 @@ public sealed class HotkeyServiceTests
         Assert.Equal(ModifierKeys.Control, new HotkeyService(settings.Store).Resolve("Day.Save")!.Modifiers);
     }
 
+    /// <summary>Совпадение с жестом без модификаторов: клавиша та, наборы пустые.</summary>
+    [Theory]
+    [InlineData(Key.Up, ModifierKeys.None, true)]
+    [InlineData(Key.Up, ModifierKeys.Control, false)]
+    [InlineData(Key.Down, ModifierKeys.None, false)]
+    public void Matches_БезМодификаторов_КлавишаиНабор(Key key, ModifierKeys modifiers, bool expected)
+    {
+        var gesture = new KeyGesture(Key.Up);
+
+        Assert.Equal(expected, HotkeyService.Matches(gesture, key, modifiers));
+    }
+
+    /// <summary>Жест «Ctrl+Up» совпадает только с Ctrl+Up: нажатый Up с Ctrl — не частичный набор.</summary>
+    [Fact]
+    public void Matches_СМодификатором_Целиком()
+    {
+        var gesture = new KeyGesture(Key.Up, ModifierKeys.Control);
+
+        Assert.True(HotkeyService.Matches(gesture, Key.Up, ModifierKeys.Control));
+        Assert.False(HotkeyService.Matches(gesture, Key.Up, ModifierKeys.None));
+        Assert.False(HotkeyService.Matches(gesture, Key.Down, ModifierKeys.Control));
+    }
+
     /// <summary>Уведомление после перечитывания: живущие окна пересобирают привязки.</summary>
     [Fact]
     public void NotifyChanged_ПеречитываетФайлИСообщает()

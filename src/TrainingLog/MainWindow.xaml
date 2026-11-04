@@ -6,6 +6,7 @@
         xmlns:vm="clr-namespace:TrainingLog.ViewModels"
         xmlns:helpers="clr-namespace:TrainingLog.Controls"
         xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
+        xmlns:kb="clr-namespace:System.Windows.Input;assembly=PresentationFramework"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         mc:Ignorable="d"
         Title="{Binding Title}"
@@ -92,6 +93,10 @@
               поэтому «мусор» здесь — пустое поле и значение за пределом DaysCountRules, оба случая
               гасят кнопку.
 
+              BlurOnKeys возвращает фокус списку по Esc и Enter: без снятия фокуса поле гасит
+              стрелки выделения кареткой, а клик по журналу фокус не переносит (нефокусируемое).
+              Enter не гасится — «Применить» срабатывает IsDefault'ом, и фокус уходит уже после.
+
               Background="Transparent" у подписи обязателен: без фона она попадает под мышь только по
               самим буквам, и клик по пробелу не передал бы фокус (ловушка 13).
             -->
@@ -111,6 +116,8 @@
                          HorizontalContentAlignment="Center"
                          VerticalContentAlignment="Center"
                          helpers:AllowedCharsInput.Allowed="Digits"
+                         helpers:BlurOnKeys.Keys="Escape,Enter"
+                         helpers:BlurOnKeys.Target="{Binding ElementName=DaysList}"
                          Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
             </StackPanel>
 
@@ -179,8 +186,20 @@
         <ScrollViewer helpers:ScrollBarGutter.Left="2"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
+                <!--
+          Список фокусируем и гасим его стрелочную навигацию. Фокус — цель для BlurOnKeys:
+          Esc и Enter уводят клавиатурный фокус с поля количества дней сюда. Продвижение
+          выделения списку даёт окно в OnDaysListKeyDown (PreviewKeyDown): с всплыванием
+          клавишу перехватил бы ScrollViewer над списком — прокрутил содержимое и погасил
+          нажатие. DirectionalNavigation=None держит про запас неназначенные стрелки: без
+          значения по умолчанию (Continue) они перескакивали бы фокусом по кнопкам строк,
+          «как по tab», вместо честного скролла содержимого.
+        -->
                 <ItemsControl x:Name="DaysList"
                               ItemsSource="{Binding Days}"
+                              Focusable="True"
+                              PreviewKeyDown="OnDaysListKeyDown"
+                              kb:KeyboardNavigation.DirectionalNavigation="None"
                               helpers:RowSelection.Enabled="True"
                               MouseDoubleClick="OnDayDoubleClick">
                     <ItemsControl.ItemTemplate>

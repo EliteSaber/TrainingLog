@@ -54,6 +54,15 @@ public sealed class HotkeyService
         Changed?.Invoke();
     }
 
+    /// <summary>Совпадает ли нажатие с жестом: клавиша и набор модификаторов рядом.</summary>
+    /// <remarks>
+    /// Чистая функция, а не условие в обработчике: правило проверяется тестом. Клавиша живёт
+    /// в жесте единственной, а модификаторы сравниваются целиком — «Ctrl+Up» не совпадает
+    /// с нажатым «Up», частичных наборов между ними не бывает.
+    /// </remarks>
+    public static bool Matches(KeyGesture gesture, Key key, ModifierKeys modifiers) =>
+        gesture.Key == key && gesture.Modifiers == modifiers;
+
     /// <summary>Canonical-строку комбинации переводит в KeyGesture; негодную — null.</summary>
     private static KeyGesture? ToGesture(string? text)
     {

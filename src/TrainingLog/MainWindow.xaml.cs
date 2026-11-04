@@ -17,6 +17,18 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly HotkeyBinder _binder;
+    private readonly HotkeyService _hotkeys;
+
+    /// <summary>Шаги выделения списка: id назначения к сдвигу строк.</summary>
+    /// <remarks>
+    /// Статичное поле, а не локальный массив на нажатие: обработчик срабатывает по каждой
+    /// вертикальной стрелке, пока фокус застрял на списке.
+    /// </remarks>
+    private static readonly (string Id, int Delta)[] StepKeys =
+    [
+        ("Main.SelectedUp", -1),
+        ("Main.SelectedDown", 1),
+    ];
 
     public MainWindow(MainViewModel viewModel, HotkeyService hotkeys)
     {
@@ -29,6 +41,10 @@ public partial class MainWindow : Window
 
         _viewModel = viewModel;
 
+        // Жест назначенных клавиш нужен обработчику списка напрямую: ScrollViewer над ним
+        // перехватывает всплывающие стрелки раньше привязок окна.
+        _hotkeys = hotkeys;
+
         // Пункты меню шестерёнки живут в отдельном логическом дереве, и биндер дерева окна их
         // не найдёт — исполнители заданы явно. «Редактировать» и «Показать» работают с
         // выделенной строкой, поэтому регистрируются строками, а не кнопками.
@@ -38,6 +54,10 @@ public partial class MainWindow : Window
             .Invoke("Main.OpenSettings", () => Run(_viewModel.OpenSettingsCommand))
             .Invoke("Main.Apply", () => Run(_viewModel.ApplyCommand))
             .Invoke("Main.AddDay", () => Run(_viewModel.AddDayCommand))
+            // Стрелки выделения — не кнопки и не строковые действия: они меняют выделение
+            // списка сами, а умолчания у них Up и Down.
+            .Invoke("Main.SelectedUp", () => RowSelection.Move(DaysList, -1))
+            .Invoke("Main.SelectedDown", () => RowSelection.Move(DaysList, 1))
             .Row("Main.EditDay", DaysList, row =>
             {
                 if (row is DayRowViewModel day)
@@ -68,6 +88,37 @@ public partial class MainWindow : Window
         if (command.CanExecute(parameter))
         {
             command.Execute(parameter);
+        }
+    }
+
+    /// <summary>Двигает выделение строк стрелками, пока фокус на списке дней.</summary>
+    /// <remarks>
+    /// Обычную доставку клавиши перехватывает ScrollViewer над списком: он обрабатывает
+    /// вертикальные стрелки как прокручивание, пока фокус у его потомков, и гасит нажатие
+    /// прежде, чем оно всплывёт до привязок окна. Поэтому вызов и гашение — туннелированием
+    /// на самом списке: Handled в PreviewKeyDown подавляет всплывание целиком, скроллер
+    /// не видит нажатие, а окно не исполняет привязку второй раз.
+    ///
+    /// Совпадение берётся с назначенными жестами через <see cref="HotkeyService"/>, а не
+    /// с захардкоженным Up/Down: клавишу назначают в окне параметров, и файл настроек обязан
+    /// звучать в списке так же, как в привязке окна. Несовпавшая клавиша не гасится: это
+    /// не назначение, за ней остаётся обычное поведение (скролл, прочее).
+    /// </remarks>
+    private void OnDaysListKeyDown(object sender, KeyEventArgs e)
+    {
+        // Один статичный перечень шагов: оба назначения опрашиваются у каждого нажатия,
+        // и первым совпавшим список заканчивает обработку.
+        foreach (var (id, delta) in StepKeys)
+        {
+            if (_hotkeys.Resolve(id) is { } gesture
+                && HotkeyService.Matches(gesture, e.Key, Keyboard.Modifiers))
+            {
+                RowSelection.Move(DaysList, delta);
+
+                e.Handled = true;
+
+                return;
+            }
         }
     }
 

@@ -67,6 +67,61 @@ public static class RowSelection
         return alive && GetIsSelected(container) ? container.DataContext : null;
     }
 
+    /// <summary>Сдвигает выделение строк на <paramref name="delta"/> позиций: стрелки выделения.</summary>
+    /// <remarks>
+    /// Без выделения шаг вниз выделяет первую строку, вверх — последнюю: стрелки обязаны работать
+    /// и без предварительного клика мышью. За краями списка выделение остаётся на месте —
+    /// зацикливание уводило бы строку из видимой области неожиданно для глаза.
+    ///
+    /// Мёртвый после перечитывания контейнер считается «без выделения» — выделение умирает вместе
+    /// со строками по ловушке 18 — так же, как его читает <see cref="Item"/>. Строка для выделения
+    /// даётся генератором, а не обходом визуального дерева: контейнеры перечисляются им же.
+    /// </remarks>
+    public static void Move(ItemsControl list, int delta)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+
+        var count = list.Items.Count;
+
+        if (count == 0)
+        {
+            return;
+        }
+
+        var generator = list.ItemContainerGenerator;
+
+        var index = list.GetValue(SelectedContainerProperty) is FrameworkElement selected
+            && GetIsSelected(selected)
+                ? generator.IndexFromContainer(selected)
+                : -1;
+
+        // Мёртвый контейнер за пределами списка даёт -1: выделение пропало, и начинаем
+        // с края по направлению шага — как и без выделения вовсе.
+        index = index < 0
+            ? delta > 0 ? 0 : count - 1
+            : Math.Clamp(index + delta, 0, count - 1);
+
+        // Нереализованный контейнер не заменяется: виртуализации в списках нет, а дождаться
+        // поколения на заявку клавиши нечем.
+        if (generator.ContainerFromIndex(index) is not FrameworkElement container)
+        {
+            return;
+        }
+
+        if (list.GetValue(SelectedContainerProperty) is FrameworkElement previous
+            && !ReferenceEquals(previous, container))
+        {
+            SetIsSelected(previous, false);
+        }
+
+        SetIsSelected(container, true);
+        list.SetValue(SelectedContainerProperty, container);
+
+        // Список внутри ScrollViewer видит запрос BringIntoView сквозь строку: контейнеры
+        // росли вверх от низа, и без докрутки выделение уходило бы за нижний край окна.
+        container.BringIntoView();
+    }
+
     /// <summary>Сам контейнер выделенной строки, иначе <c>null</c>: нужен для поиска кнопок внутри.</summary>
     public static FrameworkElement? Container(ItemsControl list) =>
         list.GetValue(SelectedContainerProperty) is FrameworkElement container

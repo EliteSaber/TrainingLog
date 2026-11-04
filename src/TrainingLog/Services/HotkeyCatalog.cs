@@ -15,7 +15,8 @@ public enum HotkeyKind
 
 /// <summary>Одно назначаемое действие: id, имя по-русски, умолчание.</summary>
 /// <summary>
-/// Умолчание есть не у всех: единственное — «Сохранить» окна дня с Ctrl+S, у остальных нет.
+/// Умолчание есть не у всех: «Сохранить» окна дня с Ctrl+S, стрелки выделения журнала с Up/Down —
+/// у остальных его нет.
 /// </summary>
 public sealed record HotkeyAction(string Id, string Name, string? DefaultGesture, HotkeyKind Kind)
 {
@@ -34,7 +35,8 @@ public sealed record HotkeyGroup(string WindowName, IReadOnlyList<HotkeyAction> 
 /// <summary>Каталог назначений: все кнопки всех окон, порядок групп = порядок вкладки.</summary>
 /// <remarks>
 /// Контракты, проверяемые тестом: id уникальны глобально, в группе имена не повторяются,
-/// умолчание — только у «Сохранить» окна дня. Слоты окна дня перечислены явно, диапазон 1–12.
+/// умолчания — «Сохранить» окна дня и стрелки выделения журнала. Слоты окна дня перечислены
+/// явно, диапазон 1–12.
 /// </remarks>
 public static class HotkeyCatalog
 {
@@ -53,6 +55,8 @@ public static class HotkeyCatalog
             new HotkeyAction("Main.OpenSettings", "Параметры…", null, HotkeyKind.Window),
             new HotkeyAction("Main.Apply", "Применить", null, HotkeyKind.Window),
             new HotkeyAction("Main.AddDay", "Добавить день", null, HotkeyKind.Window),
+            new HotkeyAction("Main.SelectedUp", "Строка выше (↑)", "Up", HotkeyKind.Window),
+            new HotkeyAction("Main.SelectedDown", "Строка ниже (↓)", "Down", HotkeyKind.Window),
             new HotkeyAction("Main.EditDay", "Редактировать день", null, HotkeyKind.Row),
             new HotkeyAction("Main.ShowNote", "Показать примечание", null, HotkeyKind.Row),
         ]),
