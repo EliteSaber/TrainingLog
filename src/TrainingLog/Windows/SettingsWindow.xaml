@@ -249,6 +249,10 @@
                                       а печатная правка «Ctrl+» руками — источник негодных значений.
                                       Mode=OneWay обязателен: модель пишет в строку сама
                                       промежуточный набор, а привязка по умолчанию двусторонняя.
+                                      Подсветка по признаку захвата строки: приглашение текстом
+                                      показывает назначение поля и само, подсветка страхует случай,
+                                      когда подсказку уже проглотил набор («Ctrl+»). Enter нигде не
+                                      подтверждает — комбинация подтверждается нажатой клавишей.
                                     -->
                                     <TextBox Grid.Column="1"
                                              Width="120"
@@ -263,7 +267,18 @@
                                              GotKeyboardFocus="OnCaptureGotFocus"
                                              PreviewKeyDown="OnCaptureKeyDown"
                                              PreviewLostKeyboardFocus="OnCaptureLostFocus"
-                                             ToolTip="Нажмите комбинацию; Enter — подтвердить, Esc — вернуть предыдущую" />
+                                             ToolTip="Нажмите комбинацию; Esc — вернуть предыдущую">
+                                        <TextBox.Style>
+                                            <Style TargetType="TextBox">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsCapturing}" Value="True">
+                                                        <Setter Property="BorderBrush" Value="Goldenrod" />
+                                                        <Setter Property="Background" Value="LightGoldenrodYellow" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBox.Style>
+                                    </TextBox>
 
                                     <!--
                                       «Убрать» возвращает умолчание или пусто. Новая кнопка, не

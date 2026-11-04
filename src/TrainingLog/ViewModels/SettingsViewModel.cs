@@ -160,11 +160,17 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// Умолчание в файл не пишется: «убрать назначение» равнозначно возврату к умолчанию, и
     /// отсутствие записи в файле уже означает «умолчание» — интерпретировать оба механизма
     /// дублированием не нужно, иначе снятое и умолчание разъехались бы.
+    /// Захваченная строка пропускается с флагом <see cref="HotkeyRowViewModel.IsCapturing"/>:
+    /// «Сохранить» может быть нажат прямо во время набора, когда поле показывает приглашение
+    /// или промежуточный набор «Ctrl+…», — такой текст назначением быть не может, и в файл
+    /// ему дорога вела бы как мёртвому значению.
     /// </remarks>
     private Dictionary<string, string> AssignedHotkeys() =>
         HotkeyGroups
             .SelectMany(group => group.Rows)
-            .Where(row => row.GestureText.Length > 0 && row.GestureText != row.DefaultGesture)
+            .Where(row => !row.IsCapturing
+                && row.GestureText.Length > 0
+                && row.GestureText != row.DefaultGesture)
             .ToDictionary(row => row.Id, row => row.GestureText);
 
     /// <summary>Служба, которую вызывает строка, когда её значение изменилось.</summary>
@@ -196,6 +202,13 @@ public sealed partial class SettingsViewModel : ObservableObject
             foreach (var row in group.Rows)
             {
                 var gesture = row.GestureText;
+
+                // Захваченная строка показывает приглашение или промежуточный набор — не решение,
+                // и в конфликты ему дорога закрыта так же, как в сохранение.
+                if (row.IsCapturing)
+                {
+                    continue;
+                }
 
                 if (gesture.Length > 0)
                 {
@@ -336,8 +349,22 @@ public sealed partial class HotkeyRowViewModel : ObservableObject
     /// <summary>Команда «Убрать»: возврат к умолчанию или к пустой строке.</summary>
     public IRelayCommand ClearCommand { get; }
 
+    /// <summary>Идёт ли захват: поле показывает приглашение и подсветку, пока это подмножество так.</summary>
+    /// <remarks>
+    /// Признак живёт у строки, а не в окне: и подсветка в разметке, и защита сохранения
+    /// (см. <see cref="SettingsViewModel.AssignedHotkeys"/>) смотрят одно и то же состояние,
+    /// а не догадываются по тексту поля. Текст поля похожим носителем быть не может:
+    /// и приглашение, и промежуточный набор «Ctrl+…» там «похожи» на настоящую комбинацию.
+    /// </remarks>
+    [ObservableProperty]
+    private bool _isCapturing;
+
     /// <summary>Начало захвата: запоминает действующее значение для Esc.</summary>
-    public void BeginCapture() => _savedGesture = GestureText;
+    public void BeginCapture()
+    {
+        _savedGesture = GestureText;
+        IsCapturing = true;
+    }
 
     /// <summary>Промежуточный набор модификаторов: «Ctrl+…» без подтверждения.</summary>
     /// <remarks>
@@ -354,6 +381,10 @@ public sealed partial class HotkeyRowViewModel : ObservableObject
             ? canonical
             : _savedGesture;
 
+        // Захват окончается в любом исходе: и с подтверждением, и возвратом к прежнему —
+        // иначе подсветка и защита сохранения пережили бы набор и остались бы с флагом навсегда.
+        IsCapturing = false;
+
         // После подтверждения «до захвата» — само подтверждённое значение: уход фокуса
         // вернёт ровно то же, а не старый хвост.
         _savedGesture = GestureText;
@@ -362,7 +393,11 @@ public sealed partial class HotkeyRowViewModel : ObservableObject
     }
 
     /// <summary>Захват отменён (Esc или уход фокуса): восстанавливает значение до захвата.</summary>
-    public void CancelCapture() => GestureText = _savedGesture;
+    public void CancelCapture()
+    {
+        GestureText = _savedGesture;
+        IsCapturing = false;
+    }
 
     private void Clear()
     {

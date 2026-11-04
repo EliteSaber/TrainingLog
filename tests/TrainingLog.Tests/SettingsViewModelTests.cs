@@ -368,6 +368,66 @@ public sealed class SettingsViewModelTests
     }
 
     /// <summary>
+    /// Сохранение во время захвата не пишет в файл промежуточный набор строки.
+    /// </summary>
+    /// <remarks>
+    /// «Сохранить» сработает и тогда, когда поле захвата показывает приглашение или «Ctrl+…»:
+    /// такой текст назначением быть не может — жест по нему никогда не построится. Признак
+    /// <see cref="HotkeyRowViewModel.IsCapturing"/> отсекает незавершённые строки, а другие
+    /// подтверждённые назначения в тот же момент сохраняются как ни в чём не бывало.
+    /// </remarks>
+    [Fact]
+    public void СохранениеВоВремяЗахвата_НеПишетНезавершённыйНабор()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        // Одну строку подтверждаем, вторую оставляем в незавершённом наборе.
+        HotkeyRow(viewModel, "Exercises.Add").CommitCapture("Ctrl+D");
+
+        var capturing = HotkeyRow(viewModel, "Plans.Add");
+        capturing.BeginCapture();
+        capturing.CapturePreview("Ctrl+B");
+
+        Assert.True(viewModel.SaveCommand.CanExecute(null));
+
+        viewModel.SaveCommand.Execute(null);
+
+        var stored = new AppSettingsStore(settings.FilePath).Load().Hotkeys;
+
+        Assert.Equal("Ctrl+D", stored.GetValueOrDefault("Exercises.Add"));
+        Assert.False(stored.ContainsKey("Plans.Add"));
+    }
+
+    /// <summary>
+    /// Признак захвата ставится началом набора и гасится и подтверждением, и отменой.
+    /// </summary>
+    /// <remarks>
+    /// На нём держится и подсветка поля, и защита сохранения: флаг, переживший набор, покрыл бы
+    /// строку подсветкой навсегда или молча выпал бы из файла вместе с настоящим назначением.
+    /// </remarks>
+    [Fact]
+    public void ФлагЗахвата_СтавитсяИСнимаетсяПодтверждениемИОтменой()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var row = HotkeyRow(viewModel, "Exercises.Add");
+
+        row.BeginCapture();
+        Assert.True(row.IsCapturing);
+
+        row.CommitCapture("Ctrl+D");
+        Assert.False(row.IsCapturing);
+
+        row.BeginCapture();
+        Assert.True(row.IsCapturing);
+
+        row.CancelCapture();
+        Assert.False(row.IsCapturing);
+    }
+
+    /// <summary>
     /// Плоский перечень вкладки повторяет группы: за заголовком окна идут строки этого окна.
     /// </summary>
     /// <remarks>
