@@ -220,9 +220,25 @@
                             -->
 
                             <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                    Background="Transparent"
                                     ContextMenu="{StaticResource DayContextMenu}"
                                     ContextMenuOpening="OnDayContextMenuOpening">
+                                <!--
+                                  Выделение строки кликом — на внешней рамке: она тянется на всю
+                                  ширину строки, а внутренняя начинается после отступа 16 px, и
+                                  подсветка на ней оставляла бы слева незакрашенное поле. Прозрачный
+                                  фон живёт стилем, а не атрибутом: локальное значение перекрыло
+                                  бы сеттер триггера.
+                                -->
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Path=(helpers:RowSelection.IsSelected), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
+                                                <Setter Property="Background" Value="#F3F3F3" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
                                 <Border Margin="{Binding ComputedVerticalScrollBarVisibility,
                                                              RelativeSource={RelativeSource AncestorType=ScrollViewer},
                                                              Converter={StaticResource ScrollBarMargin},
@@ -230,16 +246,6 @@
                                         Padding="0,10,0,10"
                                         BorderBrush="#E0E0E0"
                                         BorderThickness="0,0,0,1">
-                                    <!-- Выделение строки кликом: фон светлее границы, но заметней её. -->
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Path=(helpers:RowSelection.IsSelected), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
-                                                    <Setter Property="Background" Value="#F3F3F3" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
