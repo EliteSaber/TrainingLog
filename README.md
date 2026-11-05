@@ -42,6 +42,9 @@ src/TrainingLog/             net10.0-windows — WPF-приложение (MVVM,
 tests/TrainingLog.Tests/     тесты xUnit
 .vscode/                     tasks.json, launch.json, extensions.json
 docs/logo.png                логотип для шапки этого файла
+docs/addDayButtonStates.svg  пример кнопки «Добавить день» во всех состояниях для светлой
+                             темы; стиль — src/TrainingLog/Themes/AddDayButton.xaml
+                             (ключ AddDayButton в Resources главного окна)
 docs/releases/               заметки к релизам: их читает публикация на GitHub
 .github/workflows/           тесты на каждом коммите и сборка релиза по тегу
 ```

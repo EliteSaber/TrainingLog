@@ -1,0 +1,289 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 90" width="960" height="90">
+  <!--
+    Пример кнопки «Добавить день» во всех состояниях — для светлой темы приложения.
+
+    Используемый стиль: src/TrainingLog/Themes/AddDayButton.xaml, ключ AddDayButton
+    (ControlTemplate у Button, подключается в MainWindow.Resources).
+
+    Геометрия здесь повторяет шаблон стиля — компактный вариант: тело 204×28 (rx 4),
+    поля 10px под свечение и тень, без уголков-скобок. Слева направо: обычная,
+    наведённая, нажатая, недоступная.
+  -->
+  <defs>
+    <!-- ===== ГРАДИЕНТЫ ===== -->
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="38%"  stop-color="#e7f8ff"/>
+      <stop offset="52%"  stop-color="#b9e6fa"/>
+      <stop offset="100%" stop-color="#8ccfef"/>
+    </linearGradient>
+
+    <linearGradient id="glassHover" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="35%"  stop-color="#eafcff"/>
+      <stop offset="52%"  stop-color="#a5ecff"/>
+      <stop offset="100%" stop-color="#5cc9f2"/>
+    </linearGradient>
+
+    <linearGradient id="glassActive" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#9fd8f0"/>
+      <stop offset="50%"  stop-color="#7bc4e8"/>
+      <stop offset="100%" stop-color="#4fa8d6"/>
+    </linearGradient>
+
+    <linearGradient id="glassDisabled" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#f4f8fb"/>
+      <stop offset="38%"  stop-color="#e6eef4"/>
+      <stop offset="52%"  stop-color="#d4e0e9"/>
+      <stop offset="100%" stop-color="#c2d1dc"/>
+    </linearGradient>
+
+    <linearGradient id="bevel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="45%"  stop-color="#a8e4ff"/>
+      <stop offset="100%" stop-color="#2b7fb9"/>
+    </linearGradient>
+
+    <linearGradient id="bevelHover" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="45%"  stop-color="#c8f4ff"/>
+      <stop offset="100%" stop-color="#19a0e0"/>
+    </linearGradient>
+
+    <linearGradient id="bevelActive" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#2b7fb9"/>
+      <stop offset="55%"  stop-color="#4a9bc4"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+
+    <linearGradient id="bevelDisabled" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="45%"  stop-color="#dde7ee"/>
+      <stop offset="100%" stop-color="#a8b8c4"/>
+    </linearGradient>
+
+    <linearGradient id="innerBottom" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#2b6f9e" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#1d5a83" stop-opacity="0.45"/>
+    </linearGradient>
+
+    <linearGradient id="innerBottomDisabled" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#7f95a5" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#7f95a5" stop-opacity="0.22"/>
+    </linearGradient>
+
+    <linearGradient id="streak" x1="0" y1="1" x2="0.6" y2="0">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="60%"  stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- ===== ФИЛЬТРЫ ===== -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+
+    <filter id="glowHover" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="6.5"/>
+    </filter>
+
+    <filter id="drop" x="-25%" y="-25%" width="150%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.5"/>
+      <feOffset dy="3" result="off"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.32"/></feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="dropHover" x="-25%" y="-25%" width="150%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dy="3.5" result="off"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.38"/></feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="dropDisabled" x="-25%" y="-25%" width="150%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.4"/>
+      <feOffset dy="1.1" result="off"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.15"/></feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="txtShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="0.7" stdDeviation="0.5"
+                    flood-color="#ffffff" flood-opacity="0.9"/>
+    </filter>
+
+    <filter id="txtShadowActive" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="0.5" stdDeviation="0.4"
+                    flood-color="#1d5a83" flood-opacity="0.35"/>
+    </filter>
+
+    <filter id="txtShadowDisabled" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="0.7" stdDeviation="0.5"
+                    flood-color="#ffffff" flood-opacity="0.7"/>
+    </filter>
+
+    <!-- Скруглённая обрезка внутренних слоёв (Grid.Clip в шаблоне) -->
+    <clipPath id="clip">
+      <rect x="0" y="0" width="204" height="28" rx="4"/>
+    </clipPath>
+  </defs>
+
+  <!-- Фон-подложка светлой темы -->
+  <rect width="960" height="90" fill="#f4f9ff"/>
+
+  <!-- Кнопка и надпись под ней: Verdana Bold 11, тёмно-синий текст, иконка «+» слева -->
+  <g font-family="'Verdana','Segoe UI',Arial,sans-serif">
+
+    <!-- ============================================================ -->
+    <!-- ======================= 1. ОБЫЧНАЯ ========================= -->
+    <!-- ============================================================ -->
+    <g transform="translate(8, 0)">
+      <text x="112" y="76" text-anchor="middle"
+            font-size="9" font-weight="600" fill="#7aa7bf"
+            letter-spacing="1.5">ОБЫЧНАЯ</text>
+
+      <g transform="translate(10, 18)">
+        <rect x="8" y="11" width="188" height="15" rx="5"
+              fill="#3fc4ff" opacity="0.2" filter="url(#glow)"/>
+
+        <g filter="url(#drop)">
+          <rect x="0" y="0" width="204" height="28" rx="4"
+                fill="url(#glass)" stroke="url(#bevel)" stroke-width="1.2"/>
+
+          <g clip-path="url(#clip)">
+            <rect x="1.5" y="0.8"   width="201" height="2" fill="#ffffff" opacity="0.95"/>
+            <rect x="1.5" y="3.3"   width="201" height="1" fill="#ffffff" opacity="0.45"/>
+            <rect x="1.5" y="20.2"  width="201" height="7" fill="url(#innerBottom)"/>
+            <rect x="1.5" y="27"    width="201" height="1" fill="#1d5a83" opacity="0.25"/>
+            <polygon points="0,28 0,5 40,0 66,0" fill="url(#streak)"/>
+            <rect x="0.6"   y="0" width="1" height="28" fill="#ffffff" opacity="0.75"/>
+            <rect x="202.4" y="0" width="1" height="28" fill="#ffffff" opacity="0.35"/>
+          </g>
+        </g>
+
+        <path d="M17,14 H25 M21,10 V18" stroke="#08355c" stroke-width="2"
+              stroke-linecap="square" filter="url(#txtShadow)"/>
+
+        <text x="115" y="18" text-anchor="middle"
+              font-size="11" font-weight="700" fill="#08355c"
+              letter-spacing="0.5" filter="url(#txtShadow)">Добавить день</text>
+      </g>
+    </g>
+
+    <!-- ============================================================ -->
+    <!-- ====================== 2. НАВЕДЁННАЯ ======================= -->
+    <!-- ============================================================ -->
+    <g transform="translate(248, 0)">
+      <text x="112" y="76" text-anchor="middle"
+            font-size="9" font-weight="600" fill="#7aa7bf"
+            letter-spacing="1.5">НАВЕДЁННАЯ</text>
+
+      <g transform="translate(10, 18)">
+        <rect x="3" y="7" width="198" height="19" rx="6"
+              fill="#3fc4ff" opacity="0.4" filter="url(#glowHover)"/>
+
+        <g filter="url(#dropHover)">
+          <rect x="0" y="0" width="204" height="28" rx="4"
+                fill="url(#glassHover)" stroke="url(#bevelHover)" stroke-width="1.4"/>
+
+          <g clip-path="url(#clip)">
+            <rect x="1.5" y="0.8" width="201" height="2" fill="#ffffff" opacity="1"/>
+            <rect x="1.5" y="3.3" width="201" height="1" fill="#ffffff" opacity="0.55"/>
+            <rect x="1.5" y="20.2" width="201" height="7" fill="url(#innerBottom)"/>
+            <rect x="1.5" y="27"   width="201" height="1" fill="#19a0e0" opacity="0.35"/>
+            <polygon points="0,28 0,5 40,0 66,0" fill="url(#streak)"/>
+            <rect x="0.6"   y="0" width="1" height="28" fill="#ffffff" opacity="0.9"/>
+            <rect x="202.4" y="0" width="1" height="28" fill="#ffffff" opacity="0.45"/>
+          </g>
+        </g>
+
+        <path d="M17,14 H25 M21,10 V18" stroke="#08355c" stroke-width="2"
+              stroke-linecap="square" filter="url(#txtShadow)"/>
+
+        <text x="115" y="18" text-anchor="middle"
+              font-size="11" font-weight="700" fill="#08355c"
+              letter-spacing="0.5" filter="url(#txtShadow)">Добавить день</text>
+      </g>
+    </g>
+
+    <!-- ============================================================ -->
+    <!-- ======================== 3. НАЖАТАЯ ======================== -->
+    <!-- ============================================================ -->
+    <g transform="translate(488, 0)">
+      <text x="112" y="76" text-anchor="middle"
+            font-size="9" font-weight="600" fill="#7aa7bf"
+            letter-spacing="1.5">НАЖАТАЯ</text>
+
+      <g transform="translate(10, 18)">
+        <rect x="11" y="16" width="182" height="8" rx="4"
+              fill="#3fc4ff" opacity="0.15" filter="url(#glow)"/>
+
+        <!-- Кнопка «утоплена»: тело и содержимое смещены вниз на 1px, тени нет -->
+        <g transform="translate(0, 1)">
+          <rect x="0" y="0" width="204" height="28" rx="4"
+                fill="url(#glassActive)" stroke="url(#bevelActive)" stroke-width="1.4"/>
+
+          <g clip-path="url(#clip)">
+            <rect x="1.5" y="25.2" width="201" height="2"  fill="#ffffff" opacity="0.7"/>
+            <rect x="1.5" y="0"    width="201" height="8"  fill="#1d5a83" opacity="0.3"/>
+            <rect x="1.5" y="0"    width="201" height="1"  fill="#1d5a83" opacity="0.45"/>
+            <polygon points="0,28 0,14 20,4 36,4" fill="#ffffff" opacity="0.18"/>
+            <rect x="0.6"   y="0" width="1" height="28" fill="#ffffff" opacity="0.35"/>
+            <rect x="202.4" y="0" width="1" height="28" fill="#ffffff" opacity="0.2"/>
+          </g>
+        </g>
+
+        <path d="M17,14 H25 M21,10 V18" stroke="#0b4a72" stroke-width="2"
+              stroke-linecap="square" filter="url(#txtShadowActive)"/>
+
+        <text x="115" y="18" text-anchor="middle"
+              font-size="11" font-weight="700" fill="#0b4a72"
+              letter-spacing="0.5" filter="url(#txtShadowActive)">Добавить день</text>
+      </g>
+    </g>
+
+    <!-- ============================================================ -->
+    <!-- ===================== 4. НЕДОСТУПНАЯ ======================= -->
+    <!-- ============================================================ -->
+    <g transform="translate(728, 0)">
+      <text x="112" y="76" text-anchor="middle"
+            font-size="9" font-weight="600" fill="#7aa7bf"
+            letter-spacing="1.5">НЕДОСТУПНАЯ</text>
+
+      <g transform="translate(10, 18)">
+        <!-- Свечения у недоступной нет, остаётся слабая тень -->
+        <g filter="url(#dropDisabled)">
+          <rect x="0" y="0" width="204" height="28" rx="4"
+                fill="url(#glassDisabled)" stroke="url(#bevelDisabled)" stroke-width="1.2"/>
+
+          <g clip-path="url(#clip)">
+            <rect x="1.5" y="0.8" width="201" height="2" fill="#ffffff" opacity="0.55"/>
+            <rect x="1.5" y="3.3" width="201" height="1" fill="#ffffff" opacity="0.25"/>
+            <rect x="1.5" y="20.2" width="201" height="7" fill="url(#innerBottomDisabled)"/>
+            <rect x="1.5" y="27"   width="201" height="1" fill="#7f95a5" opacity="0.18"/>
+            <polygon points="0,28 0,5 40,0 66,0" fill="url(#streak)" opacity="0.64"/>
+            <rect x="0.6"   y="0" width="1" height="28" fill="#ffffff" opacity="0.45"/>
+            <rect x="202.4" y="0" width="1" height="28" fill="#ffffff" opacity="0.2"/>
+          </g>
+        </g>
+
+        <path d="M17,14 H25 M21,10 V18" stroke="#94a6b3" stroke-width="2"
+              stroke-linecap="square" filter="url(#txtShadowDisabled)"/>
+
+        <text x="115" y="18" text-anchor="middle"
+              font-size="11" font-weight="700" fill="#94a6b3"
+              letter-spacing="0.5" filter="url(#txtShadowDisabled)">Добавить день</text>
+      </g>
+    </g>
+  </g>
+</svg>

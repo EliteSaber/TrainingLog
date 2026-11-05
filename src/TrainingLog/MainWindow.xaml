@@ -15,52 +15,59 @@
         MinWidth="640"
         MinHeight="360">
     <Window.Resources>
-        <ContextMenu x:Key="SettingsMenu"
-                     DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-            <MenuItem Header="Упражнения"
-                      Command="{Binding OpenExercisesCommand}" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Стиль «Добавить день» по мокапу docs/addDayIcons.svg: два размера на сравнение -->
+                <ResourceDictionary Source="Themes/AddDayButton.xaml" />
+            </ResourceDictionary.MergedDictionaries>
 
-            <MenuItem Header="Планы"
-                      Command="{Binding OpenPlansCommand}" />
+            <ContextMenu x:Key="SettingsMenu"
+                         DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                <MenuItem Header="Упражнения"
+                          Command="{Binding OpenExercisesCommand}" />
+
+                <MenuItem Header="Планы"
+                          Command="{Binding OpenPlansCommand}" />
+
+                <!--
+                  Параметры отделены разделителем и стоят последними: это единственный пункт, который
+                  не открывает справочник, а меняет само приложение. Разделитель объявлен в меню, а не
+                  сделан отступом у пункта — иначе отступ остался бы висеть в воздухе.
+                -->
+                <Separator />
+
+                <MenuItem Header="Параметры…"
+                          Command="{Binding OpenSettingsCommand}" />
+            </ContextMenu>
 
             <!--
-              Параметры отделены разделителем и стоят последними: это единственный пункт, который
-              не открывает справочник, а меняет само приложение. Разделитель объявлен в меню, а не
-              сделан отступом у пункта — иначе отступ остался бы висеть в воздухе.
+              Меню строки дня. DataContext задаётся не здесь, а при открытии, в
+              OnDayContextMenuOpening: у ContextMenu отдельное логическое дерево, и до окна
+              добраться из него нельзя (ловушка 41). Поэтому и команда, и её параметр приходят
+              сверху — из открывающего кода, а не привязкой.
+
+              Контекстное меню открывается само по правому клику в любом месте строки:
+              ContextMenuService находит меню у элемента под мышью и поднимается вверх, поэтому
+              клик по названию плана или по столбцу подхода попадает в меню дня.
+
+              Побочный эффект тот же, что у меню шестерёнки: пока меню открыто, окно не получает
+              наведения (ловушка 34). В строке дня наведения нет, так что это видно только по
+              курсору.
             -->
-            <Separator />
+            <ContextMenu x:Key="DayContextMenu">
+                <MenuItem Header="Редактировать"
+                          Command="{Binding EditDayCommand}" />
+            </ContextMenu>
 
-            <MenuItem Header="Параметры…"
-                      Command="{Binding OpenSettingsCommand}" />
-        </ContextMenu>
+            <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
-        <!--
-          Меню строки дня. DataContext задаётся не здесь, а при открытии, в
-          OnDayContextMenuOpening: у ContextMenu отдельное логическое дерево, и до окна
-          добраться из него нельзя (ловушка 41). Поэтому и команда, и её параметр приходят
-          сверху — из открывающего кода, а не привязкой.
-
-          Контекстное меню открывается само по правому клику в любом месте строки:
-          ContextMenuService находит меню у элемента под мышью и поднимается вверх, поэтому
-          клик по названию плана или по столбцу подхода попадает в меню дня.
-
-          Побочный эффект тот же, что у меню шестерёнки: пока меню открыто, окно не получает
-          наведения (ловушка 34). В строке дня наведения нет, так что это видно только по
-          курсору.
-        -->
-        <ContextMenu x:Key="DayContextMenu">
-            <MenuItem Header="Редактировать"
-                      Command="{Binding EditDayCommand}" />
-        </ContextMenu>
-
-        <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-
-        <!--
-          Отступ рамки строки дня по состоянию полосы: пока полоса на экране, правый отступ
-          снимается. Величина приходит параметром конвертера, поэтому он ничего не знает про
-          отступы окна.
-        -->
-        <helpers:ScrollBarMarginConverter x:Key="ScrollBarMargin" />
+            <!--
+              Отступ рамки строки дня по состоянию полосы: пока полоса на экране, правый отступ
+              снимается. Величина приходит параметром конвертера, поэтому он ничего не знает про
+              отступы окна.
+            -->
+            <helpers:ScrollBarMarginConverter x:Key="ScrollBarMargin" />
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -599,10 +606,16 @@
                        Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
 
+        <!--
+          Кнопка «Добавить день» по мокапу docs/exampleIcons.svg, стиль — в
+          Themes/AddDayButton.xaml: четыре состояния (обычное, наведённое, нажатая,
+          недоступная) и без уголков-скобок.
+        -->
         <Button Grid.Row="3"
                 Margin="0,16,0,0"
                 HorizontalAlignment="Left"
-                Padding="14,4"
+                VerticalAlignment="Top"
+                Style="{StaticResource AddDayButton}"
                 Command="{Binding AddDayCommand}"
                 helpers:Hotkey.Id="Main.AddDay"
                 Content="Добавить день" />
