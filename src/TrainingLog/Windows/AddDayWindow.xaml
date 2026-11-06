@@ -32,52 +32,14 @@
       «+» справа на обе строки.
     -->
     <Window.Resources>
-        <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Стеклянные кнопки — ловушка 6: ресурсы окна живут в окне -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/GlassButton.xaml" />
+            </ResourceDictionary.MergedDictionaries>
 
-        <!--
-          Стрелки перехода между упражнениями: полоса во всю высоту, рисунок по центру.
-
-          Рамки у кнопки нет намеренно — полоса во всю высоту в системной рамке выглядит
-          тяжело. Раз системной подсветки при наведении больше нет, она описана здесь же.
-          Подложка взята системным цветом Control, как подложки панелей в остальных окнах,
-          поэтому в тёмной теме она останется темнее фона окна, а не станет светлым пятном.
-        -->
-        <ControlTemplate x:Key="ArrowButtonTemplate" TargetType="Button">
-            <Border x:Name="Surface"
-                    Background="Transparent"
-                    CornerRadius="3"
-                    SnapsToDevicePixels="True">
-                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Border>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Surface"
-                            Property="Background"
-                            Value="{DynamicResource {x:Static SystemColors.ControlLightBrushKey}}" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
-
-        <!--
-          Цвета шеврона. Состояния берутся у кнопки-предка: у Path нет IsEnabled, поэтому
-          иначе бледная недоступная стрелка загоралась бы при наведении.
-
-          Порядок триггеров значим: IsEnabled=False объявлен последним и потому выигрывает у
-          наведения — disabled не должен реагировать на мышь.
-        -->
-        <Style x:Key="Chevron" TargetType="Path">
-            <Setter Property="Fill" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}"
-                             Value="True">
-                    <Setter Property="Fill" Value="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType=Button}}"
-                             Value="False">
-                    <Setter Property="Fill" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+            <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        </ResourceDictionary>
     </Window.Resources>
 
     <!-- Ctrl+S теперь живёт в HotkeyService: умолчание «Сохранить» переписывается в параметрах. -->
@@ -140,17 +102,22 @@
                     <!--
                       Кнопка занимает номер по порядку выполнения, а не позицию в списке: номер и
                       состав задаёт план, и он же показан подсказкой вместе с названием.
+
+                      Стиль локальный поверх стекла: выделение подчёркнуто рамкой системного
+                      цвета выделения, а не толщиной фаски. Рамка стекла идёт TemplateBinding'ом
+                      (умолчание — фаска), поэтому переопределение BorderBrush и BorderThickness
+                      кнопки доходит до тела; при наведении и нажатии триггеры стиля красят
+                      рамку своими градиентами наравне с остальными состояниями.
                     -->
-                    <Button Margin="0,0,6,0"
+                    <Button Margin="0,0,2,0"
                             MinWidth="34"
-                            Padding="8,4"
                             Command="{Binding DataContext.SelectExerciseCommand,
                                               RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                             CommandParameter="{Binding}"
                             Content="{Binding Number}"
                             ToolTip="{Binding Name}">
                         <Button.Style>
-                            <Style TargetType="Button">
+                            <Style TargetType="Button" BasedOn="{StaticResource GlassButtonIcon}">
                                 <Setter Property="FontWeight" Value="Normal" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
@@ -184,7 +151,8 @@
             </Grid.ColumnDefinitions>
 
             <!--
-              Переходы между упражнениями стоят по краям и тянутся во всю высоту области ввода.
+              Переходы между упражнениями стоят по краям с фиксированной высотой 48 (тело 36):
+              стекло во всю высоту области ввода читалось бы плитой, а всё, что ниже, — проходом.
               Активность снимает WPF сама по CanExecute, поэтому у первого упражнения «‹» бледная,
               а у последнего «›».
 
@@ -196,15 +164,16 @@
             -->
 
             <Button Grid.Column="0"
-                    VerticalAlignment="Stretch"
+                    Height="48"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource GlassButtonIcon}"
                     Command="{Binding PreviousCommand}"
-                    Template="{StaticResource ArrowButtonTemplate}"
                     helpers:Hotkey.Id="Day.Previous"
                     ToolTip="Предыдущее упражнение">
                 <Path Height="22"
                       Stretch="Uniform"
                       Data="M 9,2 L 3,11 L 9,20 L 6,20 L 0,11 L 6,2 Z"
-                      Style="{StaticResource Chevron}" />
+                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
             </Button>
 
             <!--
@@ -274,9 +243,10 @@
                     </Grid.RowDefinitions>
 
                     <!--
-                      «−» и «+» нарисованы той же техникой, что и стрелки перехода между
-                      упражнениями: тот же прозрачный шаблон кнопки и тот же стиль цвета,
-                      поэтому гаснут и загораются одинаково.
+                      «−» и «+» — на стекле тем же стилем, что и стрелки перехода между
+                      упражнениями, и цвет рисунка привязан к Foreground кнопки: состояния
+                      (наведение, нажатие, отключение) красят рисунок из триггеров стиля
+                      одинаково.
 
                       Рисунок задан квадратом 22×22 и масштабируется 1:1. Это не избыточность:
                       у плюса и минуса, в отличие от шеврона, фигура широкая и низкая, и при
@@ -286,17 +256,18 @@
                     -->
                     <Button Grid.Column="0"
                             Grid.RowSpan="2"
-                            Margin="0,0,12,0"
-                            VerticalAlignment="Stretch"
+                            Margin="0,0,6,0"
+                            Height="48"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource GlassButtonIcon}"
                             Command="{Binding RemoveSetCommand}"
-                            Template="{StaticResource ArrowButtonTemplate}"
                             helpers:Hotkey.Id="Day.RemoveSet"
                             ToolTip="Убрать подход">
                         <Path Width="22"
                               Height="22"
                               Stretch="Uniform"
                               Data="M 2,9.5 L 20,9.5 L 20,12.5 L 2,12.5 Z"
-                              Style="{StaticResource Chevron}" />
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                     </Button>
 
                     <!--
@@ -387,17 +358,18 @@
 
                     <Button Grid.Column="2"
                             Grid.RowSpan="2"
-                            Margin="12,0,0,0"
-                            VerticalAlignment="Stretch"
+                            Margin="6,0,0,0"
+                            Height="48"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource GlassButtonIcon}"
                             Command="{Binding AddSetCommand}"
-                            Template="{StaticResource ArrowButtonTemplate}"
                             helpers:Hotkey.Id="Day.AddSet"
                             ToolTip="Добавить подход">
                         <Path Width="22"
                               Height="22"
                               Stretch="Uniform"
                               Data="M 9.5,2 L 12.5,2 L 12.5,20 L 9.5,20 Z M 2,9.5 L 20,9.5 L 20,12.5 L 2,12.5 Z"
-                              Style="{StaticResource Chevron}" />
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                     </Button>
                 </Grid>
 
@@ -569,15 +541,16 @@
             </Grid>
 
             <Button Grid.Column="2"
-                    VerticalAlignment="Stretch"
+                    Height="48"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource GlassButtonIcon}"
                     Command="{Binding NextCommand}"
-                    Template="{StaticResource ArrowButtonTemplate}"
                     helpers:Hotkey.Id="Day.Next"
                     ToolTip="Следующее упражнение">
                 <Path Height="22"
                       Stretch="Uniform"
                       Data="M 0,2 L 6,11 L 0,20 L 3,20 L 9,11 L 3,2 Z"
-                      Style="{StaticResource Chevron}" />
+                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
             </Button>
         </Grid>
 
@@ -649,8 +622,8 @@
                   стала втрое длиннее — и на узком окне «Отменить» уходила за край (ловушка 38).
                 -->
                 <Button Grid.Column="0"
-                        Padding="14,4"
                         VerticalAlignment="Center"
+                        Style="{StaticResource GlassButton}"
                         Command="{Binding SaveCommand}"
                         helpers:Hotkey.Id="Day.Save"
                         Content="Сохранить"
@@ -701,13 +674,13 @@
                 <StackPanel Grid.Column="2"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
-                    <Button Padding="14,4"
+                    <Button Style="{StaticResource GlassButton}"
                             Command="{Binding SaveAndCloseCommand}"
                             helpers:Hotkey.Id="Day.SaveAndClose"
                             Content="Сохранить и закрыть" />
 
-                    <Button Margin="8,0,0,0"
-                            Padding="14,4"
+                    <Button Margin="4,0,0,0"
+                            Style="{StaticResource GlassButton}"
                             Click="OnCancelClick"
                             helpers:Hotkey.Id="Day.Cancel"
                             Content="Отменить" />

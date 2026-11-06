@@ -42,9 +42,10 @@ src/TrainingLog/             net10.0-windows — WPF-приложение (MVVM,
 tests/TrainingLog.Tests/     тесты xUnit
 .vscode/                     tasks.json, launch.json, extensions.json
 docs/logo.png                логотип для шапки этого файла
-docs/addDayButtonStates.svg  пример кнопки «Добавить день» во всех состояниях для светлой
-                             темы; стиль — src/TrainingLog/Themes/AddDayButton.xaml
-                             (ключ AddDayButton в Resources главного окна)
+docs/addDayButtonStates.svg  пример стеклянной кнопки во всех состояниях для светлой темы;
+                             стиль — src/TrainingLog/Themes/GlassButton.xaml (ключи
+                             GlassButton, GlassButtonIcon и AddDayButton на все кнопки
+                             приложения; словарь слит в Resources каждого окна)
 docs/releases/               заметки к релизам: их читает публикация на GitHub
 .github/workflows/           тесты на каждом коммите и сборка релиза по тегу
 ```

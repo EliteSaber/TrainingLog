@@ -25,7 +25,14 @@
       на рамке подсказки: зона приёма совпадает с окном и не требует прицеливания.
     -->
     <Window.Resources>
-        <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Стеклянные кнопки — ловушка 6: ресурсы окна живут в окне -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/GlassButton.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -71,8 +78,8 @@
 
             <Button Grid.Column="2"
                     Margin="8,0,0,0"
-                    Padding="14,4"
                     VerticalAlignment="Center"
+                    Style="{StaticResource GlassButton}"
                     Click="OnBrowseClick"
                     helpers:Hotkey.Id="Import.PickFile"
                     Content="Выбрать файл…" />
@@ -151,15 +158,15 @@
                     Margin="0,16,0,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
-            <Button Padding="14,4"
+            <Button Style="{StaticResource GlassButton}"
                     Click="OnSaveClick"
                     helpers:Hotkey.Id="Import.Save"
                     Content="Сохранить"
                     IsDefault="True"
                     IsEnabled="{Binding CanSave}" />
 
-            <Button Margin="8,0,0,0"
-                    Padding="14,4"
+            <Button Margin="4,0,0,0"
+                    Style="{StaticResource GlassButton}"
                     Content="Отменить"
                     helpers:Hotkey.Id="Import.Cancel"
                     IsCancel="True" />

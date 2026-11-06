@@ -16,11 +16,18 @@
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
     <Window.Resources>
-        <!-- Ресурсы объявлены в окне, а не в App.xaml: окно должно создаваться без приложения (ловушка 6). -->
-        <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Стеклянные кнопки — ловушка 6: ресурсы окна живут в окне -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/GlassButton.xaml" />
+            </ResourceDictionary.MergedDictionaries>
 
-        <!-- Свой экземпляр по той же причине: у конвертера состояния нет. -->
-        <helpers:ScrollBarMarginConverter x:Key="ScrollBarMargin" />
+            <!-- Ресурсы объявлены в окне, а не в App.xaml: окно должно создаваться без приложения (ловушка 6). -->
+            <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+            <!-- Свой экземпляр по той же причине: у конвертера состояния нет. -->
+            <helpers:ScrollBarMarginConverter x:Key="ScrollBarMargin" />
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid Margin="12">
@@ -34,8 +41,8 @@
         <!-- Отдельной строкой над поиском, а не рядом с ним: в одной строке с полем кнопка читалась бы как действие над результатом поиска. -->
         <Button Grid.Row="0"
                 Margin="0,0,0,10"
-                Padding="14,4"
                 HorizontalAlignment="Stretch"
+                Style="{StaticResource GlassButton}"
                 Command="{Binding AddCommand}"
                 helpers:Hotkey.Id="Plans.Add"
                 Content="Добавить" />
@@ -67,9 +74,7 @@
                 BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
                 BorderThickness="1">
             <Button HorizontalAlignment="Left"
-                    Padding="2,1"
-                    Background="Transparent"
-                    BorderThickness="0"
+                    Style="{StaticResource GlassButtonIcon}"
                     Command="{Binding ToggleSortCommand}"
                     helpers:Hotkey.Id="Plans.ToggleSort"
                     ToolTip="Изменить направление сортировки">
@@ -197,17 +202,19 @@
                                     </Expander>
 
                                     <StackPanel Grid.Column="1"
-                                                Margin="4,0,0,0"
+                                                Margin="2,0,0,0"
                                                 VerticalAlignment="Top"
                                                 Orientation="Horizontal">
-                                        <Button Padding="8,2"
+                                        <Button VerticalAlignment="Center"
+                                                Style="{StaticResource GlassButtonIcon}"
                                                 Command="{Binding DataContext.EditCommand,
                                                                   RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 CommandParameter="{Binding}"
                                                 Content="Редактировать" />
 
-                                        <Button Margin="4,0,0,0"
-                                                Padding="8,2"
+                                        <Button Margin="2,0,0,0"
+                                                VerticalAlignment="Center"
+                                                Style="{StaticResource GlassButtonIcon}"
                                                 Click="OnDeleteClick"
                                                 CommandParameter="{Binding}"
                                                 Content="Удалить" />
