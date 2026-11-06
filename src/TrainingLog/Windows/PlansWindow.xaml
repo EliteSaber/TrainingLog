@@ -42,7 +42,7 @@
         <Button Grid.Row="0"
                 Margin="0,0,0,10"
                 HorizontalAlignment="Stretch"
-                Style="{StaticResource GlassButton}"
+                Style="{StaticResource GlassButtonSoft}"
                 Command="{Binding AddCommand}"
                 helpers:Hotkey.Id="Plans.Add"
                 Content="Добавить" />
@@ -74,7 +74,7 @@
                 BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
                 BorderThickness="1">
             <Button HorizontalAlignment="Left"
-                    Style="{StaticResource GlassButtonIcon}"
+                    Style="{StaticResource GlassButtonIconSoft}"
                     Command="{Binding ToggleSortCommand}"
                     helpers:Hotkey.Id="Plans.ToggleSort"
                     ToolTip="Изменить направление сортировки">
@@ -206,7 +206,7 @@
                                                 VerticalAlignment="Top"
                                                 Orientation="Horizontal">
                                         <Button VerticalAlignment="Center"
-                                                Style="{StaticResource GlassButtonIcon}"
+                                                Style="{StaticResource GlassButtonIconSoft}"
                                                 Command="{Binding DataContext.EditCommand,
                                                                   RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 CommandParameter="{Binding}"
@@ -214,7 +214,7 @@
 
                                         <Button Margin="2,0,0,0"
                                                 VerticalAlignment="Center"
-                                                Style="{StaticResource GlassButtonIcon}"
+                                                Style="{StaticResource GlassButtonIconSoft}"
                                                 Click="OnDeleteClick"
                                                 CommandParameter="{Binding}"
                                                 Content="Удалить" />

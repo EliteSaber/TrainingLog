@@ -79,7 +79,7 @@
             <Button Grid.Column="2"
                     Margin="8,0,0,0"
                     VerticalAlignment="Center"
-                    Style="{StaticResource GlassButton}"
+                    Style="{StaticResource GlassButtonSoft}"
                     Click="OnBrowseClick"
                     helpers:Hotkey.Id="Import.PickFile"
                     Content="Выбрать файл…" />
@@ -158,7 +158,7 @@
                     Margin="0,16,0,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
-            <Button Style="{StaticResource GlassButton}"
+            <Button Style="{StaticResource GlassButtonSoft}"
                     Click="OnSaveClick"
                     helpers:Hotkey.Id="Import.Save"
                     Content="Сохранить"
@@ -166,7 +166,7 @@
                     IsEnabled="{Binding CanSave}" />
 
             <Button Margin="4,0,0,0"
-                    Style="{StaticResource GlassButton}"
+                    Style="{StaticResource GlassButtonSoft}"
                     Content="Отменить"
                     helpers:Hotkey.Id="Import.Cancel"
                     IsCancel="True" />

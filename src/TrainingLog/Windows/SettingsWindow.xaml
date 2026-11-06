@@ -122,7 +122,7 @@
                         <Button Grid.Column="2"
                                 Margin="8,0,0,0"
                                 VerticalAlignment="Center"
-                                Style="{StaticResource GlassButton}"
+                                Style="{StaticResource GlassButtonSoft}"
                                 Content="Обзор…"
                                 helpers:Hotkey.Id="Settings.PickDirectory"
                                 Click="OnPickDirectory" />
@@ -153,7 +153,7 @@
                         <Button Grid.Column="2"
                                 Margin="8,0,0,0"
                                 VerticalAlignment="Center"
-                                Style="{StaticResource GlassButton}"
+                                Style="{StaticResource GlassButtonSoft}"
                                 Content="Выбрать файл…"
                                 helpers:Hotkey.Id="Settings.PickFile"
                                 Click="OnPickDatabaseFile" />
@@ -293,7 +293,7 @@
                                     -->
                                     <Button Grid.Column="2"
                                             VerticalAlignment="Center"
-                                            Style="{StaticResource GlassButtonIcon}"
+                                            Style="{StaticResource GlassButtonIconSoft}"
                                             Command="{Binding ClearCommand}"
                                             Content="✕"
                                             ToolTip="Убрать назначение (вернуть умолчание)" />
@@ -327,14 +327,14 @@
                     Margin="0,16,0,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
-            <Button Style="{StaticResource GlassButton}"
+            <Button Style="{StaticResource GlassButtonSoft}"
                     Command="{Binding SaveCommand}"
                     helpers:Hotkey.Id="Settings.Save"
                     Content="Сохранить"
                     IsDefault="True" />
 
             <Button Margin="4,0,0,0"
-                    Style="{StaticResource GlassButton}"
+                    Style="{StaticResource GlassButtonSoft}"
                     Content="Отменить"
                     helpers:Hotkey.Id="Settings.Cancel"
                     IsCancel="True" />

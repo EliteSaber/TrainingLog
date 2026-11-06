@@ -108,16 +108,22 @@
                       (умолчание — фаска), поэтому переопределение BorderBrush и BorderThickness
                       кнопки доходит до тела; при наведении и нажатии триггеры стиля красят
                       рамку своими градиентами наравне с остальными состояниями.
+
+                      Зазор нулевой: кнопки прижимаются вплотную и полоса читается сплошной
+                      линейкой номеров, тени и ореолы соседей заведомо перекрываются — это
+                      осознанный эффект нулевого Margin, не дефект. Габарит 50×38 тоже
+                      локальный: базовые значения стиля — для мелких иконок в списках.
                     -->
-                    <Button Margin="0,0,2,0"
-                            MinWidth="34"
+                    <Button
+                            MinWidth="50"
+                            MinHeight="38"
                             Command="{Binding DataContext.SelectExerciseCommand,
                                               RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                             CommandParameter="{Binding}"
                             Content="{Binding Number}"
                             ToolTip="{Binding Name}">
                         <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource GlassButtonIcon}">
+                            <Style TargetType="Button" BasedOn="{StaticResource GlassButtonIconSoft}">
                                 <Setter Property="FontWeight" Value="Normal" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
@@ -166,7 +172,7 @@
             <Button Grid.Column="0"
                     Height="48"
                     VerticalAlignment="Center"
-                    Style="{StaticResource GlassButtonIcon}"
+                    Style="{StaticResource GlassButtonIconSoft}"
                     Command="{Binding PreviousCommand}"
                     helpers:Hotkey.Id="Day.Previous"
                     ToolTip="Предыдущее упражнение">
@@ -259,7 +265,7 @@
                             Margin="0,0,6,0"
                             Height="48"
                             VerticalAlignment="Center"
-                            Style="{StaticResource GlassButtonIcon}"
+                            Style="{StaticResource GlassButtonIconSoft}"
                             Command="{Binding RemoveSetCommand}"
                             helpers:Hotkey.Id="Day.RemoveSet"
                             ToolTip="Убрать подход">
@@ -361,7 +367,7 @@
                             Margin="6,0,0,0"
                             Height="48"
                             VerticalAlignment="Center"
-                            Style="{StaticResource GlassButtonIcon}"
+                            Style="{StaticResource GlassButtonIconSoft}"
                             Command="{Binding AddSetCommand}"
                             helpers:Hotkey.Id="Day.AddSet"
                             ToolTip="Добавить подход">
@@ -543,7 +549,7 @@
             <Button Grid.Column="2"
                     Height="48"
                     VerticalAlignment="Center"
-                    Style="{StaticResource GlassButtonIcon}"
+                    Style="{StaticResource GlassButtonIconSoft}"
                     Command="{Binding NextCommand}"
                     helpers:Hotkey.Id="Day.Next"
                     ToolTip="Следующее упражнение">
@@ -623,7 +629,7 @@
                 -->
                 <Button Grid.Column="0"
                         VerticalAlignment="Center"
-                        Style="{StaticResource GlassButton}"
+                        Style="{StaticResource GlassButtonSoft}"
                         Command="{Binding SaveCommand}"
                         helpers:Hotkey.Id="Day.Save"
                         Content="Сохранить"
@@ -674,13 +680,13 @@
                 <StackPanel Grid.Column="2"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
-                    <Button Style="{StaticResource GlassButton}"
+                    <Button Style="{StaticResource GlassButtonSoft}"
                             Command="{Binding SaveAndCloseCommand}"
                             helpers:Hotkey.Id="Day.SaveAndClose"
                             Content="Сохранить и закрыть" />
 
                     <Button Margin="4,0,0,0"
-                            Style="{StaticResource GlassButton}"
+                            Style="{StaticResource GlassButtonSoft}"
                             Click="OnCancelClick"
                             helpers:Hotkey.Id="Day.Cancel"
                             Content="Отменить" />

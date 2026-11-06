@@ -13,6 +13,11 @@
       - AddDayButton     — кнопка «Добавить день» журнала: BasedOn с фикс. габаритом,
                            шрифтом 15 и иконкой «+», передаваемой из содержимого.
 
+      Вариант с мягкими углами — GlassButtonSoft / GlassButtonIconSoft / AddDayButtonSoft
+      (мокап docs/glassButtonSoftStates.svg): BasedOn на соответствующие стили и радиус 2.
+      Радиус живёт в helpers:ButtonChrome.CornerRadius (умолчание 4, мокап
+      docs/addDayButtonStates.svg), шаблон читает его привязкой к TemplatedParent.
+
       Четыре состояния — обычное, наведённое, нажатая, недоступная: Shape-триггеры
       меняют градиенты, прозрачности слоёв, эффекты свечения/тени и «утапливают»
       кнопку вниз на 1px. Цвет состояния живёт в Foreground самой кнопки: текст
@@ -109,8 +114,8 @@
             -->
             <Rectangle x:Name="Glow"
                        Margin="6,5,6,2"
-                       RadiusX="4"
-                       RadiusY="4"
+                       RadiusX="{Binding Path=(helpers:ButtonChrome.CornerRadius).TopLeft, RelativeSource={RelativeSource TemplatedParent}}"
+                       RadiusY="{Binding Path=(helpers:ButtonChrome.CornerRadius).TopLeft, RelativeSource={RelativeSource TemplatedParent}}"
                        Fill="#3FC4FF"
                        Opacity="0.22"
                        IsHitTestVisible="False">
@@ -135,12 +140,12 @@
                   рамкой выделения.
                 -->
                 <Border x:Name="Glass"
-                        CornerRadius="4"
+                        CornerRadius="{Binding Path=(helpers:ButtonChrome.CornerRadius), RelativeSource={RelativeSource TemplatedParent}}"
                         BorderThickness="{TemplateBinding BorderThickness}"
                         Background="{StaticResource AddDayGlass}"
                         BorderBrush="{TemplateBinding BorderBrush}" />
 
-                <Grid helpers:RoundedClip.Radius="4">
+                <Grid helpers:RoundedClip.Radius="{Binding Path=(helpers:ButtonChrome.CornerRadius).TopLeft, RelativeSource={RelativeSource TemplatedParent}}">
                     <!-- Верхний белый блик: полоса + тонкая подложка под ней -->
                     <Border x:Name="TopLight"
                             Height="2"
@@ -415,5 +420,23 @@
         <Setter Property="FontSize" Value="15" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+
+    <!--
+      Вариант с мягкими углами: те же состояния и цвета, радиус 2 вместо 4.
+      Цифру можно менять значением свойства, не трогая шаблон; предыдущий
+      вариант с прямыми углами выпадал радиусом 0. Соответствует мокапу
+      docs/glassButtonSoftStates.svg.
+    -->
+    <Style x:Key="GlassButtonSoft" TargetType="Button" BasedOn="{StaticResource GlassButton}">
+        <Setter Property="helpers:ButtonChrome.CornerRadius" Value="2" />
+    </Style>
+
+    <Style x:Key="GlassButtonIconSoft" TargetType="Button" BasedOn="{StaticResource GlassButtonIcon}">
+        <Setter Property="helpers:ButtonChrome.CornerRadius" Value="2" />
+    </Style>
+
+    <Style x:Key="AddDayButtonSoft" TargetType="Button" BasedOn="{StaticResource AddDayButton}">
+        <Setter Property="helpers:ButtonChrome.CornerRadius" Value="2" />
     </Style>
 </ResourceDictionary>
