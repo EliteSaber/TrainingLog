@@ -284,6 +284,7 @@
                     -->
                     <ItemsControl Grid.Column="1"
                                   Grid.RowSpan="2"
+                                  x:Name="SetsList"
                                   HorizontalAlignment="Center"
                                   ItemsSource="{Binding Current.Sets}">
                         <ItemsControl.ItemsPanel>

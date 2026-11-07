@@ -1,6 +1,9 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
 using TrainingLog.Controls;
 using TrainingLog.Services;
 using TrainingLog.ViewModels;
@@ -45,6 +48,11 @@ public partial class AddDayWindow : Window
         _viewModel = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
+        // Подписка здесь, а не в OnLoaded: план подбирается прямо при Initialize, и событие смены
+        // упражнения проходит раньше первого показа. Отложенный вызов подстраховывает: фокус
+        // ставится уже по показанному окну, у которого есть цепочка активации (ловушка 9).
+        _viewModel.CurrentExerciseChanged += OnCurrentExerciseChanged;
+
         // Слоты — единственные назначения, у которых исполнитель не кнопка: клавиша выбирает
         // упражнение по его номеру, как клик по кнопке-номеру. Упражнения пересобираются при
         // каждой загрузке плана, поэтому номер ищется в момент нажатия, а не в момент бинда.
@@ -72,6 +80,65 @@ public partial class AddDayWindow : Window
         {
             _viewModel.SelectExerciseCommand.Execute(exercise);
         }
+    }
+
+    /// <summary>Активное упражнение сменилось: фокус переносится в повторения первого подхода.</summary>
+    /// <remarks>
+    /// Перенос откладывается до пустой диспетчерской очереди: уведомление поднимается из модели в
+    /// момент смены, когда привязка <c>Current.Sets</c> ещё не разметила контейнеры подходов, и
+    /// искать в них поле рано. Подходов нет — фокус не переносится никуда, поведение не обязано
+    /// исполняться всегда.
+    /// </remarks>
+    private void OnCurrentExerciseChanged() =>
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, FocusFirstRepetitions);
+
+    /// <summary>Ставит фокус в поле повторений первого подхода и выделяет набранное.</summary>
+    /// <remarks>
+    /// Проверка предмета привязки обязательна: отложенный вызов может прийти к моменту, когда
+    /// сменился план, и <c>Current</c> указывает уже на подходы другого упражнения.
+    ///
+    /// Поле ищется только в контейнере первого подхода, а не по всему списку: полей повторений
+    /// сколько угодно, с <see cref="SetFieldNavigation.Part"/> их помечать приходилось ради
+    /// Tab-цепочки, и поиск по всему поддереву нашёл бы первое, а не принадлежащее первому
+    /// подходу.
+    /// </remarks>
+    private void FocusFirstRepetitions()
+    {
+        if (_viewModel.Current is not { Sets.Count: > 0 } row ||
+            !ReferenceEquals(SetsList.ItemsSource, row.Sets))
+        {
+            return;
+        }
+
+        if (SetsList.ItemContainerGenerator.ContainerFromIndex(0) is not DependencyObject container ||
+            FindRepetitionsBox(container) is not { } repetitions)
+        {
+            return;
+        }
+
+        repetitions.Focus();
+        repetitions.SelectAll();
+    }
+
+    /// <summary>Ищет в поддереве поле повторений: <see cref="TextBox"/> c <see cref="SetFieldNavigation.Part"/>, равным <see cref="SetField.Repetitions"/>.</summary>
+    private static TextBox? FindRepetitionsBox(DependencyObject root)
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+
+            if (child is TextBox box && SetFieldNavigation.GetPart(box) == SetField.Repetitions)
+            {
+                return box;
+            }
+
+            if (FindRepetitionsBox(child) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -156,6 +223,7 @@ public partial class AddDayWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _viewModel.CurrentExerciseChanged -= OnCurrentExerciseChanged;
         AllowedCharsInput.RemoveRejectedHandler(this, OnInputRejected);
         AllowedCharsInput.RemoveAcceptedHandler(this, OnInputAccepted);
     }

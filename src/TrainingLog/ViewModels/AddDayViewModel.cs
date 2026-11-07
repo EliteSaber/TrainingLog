@@ -99,6 +99,16 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// </remarks>
     private bool _hasUnsavedChanges;
 
+    /// <summary>
+    /// Активное упражнение последнего <see cref="Refresh"/>.
+    /// </summary>
+    /// <remarks>
+    /// Эталон для <see cref="CurrentExerciseChanged"/>: <see cref="Refresh"/> уведомляет о
+    /// <see cref="Current"/> при каждом проходе — набор символа примечания и «+»/«−» подхода
+    /// проходят через него же, — и по самому уведомлению настоящую смену упражнения не отличить.
+    /// </remarks>
+    private PlanExerciseViewModel? _currentExercise;
+
     /// <param name="sessionRepository">Журнал тренировок.</param>
     /// <param name="planRepository">Планы тренировок: состав дня берётся из плана.</param>
     /// <param name="day">Дата, на которую открывается окно. <c>null</c> — добавляется сегодня.</param>
@@ -230,6 +240,17 @@ public sealed partial class AddDayViewModel : ObservableObject
 
     /// <summary>Дата в доменном виде. Пустое поле даёт сегодняшний день: записать день некуда.</summary>
     public DateOnly Day => DateOnly.FromDateTime(Date ?? DateTime.Today);
+
+    /// <summary>
+    /// Активное упражнение сменилось: окно переносит фокус в повторения первого подхода.
+    /// </summary>
+    /// <remarks>
+    /// Событие, а не PropertyChanged по <see cref="Current"/>: то уведомление поднимается при
+    /// каждом <see cref="Refresh"/> ради привязок — им нужна свежая строка даже там, где
+    /// упражнение не менялось, — и смену по нему не отличить от повторного прохода. Поднимается
+    /// только при изменении ссылки на строку, см. <see cref="_currentExercise"/>.
+    /// </remarks>
+    public event Action? CurrentExerciseChanged;
 
     /// <summary>Активное упражнение: его подходы показаны в центре окна.</summary>
     public PlanExerciseViewModel? Current =>
@@ -734,6 +755,16 @@ public sealed partial class AddDayViewModel : ObservableObject
 
         OnPropertyChanged(nameof(Current));
         OnPropertyChanged(nameof(HasCurrent));
+
+        // Смена упражнения определяется здесь, а не в сеттере CurrentIndex: при перестройке состава
+        // (смена плана, даты, открытие окна) индекс и так ноль, и уведомления сеттера не было бы.
+        var previousExercise = _currentExercise;
+        _currentExercise = Current;
+
+        if (!ReferenceEquals(previousExercise, _currentExercise))
+        {
+            CurrentExerciseChanged?.Invoke();
+        }
 
         AddSetCommand.NotifyCanExecuteChanged();
         RemoveSetCommand.NotifyCanExecuteChanged();

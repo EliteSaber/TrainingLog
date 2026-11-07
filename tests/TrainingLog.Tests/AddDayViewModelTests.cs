@@ -90,6 +90,80 @@ public sealed class AddDayViewModelTests
     }
 
     /// <summary>
+    /// Фокус в повторения первого подхода окно переносит по событию модели, и событие обязано
+    /// отличать настоящую смену упражнения от повторного прохода <c>Refresh</c>.
+    /// </summary>
+    /// <remarks>
+    /// Счётчик события, а не PropertyChanged: модель уведомляет о <c>Current</c> на каждом
+    /// проходе <c>Refresh</c>, и значимых для фокуса смен среди них — только изменения ссылки.
+    /// </remarks>
+    [Fact]
+    public async Task СменаАктивногоУпражнения_СобытиеТолькоПриНастоящейСмене()
+    {
+        using var database = new TemporaryDatabase();
+        await CreatePlanAsync(database, "Ноги", "Приседание", "Жим");
+
+        var viewModel = await CreateInitializedAsync(database);
+
+        var raised = 0;
+        viewModel.CurrentExerciseChanged += () => raised++;
+
+        viewModel.SelectedPlan = viewModel.Plans.Single();
+        await SettleAsync();
+
+        // Первое появление упражнений — тоже смена: до выбора плана активного не было.
+        Assert.Equal(1, raised);
+        Assert.Same(viewModel.Exercises[0], viewModel.Current);
+
+        viewModel.NextCommand.Execute(null);
+
+        Assert.Equal(2, raised);
+
+        // Повторный выбор той же строки — не смена.
+        viewModel.SelectExerciseCommand.Execute(viewModel.Exercises[1]);
+
+        Assert.Equal(2, raised);
+
+        viewModel.SelectExerciseCommand.Execute(viewModel.Exercises[0]);
+
+        Assert.Equal(3, raised);
+
+        // Набор примечания гоняет Refresh по той же строке: события нет.
+        viewModel.Current!.NoteText = "тяжелее";
+
+        Assert.Equal(3, raised);
+    }
+
+    /// <summary>
+    /// Перестройка состава меняет ссылки строк даже там, где индекс и так ноль: открытие записи и
+    /// смена плана считаются сменой активного упражнения наравне с щелчком по кнопке.
+    /// </summary>
+    [Fact]
+    public async Task СменаАктивногоУпражнения_ПерестройкаСоставаПоднимаетСобытие()
+    {
+        using var database = new TemporaryDatabase();
+        await CreatePlanAsync(database, "Ноги", "Приседание", "Жим");
+        await CreatePlanAsync(database, "Верх", "Жим лёжа");
+
+        var viewModel = await CreateInitializedAsync(database);
+
+        viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Ноги");
+        await SettleAsync();
+
+        var raised = 0;
+        viewModel.CurrentExerciseChanged += () => raised++;
+
+        var legs = viewModel.Current!;
+
+        viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Верх");
+        await SettleAsync();
+
+        Assert.Equal(1, raised);
+        Assert.NotSame(legs, viewModel.Current);
+        Assert.Equal("Жим лёжа", viewModel.Current!.Name);
+    }
+
+    /// <summary>
     /// Пересборка состава обязана трогать навигацию: индекс при смене плана и так ноль, поэтому
     /// пересчёт обязан жить в <c>Refresh</c>, а не на сеттере индекса (ловушка 25).
     /// </summary>
