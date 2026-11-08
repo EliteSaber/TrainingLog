@@ -181,6 +181,70 @@ public sealed class AppSettingsStoreTests
         Assert.Equal(daysCount, settings.Store.Load().DaysCount);
     }
 
+    /// <summary>Пробельное имя гарнитуры — тоже «по цепочке»: срез края и пустое означают одно.</summary>
+    [Theory]
+    [InlineData("   ")]
+    [InlineData("  Fira Code  ")]
+    public void Load_ИмяШрифтаНормализуется_ПробелыСрезаются(string font)
+    {
+        using var settings = new TemporarySettings();
+        settings.Write($$"""{"FontFamily": "{{font}}"}""");
+
+        Assert.Equal(FontRules.NormalizeName(font), settings.Store.Load().FontFamily);
+    }
+
+    /// <summary>
+    /// Негодный масштаб откатывает к умолчанию в памяти, а файл не переписывается: его правят
+    /// руками, и молчаливая замена испортила бы недописанное.
+    /// </summary>
+    [Theory]
+    [InlineData(79)]
+    [InlineData(151)]
+    [InlineData(0)]
+    public void Load_МасштабНеПоДиапазону_ОтдаётПоУмолчанию(int percent)
+    {
+        using var settings = new TemporarySettings();
+        settings.Write($$"""{"FontSizePercent": {{percent}}}""");
+
+        Assert.Equal(AppSettings.DefaultFontSizePercent, settings.Store.Load().FontSizePercent);
+    }
+
+    /// <summary>Правило включительное, и оба края годные — иначе проверялось бы не то.</summary>
+    [Theory]
+    [InlineData(FontRules.MinScalePercent)]
+    [InlineData(FontRules.MaxScalePercent)]
+    public void Load_ГраницыМасштаба_Принимаются(int percent)
+    {
+        using var settings = new TemporarySettings();
+        settings.Write($$"""{"FontSizePercent": {{percent}}}""");
+
+        Assert.Equal(percent, settings.Store.Load().FontSizePercent);
+    }
+
+    /// <summary>Шрифтовые поля проходят тот же круг «сохранили — прочитали», что и остальные.</summary>
+    [Fact]
+    public void Save_ПотомЧитаютсяШрифтовыеПоля()
+    {
+        using var settings = new TemporarySettings();
+
+        Assert.True(settings.Store.Save(new AppSettings
+        {
+            FontFamily = "Fira Code",
+            FontSizePercent = 125,
+        }));
+
+        var loaded = settings.Store.Load();
+
+        Assert.Equal("Fira Code", loaded.FontFamily);
+        Assert.Equal(125, loaded.FontSizePercent);
+
+        // Отдельным хранилищем: значения лежат в файле, а не только в памяти.
+        var reread = new AppSettingsStore(settings.FilePath).Load();
+
+        Assert.Equal("Fira Code", reread.FontFamily);
+        Assert.Equal(125, reread.FontSizePercent);
+    }
+
     /// <summary>
     /// Негодное число дней не выбрасывает адрес базы: значения отбираются по одному полю, а не
     /// «весь файл годен или весь файл уходит в умолчание».

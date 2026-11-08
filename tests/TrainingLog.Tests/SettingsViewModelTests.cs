@@ -1,5 +1,6 @@
 using TrainingLog.Core.Data;
 using TrainingLog.Core.Settings;
+using TrainingLog.Services;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Tests;
@@ -27,6 +28,60 @@ public sealed class SettingsViewModelTests
         Assert.Equal(12, viewModel.DaysCount);
         Assert.Equal(@"D:\журнал\базы", viewModel.DatabaseDirectory);
         Assert.Equal("спорт", viewModel.DatabaseName);
+    }
+
+    /// <summary>
+    /// Пустая запись в файле — гарнитура по умолчанию «Segoe UI», и ComboBox, и откат показывают
+    /// её, а не пустоту: применённый шрифт приложения и поле выбора обязаны совпадать.
+    /// </summary>
+    [Fact]
+    public void Шрифт_БезЗаписи_Умолчание()
+    {
+        using var settings = new TemporarySettings();
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.Equal(FontRules.DefaultFontFamily, viewModel.SelectedFont.Name);
+        Assert.Equal(FontRules.DefaultFontFamily, viewModel.SavedFontName);
+        Assert.Equal(AppSettings.DefaultFontSizePercent, viewModel.SelectedScale);
+        Assert.Equal(AppSettings.DefaultFontSizePercent, viewModel.SavedFontSizePercent);
+    }
+
+    /// <summary>Сохранённое имя читается и без каталога: перечень ему не нужен, нужен Apply.</summary>
+    [Fact]
+    public void Шрифт_ЗаписьБезКаталога_ЧитаетсяКакЕсть()
+    {
+        using var settings = new TemporarySettings();
+        settings.Write("""{"FontFamily": "Fira Code", "FontSizePercent": 125}""");
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.Equal("Fira Code", viewModel.SelectedFont.Name);
+        Assert.Equal("Fira Code", viewModel.SavedFontName);
+        Assert.Equal(125, viewModel.SelectedScale);
+        Assert.Equal(125, viewModel.SavedFontSizePercent);
+    }
+
+    /// <summary>Выбранный пункт пишется тем же «Сохранить», без передачи через Apply.</summary>
+    [Fact]
+    public void Save_ВыбранныйШрифт_ЗаписываетсяВФайл()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store)
+        {
+            DaysCount = 6,
+            DatabaseDirectory = @"D:\журнал\базы",
+            DatabaseName = "спорт",
+            SelectedFont = new FontCatalog.FontFamilyOption("Verdana"),
+            SelectedScale = 110,
+        };
+
+        viewModel.SaveCommand.Execute(null);
+
+        var loaded = new AppSettingsStore(settings.FilePath).Load();
+
+        Assert.Equal("Verdana", loaded.FontFamily);
+        Assert.Equal(110, loaded.FontSizePercent);
     }
 
     /// <summary>По <c>Accepted</c> окно выставляет <c>DialogResult</c>, а главное окно перечитывает файл.</summary>

@@ -77,6 +77,16 @@ public sealed class AppSettingsStore
             settings.DaysCount = AppSettings.DefaultDaysCount;
         }
 
+        // Пустой шрифт — «по цепочке», а не пропажа настройки: пробельные края к нему и приравниваем.
+        // Негодный масштаб откатывает к умолчанию только в памяти: файл правят руками, и переписывать
+        // его после опечатанного процента не нужно — тот же договор, что у DaysCount.
+        settings.FontFamily = FontRules.NormalizeName(settings.FontFamily);
+
+        if (!FontRules.IsScaleValid(settings.FontSizePercent))
+        {
+            settings.FontSizePercent = AppSettings.DefaultFontSizePercent;
+        }
+
         if (IsMissing(settings.DatabaseDirectory) || IsMissing(settings.DatabaseName))
         {
             settings.DatabaseDirectory = IsMissing(settings.DatabaseDirectory)

@@ -8,6 +8,8 @@
         xmlns:core="clr-namespace:TrainingLog.Core;assembly=TrainingLog.Core"
         d:DataContext="{d:DesignInstance Type=vm:EditExerciseViewModel}"
         mc:Ignorable="d"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontSize="{DynamicResource BodySize}"
         Title="Редактирование упражнения"
         Width="380"
         SizeToContent="Height"

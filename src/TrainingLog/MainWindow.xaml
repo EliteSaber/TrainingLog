@@ -9,6 +9,8 @@
         xmlns:kb="clr-namespace:System.Windows.Input;assembly=PresentationFramework"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         mc:Ignorable="d"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontSize="{DynamicResource BodySize}"
         Title="{Binding Title}"
         Height="560"
         Width="900"
@@ -93,7 +95,7 @@
             </Grid.ColumnDefinitions>
 
             <TextBlock Grid.Column="0"
-                       FontSize="24"
+                       FontSize="{DynamicResource TitleSize}"
                        FontWeight="SemiBold"
                        VerticalAlignment="Center"
                        Text="{Binding Title}" />
@@ -545,7 +547,6 @@
                                                             Padding="1,2">
                                                         <Grid>
                                                             <Button Padding="1,1"
-                                                                    FontSize="11"
                                                                     Click="OnShowNoteClick"
                                                                     helpers:Hotkey.Id="Main.ShowNote">
                                                                 <Button.Style>

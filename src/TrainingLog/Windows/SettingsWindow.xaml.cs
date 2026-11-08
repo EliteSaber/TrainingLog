@@ -61,11 +61,26 @@ public partial class SettingsWindow : Window
     {
         if (e.PropertyName == nameof(SettingsViewModel.Accepted) && _viewModel.Accepted)
         {
+            // Шрифт переписан в файле: подменяем токены, и все открытые окна перерисовываются
+            // сами — ответственность, как и у диалогов, интерфейсная, поэтому окно.
+            AppFonts.Apply(_viewModel.SelectedFont.Name, _viewModel.SelectedScale);
+
             // Файл переписан: сервис перечитает его и соберёт живущие окна пересборкой привязок.
             // Windows-диалоги привязки пересоздают при показе, поэтому здесь только живущие.
             _hotkeys.NotifyChanged();
 
             DialogResult = true;
+
+            return;
+        }
+
+        // Предпросмотр: выбор в ComboBox (и клавиатурная навигация по закрытому списку — она
+        // тоже пишет SelectedItem) перекрашивает окна до всякого «Сохранить». Подменять токены
+        // из модели нельзя — она живёт в тестах без Application, поэтому окно.
+        if (e.PropertyName is nameof(SettingsViewModel.SelectedFont)
+            or nameof(SettingsViewModel.SelectedScale))
+        {
+            AppFonts.Apply(_viewModel.SelectedFont.Name, _viewModel.SelectedScale);
         }
     }
 
@@ -298,6 +313,13 @@ public partial class SettingsWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        // Выход без сохранения возвращает предпросмотр к срезу файла на открытие окна. По
+        // Accepted откат не нужен: модель уже применила выбранное, и файл с ним согласен.
+        if (!_viewModel.Accepted)
+        {
+            AppFonts.Apply(_viewModel.SavedFontName, _viewModel.SavedFontSizePercent);
+        }
+
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         AllowedCharsInput.RemoveRejectedHandler(this, OnInputRejected);
         AllowedCharsInput.RemoveAcceptedHandler(this, OnInputAccepted);

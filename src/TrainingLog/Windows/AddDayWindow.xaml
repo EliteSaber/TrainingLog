@@ -8,6 +8,8 @@
         xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
         d:DataContext="{d:DesignInstance Type=vm:AddDayViewModel}"
         mc:Ignorable="d"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontSize="{DynamicResource BodySize}"
         Title="{Binding Title}"
         Width="760"
         Height="480"
@@ -221,7 +223,7 @@
                 -->
                 <TextBlock Grid.Row="0"
                            HorizontalAlignment="Center"
-                           FontSize="16"
+                           FontSize="{DynamicResource SubtitleSize}"
                            FontWeight="SemiBold"
                            Margin="0,4,0,12"
                            TextAlignment="Center"

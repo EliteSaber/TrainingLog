@@ -9,6 +9,8 @@
         xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
         d:DataContext="{d:DesignInstance Type=vm:ExercisesViewModel}"
         mc:Ignorable="d"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontSize="{DynamicResource BodySize}"
         Title="Упражнения"
         Width="520"
         Height="560"

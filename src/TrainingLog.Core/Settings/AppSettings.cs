@@ -28,6 +28,26 @@ public sealed class AppSettings
     /// <summary>Как называется файл базы. Пустым не остаётся — тот же договор.</summary>
     public string DatabaseName { get; set; } = SqliteDatabasePath.FileName;
 
+    /// <summary>Гарнитура приложения или пустая строка: «по цепочке» умолчаний.</summary>
+    /// <remarks>
+    /// Имя каноническое (не локализованное): записанное локальное не нашлось бы на машине с
+    /// другой локалью. Наличие в системе проверяет WPF-слой, правило — только нормализацию.
+    /// </remarks>
+    public const string DefaultFontFamily = "";
+
+    /// <summary>Гарнитура приложения. Пустое значение означает «по цепочке» умолчаний.</summary>
+    public string FontFamily { get; set; } = DefaultFontFamily;
+
+    /// <summary>Масштаб кегля при отсутствии настройки: правило одно с проверкой ввода.</summary>
+    /// <remarks>
+    /// Своё имя держится ради симметрии с другими умолчаниями класса: и хранилище, и окно
+    /// ним пользуются, а не константой правила.
+    /// </remarks>
+    public const int DefaultFontSizePercent = FontRules.DefaultScalePercent;
+
+    /// <summary>Масштаб кегля в процентах. Пригодность проверяет <see cref="FontRules"/>.</summary>
+    public int FontSizePercent { get; set; } = DefaultFontSizePercent;
+
     /// <summary>Полный адрес файла базы: сохранённые директория и наименование вместе.</summary>
     public string DatabasePath => Path.Combine(DatabaseDirectory, DatabaseName);
 

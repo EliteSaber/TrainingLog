@@ -16,8 +16,12 @@ public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly AppSettingsStore _store;
 
+    // Поле под SelectedFont: свойство написано вручную, см. комментарий у него.
+    private FontCatalog.FontFamilyOption _selectedFont;
+
     /// <param name="store">Файл настроек.</param>
-    public SettingsViewModel(AppSettingsStore store)
+    /// <param name="fonts">Каталог шрифтов системы; без него (тесты) в списке только «по цепочке».</param>
+    public SettingsViewModel(AppSettingsStore store, FontCatalog? fonts = null)
     {
         ArgumentNullException.ThrowIfNull(store);
 
@@ -30,6 +34,26 @@ public sealed partial class SettingsViewModel : ObservableObject
         DaysCount = settings.DaysCount;
         DatabaseDirectory = settings.DatabaseDirectory;
         DatabaseName = DatabaseNameRules.ForDisplay(settings.DatabaseName);
+
+        // Пустая запись в файле — «по умолчанию» (Segoe UI), а не вторая пустота: поле и откат
+        // показывают одной честно: что и применял бы WPF-слой.
+        var fontFamily = ResolveFontName(settings.FontFamily);
+        FontOptions = BuildFontOptions(fonts);
+
+        // Пункта из списка может не быть, если файл правили руками или шрифт удалили: выбор
+        // остаётся с тем же именем, Apply сам сведёт его к умолчанию. Null у ComboBox никогда
+        // не «модельный»: свойство пишут только непустыми значениями.
+        _selectedFont = FontOptions.FirstOrDefault(option =>
+                            string.Equals(option.Name, fontFamily, StringComparison.OrdinalIgnoreCase))
+                        ?? new FontCatalog.FontFamilyOption(fontFamily);
+        _selectedScale = FontRules.IsScaleValid(settings.FontSizePercent)
+            ? settings.FontSizePercent
+            : AppSettings.DefaultFontSizePercent;
+
+        // Срез файла на момент открытия: окно по нему откатывает предпросмотр, когда закрылось
+        // без сохранения. Перечитывать файл на закрытии незачем: правки в окно извне не приходят.
+        SavedFontName = fontFamily;
+        SavedFontSizePercent = _selectedScale;
 
         HotkeyGroups = BuildHotkeyGroups(settings.Hotkeys);
         HotkeyListing = BuildHotkeyListing(HotkeyGroups);
@@ -64,6 +88,63 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private string _databaseName = string.Empty;
+
+    /// <summary>Каталог выбора шрифта: все установленные семейства.</summary>
+    /// <remarks>
+    /// Строится один раз в конструкторе: переустановка шрифта живому окну не нужна, а пересборка
+    /// сотен пунктов на каждом показе вкладки была бы лишней работой.
+    /// </remarks>
+    public IReadOnlyList<FontCatalog.FontFamilyOption> FontOptions { get; }
+
+    /// <summary>Поисковая строка списка шрифтов.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FilteredFonts))]
+    private string _fontSearch = string.Empty;
+
+    /// <summary>Список шрифтов под поиск.</summary>
+    /// <remarks>
+    /// Вычисляемым, а не обслуживаемой коллекцией: пересчёт сотен пунктов дёшев, а второй
+    /// коллекцией пришлось бы синхронизировать обе половины состояния.
+    /// </remarks>
+    public IReadOnlyList<FontCatalog.FontFamilyOption> FilteredFonts =>
+        FontCatalog.Filter(FontOptions, FontSearch);
+
+    /// <summary>Выбранный пункт списка шрифтов.</summary>
+    /// <remarks>
+    /// Свойство написано вручную, а не <c>[ObservableProperty]</c>: список под поиск убирает
+    /// выбранный пункт, и ComboBox присылает null. Игнорирование null держит выбор в модели,
+    /// пока ComboBox на экране пуст, — очистка поиска возвращает пункт на место, и повторное
+    /// выделение не теряет сохранённого значения.
+    /// </remarks>
+    public FontCatalog.FontFamilyOption SelectedFont
+    {
+        get => _selectedFont;
+        set
+        {
+            if (value is not null)
+            {
+                SetProperty(ref _selectedFont, value);
+            }
+        }
+    }
+
+    /// <summary>Размер шрифта в процентах: один из пресетов.</summary>
+    [ObservableProperty]
+    private int _selectedScale = FontRules.DefaultScalePercent;
+
+    /// <summary>Пресеты масштаба: значения внутри границ <see cref="FontRules"/>, и ComboBox им верит заранее.</summary>
+    public static IReadOnlyList<int> ScaleOptions { get; } = [80, 90, 100, 110, 125, 150];
+
+    /// <summary>Гарнитура, записанная в файле на момент открытия окна.</summary>
+    /// <remarks>
+    /// Отдаётся окну отката: выход без сохранения возвращает предпросмотр к этому срезу.
+    /// Читающим свойством, а не полем-значением окна: что было сохранено, знает модель,
+    /// окно знает лишь, когда откатывать.
+    /// </remarks>
+    public string SavedFontName { get; }
+
+    /// <summary>Масштаб кегля, записанный в файле на момент открытия окна.</summary>
+    public int SavedFontSizePercent { get; }
 
     /// <summary>Подсказка об отказе по вводу.</summary>
     public HintState Hint { get; } = new();
@@ -139,6 +220,8 @@ public sealed partial class SettingsViewModel : ObservableObject
                 DatabaseDirectory = DatabaseDirectory,
                 // Расширение живёт в файле, а не в поле: настоящим именем файла владеет файл настроек.
                 DatabaseName = DatabaseNameRules.ToFileName(DatabaseName),
+                FontFamily = SelectedFont.Name,
+                FontSizePercent = SelectedScale,
                 Hotkeys = AssignedHotkeys(),
             }))
         {
@@ -227,6 +310,18 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         HotkeyConflict = string.Empty;
     }
+
+    /// <summary>Все установленные семейства; без каталога (тесты) — только гарнитура по умолчанию.</summary>
+    private static List<FontCatalog.FontFamilyOption> BuildFontOptions(FontCatalog? fonts) =>
+        fonts is null
+            ? [new FontCatalog.FontFamilyOption(FontRules.DefaultFontFamily)]
+            : [.. FontCatalog.Families()];
+
+    /// <summary>Имя из файла: непустое — как есть, пустое — гарнитура по умолчанию.</summary>
+    private static string ResolveFontName(string? font) =>
+        FontRules.NormalizeName(font) is { Length: > 0 } name
+            ? name
+            : FontRules.DefaultFontFamily;
 
     /// <summary>Строит строки каталога: значения показываются как действующие — назначение или умолчание.</summary>
     private List<HotkeyGroupViewModel> BuildHotkeyGroups(Dictionary<string, string> assigned)

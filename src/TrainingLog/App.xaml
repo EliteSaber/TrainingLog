@@ -9,6 +9,16 @@
       владельца, «последним окном» закончится оно, а не журнал.
     -->
     <Application.Resources>
-
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!--
+                  Токены шрифта живут здесь, а не в окнах: оконный экземпляр словаря перекрыл бы
+                  подмену из параметров (поиск DynamicResource от элемента вверх, к окну).
+                  Ловушка 6 окна не задевает: она требует ресурсов у окон, а не запрещает
+                  ресурсы приложения.
+                -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/Fonts.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

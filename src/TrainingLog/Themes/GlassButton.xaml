@@ -377,8 +377,13 @@
       после Margin 6 шаблона тело было 28 — компактный вариант мокапа.
     -->
     <Style x:Key="GlassButton" TargetType="Button">
-        <Setter Property="FontFamily" Value="Verdana" />
-        <Setter Property="FontSize" Value="11" />
+        <!--
+          Шрифт и кегль — токены приложения, а не Verdana: выбор гарнитуры и масштаб в
+          параметрах подменяют их значениями, и DynamicResource доносит замену до
+          уже показанных кнопок.
+        -->
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="{DynamicResource BodySize}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="#08355C" />
         <!--
@@ -417,7 +422,7 @@
     <Style x:Key="AddDayButton" TargetType="Button" BasedOn="{StaticResource GlassButton}">
         <Setter Property="Width" Value="216" />
         <Setter Property="Height" Value="40" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="{DynamicResource LargeSize}" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     </Style>

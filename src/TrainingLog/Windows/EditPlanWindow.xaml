@@ -8,6 +8,8 @@
         xmlns:core="clr-namespace:TrainingLog.Core;assembly=TrainingLog.Core"
         d:DataContext="{d:DesignInstance Type=vm:EditPlanViewModel}"
         mc:Ignorable="d"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontSize="{DynamicResource BodySize}"
         Title="План тренировки"
         Width="620"
         Height="560"

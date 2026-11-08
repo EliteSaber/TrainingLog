@@ -26,6 +26,10 @@ public partial class App : Application
         _services = BuildServices(settingsStore, settings);
         ApplyMigrations();
 
+        // Токены шрифта до показа окон: иначе первое окно рисовалось бы умолчанием из Fonts.xaml,
+        // и выбор в параметрах «опаздывал» на первоотрисовку.
+        AppFonts.Apply(settings.FontFamily, settings.FontSizePercent);
+
         var mainWindow = _services.GetRequiredService<MainWindow>();
         MainWindow = mainWindow;
         mainWindow.Show();
@@ -57,6 +61,9 @@ public partial class App : Application
         // То же правило единственности, что у настроек: назначения правятся одним файлом, и
         // живущие окна пересобирают привязки по событию единственного сервиса.
         services.AddSingleton<HotkeyService>();
+
+        // Каталог шрифтов без состояния: нужен только окну параметров, список строится в модели.
+        services.AddSingleton<FontCatalog>();
 
         // Синглтон, потому что окна справочников единственные и состояние их хоста переиспользуется.
         services.AddSingleton<IWindowService>(provider =>
@@ -96,7 +103,8 @@ public partial class App : Application
                 day),
                 hotkeys),
             () => new SettingsWindow(new SettingsViewModel(
-                provider.GetRequiredService<AppSettingsStore>()),
+                provider.GetRequiredService<AppSettingsStore>(),
+                provider.GetRequiredService<FontCatalog>()),
                 provider.GetRequiredService<HotkeyService>()));
         });
 

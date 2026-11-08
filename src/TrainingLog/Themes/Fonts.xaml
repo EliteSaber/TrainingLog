@@ -1,0 +1,32 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <!--
+      Токены шрифта — единственный слой оформления на уровне приложения, а не в окнах: оконный
+      экземпляр словаря перекрыл бы подмену в Application.Resources (очередь поиска
+      DynamicResource: элемент → окно → приложение), а подмена — и есть выбор в параметрах.
+      В тестах окно создаётся без Application (ловушка 6): токена там нет, шрифт остаётся
+      системным — на тесты оформление здесь не влияет вовсе.
+
+      Кегли — базовые (100 %): настоящий масштаб подставляет AppFonts.Apply умножением этих же
+      значений, и после подмены он обязан читать базу отсюда, а не из ресурсов, где уже лежит
+      масштабированное.
+
+      Токен — единственный из этого словаря, который подменяется в Application.Resources: это и
+      есть выбор в параметрах. Умолчание Segoe UI дотягивает до самого места применения: в окне
+      параметры ещё не открыты, и в файле пусто.
+    -->
+    <FontFamily x:Key="AppFontFamily">Segoe UI</FontFamily>
+
+    <!-- Кегль кнопок, ячеек таблиц и умолчания текста окон. -->
+    <sys:Double x:Key="BodySize">11</sys:Double>
+
+    <!-- Заголовок текущего упражнения в окне дня. -->
+    <sys:Double x:Key="SubtitleSize">16</sys:Double>
+
+    <!-- Заголовок журнала. -->
+    <sys:Double x:Key="TitleSize">24</sys:Double>
+
+    <!-- Кнопка «Добавить день». -->
+    <sys:Double x:Key="LargeSize">15</sys:Double>
+</ResourceDictionary>

@@ -8,6 +8,8 @@
         xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
         d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
         mc:Ignorable="d"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontSize="{DynamicResource BodySize}"
         Title="Параметры"
         Width="520"
         Height="560"
@@ -42,6 +44,8 @@
             <TabItem Header="Общие">
                 <Grid Margin="0,12,0,0">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -157,6 +161,84 @@
                                 Content="Выбрать файл…"
                                 helpers:Hotkey.Id="Settings.PickFile"
                                 Click="OnPickDatabaseFile" />
+                    </Grid>
+
+                    <!--
+                      Выбор шрифта: список всех системных семейств под строкой поиска. Живёт в
+                      колонке *, поле поиска сверху: подпись передаёт фокус именно поиску.
+
+                      Выпадающий список виртуализирован — семейств сотни, и без
+                      VirtualizingStackPanel ComboBox строил бы их все разом при первом показе.
+                      CanContentScroll обязателен: попиксельная прокрутка виртуализации противоречит,
+                      ItemsPresenter строил бы весь ItemsSource.
+                    -->
+                    <Grid Grid.Row="3" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Background="Transparent"
+                                   TextWrapping="Wrap"
+                                   Text="Шрифт"
+                                   helpers:ClickToFocus.Target="{Binding ElementName=FontSearchBox}" />
+
+                        <StackPanel Grid.Column="1"
+                                    Margin="8,0,0,0">
+                            <TextBox x:Name="FontSearchBox"
+                                     Padding="4,3"
+                                     ToolTip="Поиск — по имени шрифта"
+                                     Text="{Binding FontSearch, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <ComboBox Margin="0,6,0,0"
+                                      VerticalAlignment="Center"
+                                      ScrollViewer.CanContentScroll="True"
+                                      MaxDropDownHeight="320"
+                                      VirtualizingPanel.IsVirtualizing="True"
+                                      ItemsSource="{Binding FilteredFonts}"
+                                      SelectedItem="{Binding SelectedFont}">
+                                <ComboBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <VirtualizingStackPanel />
+                                    </ItemsPanelTemplate>
+                                </ComboBox.ItemsPanel>
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
+
+                    <!--
+                      Размер шрифта — пресетами, а не полем: годных значений шесть, и поле с
+                      фильтром цифр проверяло бы ввод, который ComboBox и так не берёт за
+                      пределы списка.
+                    -->
+                    <Grid Grid.Row="4" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Background="Transparent"
+                                   TextWrapping="Wrap"
+                                   Text="Размер шрифта"
+                                   helpers:ClickToFocus.Target="{Binding ElementName=ScaleBox}" />
+
+                        <ComboBox x:Name="ScaleBox"
+                                  Grid.Column="1"
+                                  Margin="8,0,0,0"
+                                  Width="120"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Center"
+                                  ItemsSource="{Binding ScaleOptions}"
+                                  SelectedItem="{Binding SelectedScale}" />
                     </Grid>
                 </Grid>
             </TabItem>
