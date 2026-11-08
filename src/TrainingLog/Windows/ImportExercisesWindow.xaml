@@ -10,6 +10,8 @@
         mc:Ignorable="d"
         FontFamily="{DynamicResource AppFontFamily}"
         FontSize="{DynamicResource BodySize}"
+        Background="{DynamicResource WindowBackground}"
+        Foreground="{DynamicResource TextPrimary}"
         Title="Импорт упражнений"
         Width="560"
         Height="520"
@@ -29,8 +31,8 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Стеклянные кнопки — ловушка 6: ресурсы окна живут в окне -->
-                <ResourceDictionary Source="pack://application:,,,/Themes/GlassButton.xaml" />
+                <!-- Тема целиком (палитра, кнопки, контролы) — ловушка 6: ресурсы окна живут в окне -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -93,7 +95,7 @@
         -->
         <TextBlock Grid.Row="1"
                    Margin="0,8,0,0"
-                   Foreground="Gray"
+                   Foreground="{DynamicResource TextSecondary}"
                    TextWrapping="Wrap"
                    Text="{Binding Summary}"
                    Visibility="{Binding HasSummary, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -117,7 +119,7 @@
             <TextBlock Grid.Column="1"
                        Margin="8,0,0,0"
                        VerticalAlignment="Center"
-                       Foreground="Gray"
+                       Foreground="{DynamicResource TextSecondary}"
                        TextWrapping="Wrap"
                        Text="Текущие упражнения будут удалены: из планов они тоже исчезнут, а в журнале тренировок останутся только названия." />
         </Grid>
@@ -143,7 +145,7 @@
         <!-- Отказ живёт до успеха, а не пять секунд в подсказке: упражнения не записаны. -->
         <TextBlock Grid.Row="5"
                    Margin="0,10,0,0"
-                   Foreground="Firebrick"
+                   Foreground="{DynamicResource TextError}"
                    TextWrapping="Wrap"
                    Text="{Binding Status}"
                    Visibility="{Binding HasStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />

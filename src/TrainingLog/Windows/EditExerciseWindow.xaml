@@ -10,6 +10,8 @@
         mc:Ignorable="d"
         FontFamily="{DynamicResource AppFontFamily}"
         FontSize="{DynamicResource BodySize}"
+        Background="{DynamicResource WindowBackground}"
+        Foreground="{DynamicResource TextPrimary}"
         Title="Редактирование упражнения"
         Width="380"
         SizeToContent="Height"
@@ -19,8 +21,8 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Стеклянные кнопки — ловушка 6: ресурсы окна живут в окне -->
-                <ResourceDictionary Source="pack://application:,,,/Themes/GlassButton.xaml" />
+                <!-- Тема целиком (палитра, кнопки, контролы) — ловушка 6: ресурсы окна живут в окне -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Window.Resources>

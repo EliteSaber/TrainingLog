@@ -1,0 +1,126 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+      Светлая палитра: все цвета приложения отсюда, по семантическим токенам. Ни одно окно
+      не держит точный цвет литералом: тёмная тема потом заменит значения этих же ключей,
+      и DynamicResource-ссылки обновятся сами.
+
+      Значения выведены из стеклянных кнопок (мокап docs/addDayButtonStates.svg — светлый
+      холодный): фон — почти белый с холодом, текст — тёмно-синий #08355C с кнопок,
+      вторичный — #94A6B3 (текст недоступной кнопки), акценты — голубые из фаски.
+
+      Уровень словаря: Theme.xaml вливает этот словарь и на уровне приложения, и в оконных
+      словарях. Оконная копия нужна ловушке 6 (окна в тестах создаются без Application),
+      приложение — отдельным визуальным деревьям (ToolTip, ContextMenu, dropdown ComboBox):
+      PopupRoot не поднимается к Window, и без копии на уровне приложения DynamicResource
+      в его дереве нашёл бы пустоту.
+    -->
+    <SolidColorBrush x:Key="WindowBackground" Color="#F3F8FB" />
+    <SolidColorBrush x:Key="TextPrimary" Color="#08355C" />
+    <SolidColorBrush x:Key="TextPrimaryPressed" Color="#0B4A72" />
+    <SolidColorBrush x:Key="TextSecondary" Color="#94A6B3" />
+    <SolidColorBrush x:Key="TextError" Color="#B23A48" />
+
+    <!-- Линии: мягкая — обводки таблиц и разделители, сильная — рамки подложек -->
+    <SolidColorBrush x:Key="LineSoft" Color="#E3E9EE" />
+    <SolidColorBrush x:Key="LineStrong" Color="#D3DCE2" />
+
+    <!-- Подложки: выделение строки (достаточно контрастное, чтобы читалось на фоне окна),
+         полосы таблицы «Вес»/«Повторения»/«Примечание» -->
+    <SolidColorBrush x:Key="RowHighlight" Color="#D9EAF6" />
+    <SolidColorBrush x:Key="SurfaceAlt" Color="#E8EEF2" />
+
+    <!-- Акценты: фокус полей, рамки выделения (бывший SystemColors.HighlightBrushKey) -->
+    <SolidColorBrush x:Key="Accent" Color="#19A0E0" />
+    <SolidColorBrush x:Key="AccentStrong" Color="#2B7FB9" />
+
+    <!-- Поля: белое полотно, рамка до наведения, тёплый захват горячих клавиш -->
+    <SolidColorBrush x:Key="FieldBackground" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="FieldBorder" Color="#D8E2E9" />
+    <SolidColorBrush x:Key="CaptureSurface" Color="#FCF6DC" />
+    <SolidColorBrush x:Key="CaptureBorder" Color="#D9A72A" />
+
+    <!-- Наведение: строки списков, пункты меню, стрелки в StatusHint -->
+    <SolidColorBrush x:Key="ControlHover" Color="#DDE9F2" />
+
+    <!--
+      Подложка подсказки: на пиксель темнее окна, того же холодного оттенка. Прозрачность
+      сохранена из системной версии (0.95); блок и стрелка режутся одной кистью, поэтому
+      шва между двумя фигурами не видно.
+    -->
+    <SolidColorBrush x:Key="HintSurface" Color="#EDF2F6" Opacity="0.95" />
+
+    <!--
+      Кисти стеклянных кнопок: переехали из GlassButton.xaml 1-в-1, с теми же ключами —
+      шаблон и стили кнопок ссылаются на них DynamicResource-ом, вид не меняется ни на
+      пиксель. Стопы градиентов литеральные замысленно: подмена кистей целыми (= тёмная
+      тема) или ничего — DynamicResource внутри Freezable (GradientStop) обновляться не
+      умеет.
+    -->
+    <LinearGradientBrush x:Key="AddDayGlass" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#FFFFFF" />
+        <GradientStop Offset="0.38" Color="#E7F8FF" />
+        <GradientStop Offset="0.52" Color="#B9E6FA" />
+        <GradientStop Offset="1" Color="#8CCFEF" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayGlassHover" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#FFFFFF" />
+        <GradientStop Offset="0.35" Color="#EAFCFF" />
+        <GradientStop Offset="0.52" Color="#A5ECFF" />
+        <GradientStop Offset="1" Color="#5CC9F2" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayGlassActive" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#9FD8F0" />
+        <GradientStop Offset="0.5" Color="#7BC4E8" />
+        <GradientStop Offset="1" Color="#4FA8D6" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayGlassDisabled" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#F4F8FB" />
+        <GradientStop Offset="0.38" Color="#E6EEF4" />
+        <GradientStop Offset="0.52" Color="#D4E0E9" />
+        <GradientStop Offset="1" Color="#C2D1DC" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayBevel" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#FFFFFF" />
+        <GradientStop Offset="0.45" Color="#A8E4FF" />
+        <GradientStop Offset="1" Color="#2B7FB9" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayBevelHover" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#FFFFFF" />
+        <GradientStop Offset="0.45" Color="#C8F4FF" />
+        <GradientStop Offset="1" Color="#19A0E0" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayBevelActive" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#2B7FB9" />
+        <GradientStop Offset="0.55" Color="#4A9BC4" />
+        <GradientStop Offset="1" Color="#FFFFFF" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayBevelDisabled" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#FFFFFF" />
+        <GradientStop Offset="0.45" Color="#DDE7EE" />
+        <GradientStop Offset="1" Color="#A8B8C4" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayInnerBottom" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#002B6F9E" />
+        <GradientStop Offset="1" Color="#731D5A83" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayInnerBottomDisabled" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#007F95A5" />
+        <GradientStop Offset="1" Color="#387F95A5" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayStreak" StartPoint="0,1" EndPoint="0.6,0">
+        <GradientStop Offset="0" Color="#00FFFFFF" />
+        <GradientStop Offset="0.6" Color="#8CFFFFFF" />
+        <GradientStop Offset="1" Color="#00FFFFFF" />
+    </LinearGradientBrush>
+</ResourceDictionary>

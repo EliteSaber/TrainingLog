@@ -24,6 +24,11 @@
       покрасится по наследству, Path-иконки в содержимом — привязкой Fill/Stroke
       к Foreground предка-Button.
 
+      Кисти и цвета текста взяты из палитры Themes/Theme.Light.xaml (DynamicResource):
+      тёмная тема заменит их значения, и кнопка перекрасится сама. Остаются в шаблоне
+      только белые оверлеи стекла: они частью вида кнопки, а не палитры — блики и
+      кромки стекла белыми остаются в любой теме.
+
       DropShadowEffect/BlurEffect вместо SVG-фильтров: Direction=90 кладёт тень
       строго вниз, как feOffset dy в мокапе. Поля по 6px вокруг тела — запас только
       под тень и ореол с их блюром; ореол держит один видимый габарит во всех
@@ -31,73 +36,6 @@
       нажатая выглядела бы меньше обычной. BlurEffect рисуется и за границами
       кнопки: подложка окна светлая, на вид это ореол, не артефакт.
     -->
-    <LinearGradientBrush x:Key="AddDayGlass" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#FFFFFF" />
-        <GradientStop Offset="0.38" Color="#E7F8FF" />
-        <GradientStop Offset="0.52" Color="#B9E6FA" />
-        <GradientStop Offset="1" Color="#8CCFEF" />
-    </LinearGradientBrush>
-
-    <LinearGradientBrush x:Key="AddDayGlassHover" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#FFFFFF" />
-        <GradientStop Offset="0.35" Color="#EAFCFF" />
-        <GradientStop Offset="0.52" Color="#A5ECFF" />
-        <GradientStop Offset="1" Color="#5CC9F2" />
-    </LinearGradientBrush>
-
-    <LinearGradientBrush x:Key="AddDayGlassActive" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#9FD8F0" />
-        <GradientStop Offset="0.5" Color="#7BC4E8" />
-        <GradientStop Offset="1" Color="#4FA8D6" />
-    </LinearGradientBrush>
-
-    <LinearGradientBrush x:Key="AddDayGlassDisabled" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#F4F8FB" />
-        <GradientStop Offset="0.38" Color="#E6EEF4" />
-        <GradientStop Offset="0.52" Color="#D4E0E9" />
-        <GradientStop Offset="1" Color="#C2D1DC" />
-    </LinearGradientBrush>
-
-    <LinearGradientBrush x:Key="AddDayBevel" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#FFFFFF" />
-        <GradientStop Offset="0.45" Color="#A8E4FF" />
-        <GradientStop Offset="1" Color="#2B7FB9" />
-    </LinearGradientBrush>
-
-    <LinearGradientBrush x:Key="AddDayBevelHover" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#FFFFFF" />
-        <GradientStop Offset="0.45" Color="#C8F4FF" />
-        <GradientStop Offset="1" Color="#19A0E0" />
-    </LinearGradientBrush>
-
-    <LinearGradientBrush x:Key="AddDayBevelActive" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#2B7FB9" />
-        <GradientStop Offset="0.55" Color="#4A9BC4" />
-        <GradientStop Offset="1" Color="#FFFFFF" />
-    </LinearGradientBrush>
-
-    <LinearGradientBrush x:Key="AddDayBevelDisabled" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#FFFFFF" />
-        <GradientStop Offset="0.45" Color="#DDE7EE" />
-        <GradientStop Offset="1" Color="#A8B8C4" />
-    </LinearGradientBrush>
-
-    <LinearGradientBrush x:Key="AddDayInnerBottom" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#002B6F9E" />
-        <GradientStop Offset="1" Color="#731D5A83" />
-    </LinearGradientBrush>
-
-    <LinearGradientBrush x:Key="AddDayInnerBottomDisabled" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Offset="0" Color="#007F95A5" />
-        <GradientStop Offset="1" Color="#387F95A5" />
-    </LinearGradientBrush>
-
-    <LinearGradientBrush x:Key="AddDayStreak" StartPoint="0,1" EndPoint="0.6,0">
-        <GradientStop Offset="0" Color="#00FFFFFF" />
-        <GradientStop Offset="0.6" Color="#8CFFFFFF" />
-        <GradientStop Offset="1" Color="#00FFFFFF" />
-    </LinearGradientBrush>
-
     <!--
       Общий шаблон. Размер тела не фиксирован: тело сидит в Margin 6 (запас под
       свечение/тень), габарит задаёт окно. Ширину и высоту шаблон принимает любые —
@@ -118,8 +56,7 @@
                        RadiusY="{Binding Path=(helpers:ButtonChrome.CornerRadius).TopLeft, RelativeSource={RelativeSource TemplatedParent}}"
                        Fill="#3FC4FF"
                        Opacity="0.22"
-                       IsHitTestVisible="False">
-                <Rectangle.Effect>
+                       IsHitTestVisible="False">                <Rectangle.Effect>
                     <BlurEffect Radius="3" />
                 </Rectangle.Effect>
             </Rectangle>
@@ -142,7 +79,7 @@
                 <Border x:Name="Glass"
                         CornerRadius="{Binding Path=(helpers:ButtonChrome.CornerRadius), RelativeSource={RelativeSource TemplatedParent}}"
                         BorderThickness="{TemplateBinding BorderThickness}"
-                        Background="{StaticResource AddDayGlass}"
+                        Background="{DynamicResource AddDayGlass}"
                         BorderBrush="{TemplateBinding BorderBrush}" />
 
                 <Grid helpers:RoundedClip.Radius="{Binding Path=(helpers:ButtonChrome.CornerRadius).TopLeft, RelativeSource={RelativeSource TemplatedParent}}">
@@ -163,7 +100,7 @@
                             Height="7"
                             Margin="1.5,0,1.5,0.8"
                             VerticalAlignment="Bottom"
-                            Background="{StaticResource AddDayInnerBottom}" />
+                            Background="{DynamicResource AddDayInnerBottom}" />
 
                     <!-- Нижняя тёмная грань -->
                     <Rectangle x:Name="BottomLine"
@@ -185,7 +122,7 @@
                     <Canvas>
                         <Path x:Name="Streak"
                               Data="M0,28 L0,5 L40,0 L66,0 Z"
-                              Fill="{StaticResource AddDayStreak}" />
+                              Fill="{DynamicResource AddDayStreak}" />
 
                         <!-- Нажатая: блик уходит вниз, тело «вдавливается» -->
                         <Path x:Name="PressedStreak"
@@ -267,8 +204,8 @@
                                           Opacity="0.38" />
                     </Setter.Value>
                 </Setter>
-                <Setter TargetName="Glass" Property="Background" Value="{StaticResource AddDayGlassHover}" />
-                <Setter TargetName="Glass" Property="BorderBrush" Value="{StaticResource AddDayBevelHover}" />
+                <Setter TargetName="Glass" Property="Background" Value="{DynamicResource AddDayGlassHover}" />
+                <Setter TargetName="Glass" Property="BorderBrush" Value="{DynamicResource AddDayBevelHover}" />
                 <Setter TargetName="Glass" Property="BorderThickness" Value="1.4" />
                 <Setter TargetName="TopLight" Property="Background" Value="#FFFFFF" />
                 <Setter TargetName="TopLightThin" Property="Background" Value="#8CFFFFFF" />
@@ -304,8 +241,8 @@
                                           Opacity="0.2" />
                     </Setter.Value>
                 </Setter>
-                <Setter TargetName="Glass" Property="Background" Value="{StaticResource AddDayGlassActive}" />
-                <Setter TargetName="Glass" Property="BorderBrush" Value="{StaticResource AddDayBevelActive}" />
+                <Setter TargetName="Glass" Property="Background" Value="{DynamicResource AddDayGlassActive}" />
+                <Setter TargetName="Glass" Property="BorderBrush" Value="{DynamicResource AddDayBevelActive}" />
                 <Setter TargetName="Glass" Property="BorderThickness" Value="1.4" />
                 <!-- Подсветка переворачивается: блик у низа, тень у верха -->
                 <Setter TargetName="TopLight" Property="Visibility" Value="Collapsed" />
@@ -320,7 +257,7 @@
                 <Setter TargetName="LeftEdge" Property="Fill" Value="#59FFFFFF" />
                 <Setter TargetName="RightEdge" Property="Fill" Value="#33FFFFFF" />
                 <!-- Текст и иконка темнее на вдавленном теле -->
-                <Setter Property="Foreground" Value="#0B4A72" />
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryPressed}" />
                 <Setter TargetName="ContentRoot" Property="Effect">
                     <Setter.Value>
                         <DropShadowEffect BlurRadius="0.4"
@@ -348,16 +285,16 @@
                                           Opacity="0.15" />
                     </Setter.Value>
                 </Setter>
-                <Setter TargetName="Glass" Property="Background" Value="{StaticResource AddDayGlassDisabled}" />
-                <Setter TargetName="Glass" Property="BorderBrush" Value="{StaticResource AddDayBevelDisabled}" />
+                <Setter TargetName="Glass" Property="Background" Value="{DynamicResource AddDayGlassDisabled}" />
+                <Setter TargetName="Glass" Property="BorderBrush" Value="{DynamicResource AddDayBevelDisabled}" />
                 <Setter TargetName="TopLight" Property="Background" Value="#8CFFFFFF" />
                 <Setter TargetName="TopLightThin" Property="Background" Value="#40FFFFFF" />
-                <Setter TargetName="BottomShade" Property="Background" Value="{StaticResource AddDayInnerBottomDisabled}" />
+                <Setter TargetName="BottomShade" Property="Background" Value="{DynamicResource AddDayInnerBottomDisabled}" />
                 <Setter TargetName="BottomLine" Property="Fill" Value="#2E7F95A5" />
                 <Setter TargetName="Streak" Property="Opacity" Value="0.64" />
                 <Setter TargetName="LeftEdge" Property="Fill" Value="#73FFFFFF" />
                 <Setter TargetName="RightEdge" Property="Fill" Value="#33FFFFFF" />
-                <Setter Property="Foreground" Value="#94A6B3" />
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
                 <Setter TargetName="ContentRoot" Property="Effect">
                     <Setter.Value>
                         <DropShadowEffect BlurRadius="0.5"
@@ -385,7 +322,7 @@
         <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
         <Setter Property="FontSize" Value="{DynamicResource BodySize}" />
         <Setter Property="FontWeight" Value="Bold" />
-        <Setter Property="Foreground" Value="#08355C" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
         <!--
           Умолчания рамки: их же шаблон берёт для рамки стекла через TemplateBinding,
           поэтому все кнопки выглядят как по мокапу, а окну, которому нужна другая
@@ -393,7 +330,7 @@
           BorderThickness на самой кнопке.
         -->
         <Setter Property="BorderThickness" Value="1.2" />
-        <Setter Property="BorderBrush" Value="{StaticResource AddDayBevel}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AddDayBevel}" />
         <Setter Property="Padding" Value="14,4" />
         <Setter Property="MinHeight" Value="40" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />

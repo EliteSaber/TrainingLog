@@ -314,11 +314,18 @@ public partial class StatusHint : UserControl
     /// Тон по виду показа: отказ — предупреждающим цветом, примечание — обычным цветом текста окна.
     /// </summary>
     /// <remarks>
-    /// Цвет текста взят системной кистью: тот же, что у подписей в строке журнала, поэтому
-    /// примечание читается как часть таблицы, а в тёмной теме не становится тёмным пятном.
+    /// Токены палитры приложения: тот же цвет, что у текста окна и у надписей отказов в полях
+    /// (<see cref="Accent"/> применён к надписи подсказки). Ссылкой на Application нельзя:
+    /// окно может быть создано без него (ловушка 6, тесты) — запас-фолбэк это закрывает.
     /// </remarks>
     private static SolidColorBrush Accent(HintState.HintKind kind) =>
-        kind == HintState.HintKind.Note ? SystemColors.ControlTextBrush : Brushes.Firebrick;
+        kind == HintState.HintKind.Note
+            ? PaletteBrush("TextPrimary", SystemColors.ControlTextBrush)
+            : PaletteBrush("TextError", Brushes.Firebrick);
+
+    /// <summary>Палитра приложения с запасом первичными кистями, когда ресурсов ещё нет.</summary>
+    private static SolidColorBrush PaletteBrush(string key, SolidColorBrush fallback) =>
+        Application.Current?.TryFindResource(key) as SolidColorBrush ?? fallback;
 
     /// <summary>
     /// Показ включился — ставим подсказку, запускаем отсчёт и слежение за окном; выключился —

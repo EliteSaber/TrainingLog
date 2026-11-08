@@ -10,6 +10,8 @@
         mc:Ignorable="d"
         FontFamily="{DynamicResource AppFontFamily}"
         FontSize="{DynamicResource BodySize}"
+        Background="{DynamicResource WindowBackground}"
+        Foreground="{DynamicResource TextPrimary}"
         Title="План тренировки"
         Width="620"
         Height="560"
@@ -20,8 +22,8 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Стеклянные кнопки — ловушка 6: ресурсы окна живут в окне -->
-                <ResourceDictionary Source="pack://application:,,,/Themes/GlassButton.xaml" />
+                <!-- Тема целиком (палитра, кнопки, контролы) — ловушка 6: ресурсы окна живут в окне -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Свой экземпляр: ресурсы окна живут в окне, общий словарь ему недоступен (ловушка 6). -->
@@ -109,7 +111,7 @@
             <Border Grid.Column="1"
                     Width="1"
                     Margin="9,0,9,0"
-                    Background="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                    Background="{DynamicResource LineStrong}"
                     SnapsToDevicePixels="True" />
 
             <!--
@@ -150,8 +152,8 @@
         <Border Grid.Row="3"
                 Margin="0,10,0,0"
                 Padding="4,5"
-                Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"
-                BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                Background="{DynamicResource SurfaceAlt}"
+                BorderBrush="{DynamicResource LineStrong}"
                 BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -195,7 +197,7 @@
                                 <DataTemplate>
                                     <!-- Границу рисует контейнер строки, а не шаблон данных: иначе она привязана к содержимому, а не к строке. -->
                                     <Border Padding="0,4"
-                                            BorderBrush="#E0E0E0"
+                                            BorderBrush="{DynamicResource LineSoft}"
                                             BorderThickness="0,0,0,1">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -222,7 +224,7 @@
                     <TextBlock Grid.Row="1"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
-                               Foreground="Gray"
+                               Foreground="{DynamicResource TextSecondary}"
                                IsHitTestVisible="False"
                                Text="Справочник упражнений пуст">
                         <TextBlock.Style>
@@ -242,7 +244,7 @@
                 <Border Grid.Column="1"
                         Margin="8,0,0,0"
                         Padding="4,5"
-                        BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                        BorderBrush="{DynamicResource LineStrong}"
                         BorderThickness="1">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -275,13 +277,13 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Padding="0,4"
-                                                BorderBrush="#E0E0E0"
+                                                BorderBrush="{DynamicResource LineSoft}"
                                                 BorderThickness="0,0,0,1">
                                             <Border.Style>
                                                 <Style TargetType="Border">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding Path=(helpers:RowSelection.IsSelected), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
-                                                            <Setter Property="Background" Value="#F3F3F3" />
+                                                            <Setter Property="Background" Value="{DynamicResource RowHighlight}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -299,7 +301,7 @@
                                                            MinWidth="18"
                                                            Margin="0,0,6,0"
                                                            VerticalAlignment="Center"
-                                                           Foreground="Gray"
+                                                           Foreground="{DynamicResource TextSecondary}"
                                                            Text="{Binding Position}" />
 
                                                 <TextBlock Grid.Column="1"
@@ -346,7 +348,7 @@
                         <TextBlock Grid.Row="1"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="Gray"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    IsHitTestVisible="False"
                                    Text="Отметьте упражнения слева">
                             <TextBlock.Style>

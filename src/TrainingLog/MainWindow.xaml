@@ -11,6 +11,8 @@
         mc:Ignorable="d"
         FontFamily="{DynamicResource AppFontFamily}"
         FontSize="{DynamicResource BodySize}"
+        Background="{DynamicResource WindowBackground}"
+        Foreground="{DynamicResource TextPrimary}"
         Title="{Binding Title}"
         Height="560"
         Width="900"
@@ -20,12 +22,11 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <!--
-                  Стеклянные кнопки (GlassButtonSoft / GlassButtonIconSoft /
-                  AddDayButtonSoft) —
+                  Тема целиком (палитра, кнопки, контролы) —
                   ловушка 6: ресурсы окна живут в окне, иначе оно не создаётся без
                   Application (проверено тестами, открывающими окно напрямую).
                 -->
-                <ResourceDictionary Source="pack://application:,,,/Themes/GlassButton.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Themes/Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <ContextMenu x:Key="SettingsMenu"
@@ -186,7 +187,7 @@
         -->
         <Border Grid.Row="1"
                 Margin="-16,16,-16,0"
-                BorderBrush="#E0E0E0"
+                BorderBrush="{DynamicResource LineSoft}"
                 BorderThickness="0,1,0,0"
                 IsHitTestVisible="False" />
 
@@ -273,7 +274,7 @@
                                         <Setter Property="Background" Value="Transparent" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Path=(helpers:RowSelection.IsSelected), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
-                                                <Setter Property="Background" Value="#F3F3F3" />
+                                                <Setter Property="Background" Value="{DynamicResource RowHighlight}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -283,7 +284,7 @@
                                                              Converter={StaticResource ScrollBarMargin},
                                                              ConverterParameter=16}"
                                         Padding="0,10,0,10"
-                                        BorderBrush="#E0E0E0"
+                                        BorderBrush="{DynamicResource LineSoft}"
                                         BorderThickness="0,0,0,1">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -334,15 +335,15 @@
                                           отрисовки: в Grid рисуется последним объявленным, и полоса
                                           рядом со своей строкой закрыла бы сквозные линии упражнений.
 
-                                          Оттенок зашит, а не взят системной кистью: фон окна сам
-                                          ControlBrush, и такая кисть была бы неотличима от подложки.
-                                          В тёмной теме полоса станет светлой — в окне дня фон поля
-                                          белый, здесь фон окна серый, и решения разнонаправленные.
+                                          Подложка — токен SurfaceAlt, а не системная кисть: фон
+                                          окна того же холодного семейства, и ControlBrush на нём
+                                          была бы неотличима от самой подложки. Токен тёмная тема
+                                          потемнеет сама, и разнонаправленные решения уйдут.
                                         -->
                                         <Border Grid.Row="2"
                                                 Grid.Column="0"
                                                 Grid.ColumnSpan="2"
-                                                Background="#E6E6E6"
+                                                Background="{DynamicResource SurfaceAlt}"
                                                 IsHitTestVisible="False" />
 
                                         <!--
@@ -353,7 +354,7 @@
                                         <Border Grid.Row="4"
                                                 Grid.Column="0"
                                                 Grid.ColumnSpan="2"
-                                                Background="#E6E6E6"
+                                                Background="{DynamicResource SurfaceAlt}"
                                                 IsHitTestVisible="False" />
 
                                         <!--
@@ -395,7 +396,7 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <Border Width="{Binding Width}"
-                                                            BorderBrush="#E0E0E0"
+                                                            BorderBrush="{DynamicResource LineSoft}"
                                                             BorderThickness="1,0,1,0" />
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -428,7 +429,7 @@
                                                 <DataTemplate>
                                                     <Border Width="{Binding Width}"
                                                             Padding="6,0"
-                                                            BorderBrush="#E0E0E0"
+                                                            BorderBrush="{DynamicResource LineSoft}"
                                                             BorderThickness="1,0,1,0">
                                                         <TextBlock VerticalAlignment="Center"
                                                                    TextAlignment="Center"
@@ -550,7 +551,7 @@
                                                                     Click="OnShowNoteClick"
                                                                     helpers:Hotkey.Id="Main.ShowNote">
                                                                 <Button.Style>
-                                                                    <Style TargetType="Button">
+                                                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                                                                         <Setter Property="Visibility" Value="Collapsed" />
 
                                                                         <Style.Triggers>
@@ -583,7 +584,7 @@
                                                               Тон бледный — примечания нет, и читаться
                                                               это должно как пустота, а не как значение.
                                                             -->
-                                                            <TextBlock Foreground="Gray"
+                                                            <TextBlock Foreground="{DynamicResource TextSecondary}"
                                                                        Text="—"
                                                                        TextAlignment="Center"
                                                                        VerticalAlignment="Center">
@@ -612,7 +613,7 @@
 
             <TextBlock HorizontalAlignment="Center"
                        VerticalAlignment="Center"
-                       Foreground="Gray"
+                       Foreground="{DynamicResource TextSecondary}"
                        IsHitTestVisible="False"
                        Text="Записей пока нет"
                        Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />

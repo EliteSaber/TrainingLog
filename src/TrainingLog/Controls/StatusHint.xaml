@@ -17,17 +17,14 @@
     -->
     <UserControl.Resources>
         <!--
-          Подложка системным цветом Control: у окон нет собственного фона, WPF берёт цвет окна, и
-          подложка слилась бы с ним, а Control темнее. Прозрачность задана на кисти, а не на
-          элементе: у Border она пришлась бы и на текст, и на крестик.
+          Подложка из палитры (HintSurface): у окон нет собственного фона, WPF берёт цвет окна,
+          и подложка слилась бы с ним, а токен на пиксель темнее окна. Прозрачность задана на
+          кисти, а не на элементе: у Border она пришлась бы и на текст, и на крестик.
 
-          Ресурс, а не инлайн: DynamicResource внутри кисти не перестаёт обновляться при смене
-          системной темы, потому что кисть объявлена в словаре.
+          Локальной кисти больше нет: если объявить здесь же поверх ресурсов палитры ключ
+          HintSurface, оконный экземпляр перекрыл бы подмену палитры — как и со шрифтом
+          (ловушка DynamicResource).
         -->
-        <SolidColorBrush x:Key="HintSurface"
-                         Color="{DynamicResource {x:Static SystemColors.ControlColorKey}}"
-                         Opacity="0.95" />
-
         <!--
           Прозрачная кнопка со скруглённой подложкой — та же, что у стрелок и «+»/«−» в окне дня.
           Рамки у кнопки нет намеренно: полоса во всю высоту подсказки в системной рамке выглядела
@@ -44,7 +41,7 @@
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter TargetName="Surface"
                             Property="Background"
-                            Value="{DynamicResource {x:Static SystemColors.ControlLightBrushKey}}" />
+                            Value="{DynamicResource ControlHover}" />
                 </Trigger>
             </ControlTemplate.Triggers>
         </ControlTemplate>

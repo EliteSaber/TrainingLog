@@ -11,6 +11,8 @@
         mc:Ignorable="d"
         FontFamily="{DynamicResource AppFontFamily}"
         FontSize="{DynamicResource BodySize}"
+        Background="{DynamicResource WindowBackground}"
+        Foreground="{DynamicResource TextPrimary}"
         Title="Упражнения"
         Width="520"
         Height="560"
@@ -21,8 +23,8 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Стеклянные кнопки — ловушка 6: ресурсы окна живут в окне -->
-                <ResourceDictionary Source="pack://application:,,,/Themes/GlassButton.xaml" />
+                <!-- Тема целиком (палитра, кнопки, контролы) — ловушка 6: ресурсы окна живут в окне -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Ресурсы объявлены в окне, а не в App.xaml: окно должно создаваться без приложения (ловушка 6). -->
@@ -161,8 +163,8 @@
         <Border Grid.Row="2"
                 Margin="0,12,0,4"
                 Padding="4,5"
-                Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"
-                BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                Background="{DynamicResource SurfaceAlt}"
+                BorderBrush="{DynamicResource LineStrong}"
                 BorderThickness="1">
             <Button HorizontalAlignment="Left"
                     Style="{StaticResource GlassButtonIconSoft}"
@@ -206,13 +208,13 @@
                             <!-- Границу рисует контейнер строки, а не шаблон данных: иначе она привязана к содержимому, а не к строке. -->
                             <Border Margin="0,0,0,0"
                                     Padding="0,4"
-                                    BorderBrush="#E0E0E0"
+                                    BorderBrush="{DynamicResource LineSoft}"
                                     BorderThickness="0,0,0,1">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Path=(helpers:RowSelection.IsSelected), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
-                                                <Setter Property="Background" Value="#F3F3F3" />
+                                                <Setter Property="Background" Value="{DynamicResource RowHighlight}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -254,7 +256,7 @@
 
             <TextBlock HorizontalAlignment="Center"
                        VerticalAlignment="Center"
-                       Foreground="Gray"
+                       Foreground="{DynamicResource TextSecondary}"
                        IsHitTestVisible="False"
                        Text="Справочник пуст"
                        Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />

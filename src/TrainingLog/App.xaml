@@ -18,6 +18,14 @@
                   ресурсы приложения.
                 -->
                 <ResourceDictionary Source="pack://application:,,,/Themes/Fonts.xaml" />
+
+                <!--
+                  Тема — тоже на уровне приложения: отдельные визуальные деревья (ToolTip,
+                  ContextMenu, dropdown ComboBox) не поднимаются к окну, и без этой копии
+                  DynamicResource в них нашёл бы пустоту. Оконные словари не мешают: их копии
+                  — те же значения; этот словарь и есть будущий переключатель темы.
+                -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

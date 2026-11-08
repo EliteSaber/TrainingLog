@@ -10,6 +10,8 @@
         mc:Ignorable="d"
         FontFamily="{DynamicResource AppFontFamily}"
         FontSize="{DynamicResource BodySize}"
+        Background="{DynamicResource WindowBackground}"
+        Foreground="{DynamicResource TextPrimary}"
         Title="{Binding Title}"
         Width="760"
         Height="480"
@@ -36,8 +38,8 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Стеклянные кнопки — ловушка 6: ресурсы окна живут в окне -->
-                <ResourceDictionary Source="pack://application:,,,/Themes/GlassButton.xaml" />
+                <!-- Тема целиком (палитра, кнопки, контролы) — ловушка 6: ресурсы окна живут в окне -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -105,8 +107,8 @@
                       Кнопка занимает номер по порядку выполнения, а не позицию в списке: номер и
                       состав задаёт план, и он же показан подсказкой вместе с названием.
 
-                      Стиль локальный поверх стекла: выделение подчёркнуто рамкой системного
-                      цвета выделения, а не толщиной фаски. Рамка стекла идёт TemplateBinding'ом
+                      Стиль локальный поверх стекла: выделение подчёркнуто рамкой акцента палитры,
+                      а не толщиной фаски. Рамка стекла идёт TemplateBinding'ом
                       (умолчание — фаска), поэтому переопределение BorderBrush и BorderThickness
                       кнопки доходит до тела; при наведении и нажатии триггеры стиля красят
                       рамку своими градиентами наравне с остальными состояниями.
@@ -131,7 +133,7 @@
                                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                         <Setter Property="FontWeight" Value="Bold" />
                                         <Setter Property="BorderBrush"
-                                                Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+                                                Value="{DynamicResource Accent}" />
                                         <Setter Property="BorderThickness" Value="2" />
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -325,7 +327,7 @@
                                              Width="84"
                                              Padding="4,3"
                                              HorizontalContentAlignment="Center"
-                                             Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"
+                                             Background="{DynamicResource FieldBackground}"
                                              helpers:AllowedCharsInput.Allowed="DigitsWithSeparators"
                                              helpers:SetFieldNavigation.Part="Weight"
                                              ToolTip="Вес, кг"
@@ -356,7 +358,7 @@
                                         <TextBlock HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
                                                    IsHitTestVisible="False"
-                                                   Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                                                   Foreground="{DynamicResource TextSecondary}"
                                                    Text="{Binding RepetitionPlaceholder}"
                                                    Visibility="{Binding HasRepetitionPlaceholder, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                     </Grid>
@@ -455,7 +457,7 @@
                               маркере это было и до правки, блок лишь стал крупнее.
                             -->
                             <Border Margin="6,0,0,0" Background="Transparent">
-                                <TextBlock Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                                <TextBlock Foreground="{DynamicResource TextSecondary}"
                                            Text="○" />
 
                                 <Border.ToolTip>
@@ -530,7 +532,7 @@
                                    VerticalAlignment="Top"
                                    ClipToBounds="True"
                                    IsHitTestVisible="False"
-                                   Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    TextWrapping="Wrap"
                                    Text="{Binding Current.NotePlaceholder, TargetNullValue=''}">
                             <TextBlock.Style>
@@ -588,7 +590,7 @@
 
                 <TextBlock Grid.Column="0"
                            TextWrapping="Wrap"
-                           Foreground="Firebrick"
+                           Foreground="{DynamicResource TextError}"
                            Visibility="{Binding HasStatus, Converter={StaticResource BooleanToVisibilityConverter}}"
                            Text="{Binding Status}" />
 
@@ -606,7 +608,7 @@
                 <TextBlock Grid.Column="1"
                            Margin="12,0,0,0"
                            VerticalAlignment="Center"
-                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                           Foreground="{DynamicResource TextSecondary}"
                            Text="Загрузка…"
                            Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </Grid>
@@ -658,7 +660,7 @@
                            Margin="12,0,12,0"
                            VerticalAlignment="Center"
                            TextWrapping="Wrap"
-                           Foreground="Firebrick"
+                           Foreground="{DynamicResource TextError}"
                            Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Run Text="Не сохранено" />
                     <Run Text="{Binding PulledFromDateText, Mode=OneWay}" />
