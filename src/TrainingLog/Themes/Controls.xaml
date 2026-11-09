@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:helpers="clr-namespace:TrainingLog.Controls">
     <!--
       Единый вид контролов: поля, галочки, комбобоксы, кнопки строк, подсказки, меню,
       вкладки, спойлеры, прокрутка. Неявные стили (без x:Key): любой TextBox/CheckBox/... в окне и в отдельном
@@ -619,14 +620,18 @@
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
                                     <StackPanel Orientation="Horizontal" Background="Transparent">
-                                        <!-- Поворот вокруг центра: без RenderTransformOrigin шеврон крутился вокруг точки (0,0)
-                                             и при повороте улетал влево за пределы кнопки. Отступы -2/2 поднимают глиф на 2 px
-                                             при неизменном макетном размере: центр бокса строки шрифта ниже видимого центра
-                                             наименования, и треугольник по «геометрическому» центру читался как сдвинутый вниз. -->
+                                        <!--
+                                          Поворот вокруг центра: без RenderTransformOrigin шеврон крутился
+                                          вокруг точки (0,0) и при повороте улетал влево за пределы кнопки.
+                                          Вертикальный сдвиг оптической доводки приходит от Expander'а
+                                          (helpers:ExpanderChrome.ChevronOffset): вложенный шаблон ToggleButton
+                                          видит TemplatedParent'ом сам ToggleButton, find-предок нужен для значений
+                                          с места вызова. Сдвиг после вращения точку вращения не двигает.
+                                        -->
                                         <Path x:Name="Chevron"
                                               Width="5"
                                               Height="9"
-                                              Margin="4,-2,0,2"
+                                              Margin="4,0,0,0"
                                               VerticalAlignment="Center"
                                               RenderTransformOrigin="0.5,0.5"
                                               Data="M 0,0 L 4,4 L 0,8"
@@ -634,7 +639,10 @@
                                               Fill="{DynamicResource TextSecondary}"
                                               StrokeThickness="0">
                                             <Path.RenderTransform>
-                                                <RotateTransform />
+                                                <TransformGroup>
+                                                    <RotateTransform />
+                                                    <TranslateTransform Y="{Binding Path=(helpers:ExpanderChrome.ChevronOffset), RelativeSource={RelativeSource FindAncestor, AncestorType=Expander}}" />
+                                                </TransformGroup>
                                             </Path.RenderTransform>
                                         </Path>
                                         <ContentPresenter Margin="6,0,0,0"
@@ -653,7 +661,7 @@
                                                 <BeginStoryboard>
                                                     <Storyboard>
                                                         <DoubleAnimation Storyboard.TargetName="Chevron"
-                                                                         Storyboard.TargetProperty="RenderTransform.Angle"
+                                                                         Storyboard.TargetProperty="(RenderTransform).(TransformGroup.Children)[0].(RotateTransform.Angle)"
                                                                          From="0" To="90"
                                                                          Duration="0:0:0.15" />
                                                     </Storyboard>
@@ -663,7 +671,7 @@
                                                 <BeginStoryboard>
                                                     <Storyboard>
                                                         <DoubleAnimation Storyboard.TargetName="Chevron"
-                                                                         Storyboard.TargetProperty="RenderTransform.Angle"
+                                                                         Storyboard.TargetProperty="(RenderTransform).(TransformGroup.Children)[0].(RotateTransform.Angle)"
                                                                          From="90" To="0"
                                                                          Duration="0:0:0.15" />
                                                     </Storyboard>

@@ -169,17 +169,12 @@
             </Grid>
 
             <!--
-              Содержимое. Отдельно от Chrome, чтобы тень «тела» не ложилась на текст —
-              у него своя, белая (txtShadow мокапа): меняется по состоянию в триггерах.
+              Содержимое. Отдельно от Chrome, чтобы тень «тела» не ложилась на текст.
+              На тексте нет Effect: белый эмбосс из мокапа (txtShadow) был DropShadowEffect'ом,
+              а Effect переводит поддерево в битмап-рендер и запрещает ClearType — 11px
+              надписи читались муточно. Чёткий текст важнее невидимого на малом кегле обвода.
             -->
             <Grid x:Name="ContentRoot" Margin="6">
-                <Grid.Effect>
-                    <DropShadowEffect BlurRadius="0.5"
-                                      Direction="90"
-                                      ShadowDepth="0.7"
-                                      Color="#FFFFFF"
-                                      Opacity="0.9" />
-                </Grid.Effect>
                 <ContentPresenter Margin="{TemplateBinding Padding}"
                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
@@ -258,15 +253,6 @@
                 <Setter TargetName="RightEdge" Property="Fill" Value="#33FFFFFF" />
                 <!-- Текст и иконка темнее на вдавленном теле -->
                 <Setter Property="Foreground" Value="{DynamicResource TextPrimaryPressed}" />
-                <Setter TargetName="ContentRoot" Property="Effect">
-                    <Setter.Value>
-                        <DropShadowEffect BlurRadius="0.4"
-                                          Direction="90"
-                                          ShadowDepth="0.7"
-                                          Color="#1D5A83"
-                                          Opacity="0.35" />
-                    </Setter.Value>
-                </Setter>
             </Trigger>
 
             <!--
@@ -295,15 +281,6 @@
                 <Setter TargetName="LeftEdge" Property="Fill" Value="#73FFFFFF" />
                 <Setter TargetName="RightEdge" Property="Fill" Value="#33FFFFFF" />
                 <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
-                <Setter TargetName="ContentRoot" Property="Effect">
-                    <Setter.Value>
-                        <DropShadowEffect BlurRadius="0.5"
-                                          Direction="90"
-                                          ShadowDepth="0.7"
-                                          Color="#FFFFFF"
-                                          Opacity="0.7" />
-                    </Setter.Value>
-                </Setter>
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>

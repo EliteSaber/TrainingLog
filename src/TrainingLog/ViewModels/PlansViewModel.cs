@@ -42,19 +42,12 @@ public sealed partial class PlansViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDescending;
 
-    /// <summary>Индикатор направления сортировки в заголовке колонки.</summary>
-    public string SortIndicator => IsDescending ? "▼" : "▲";
-
     /// <summary>Признак, что планы загружены и их нет ни одного.</summary>
     public bool IsEmpty => _all.Count == 0;
 
     partial void OnFilterTextChanged(string value) => RebuildVisible();
 
-    partial void OnIsDescendingChanged(bool value)
-    {
-        OnPropertyChanged(nameof(SortIndicator));
-        RebuildVisible();
-    }
+    partial void OnIsDescendingChanged(bool value) => RebuildVisible();
 
     [RelayCommand]
     private Task LoadAsync() => RefreshAsync();

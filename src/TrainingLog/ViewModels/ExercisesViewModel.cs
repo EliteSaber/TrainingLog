@@ -43,9 +43,6 @@ public sealed partial class ExercisesViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDescending;
 
-    /// <summary>Показывается в заголовке колонки.</summary>
-    public string SortIndicator => IsDescending ? "▼" : "▲";
-
     /// <summary>Признак, что справочник загружен.</summary>
     public bool IsEmpty => _all.Count == 0;
 
@@ -66,7 +63,6 @@ public sealed partial class ExercisesViewModel : ObservableObject
 
     partial void OnIsDescendingChanged(bool value)
     {
-        OnPropertyChanged(nameof(SortIndicator));
         RefreshEmptyState();
         RebuildVisible();
     }
