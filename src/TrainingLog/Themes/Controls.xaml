@@ -15,6 +15,12 @@
       ExpandDirection кроме Down у Expander (внутри списка планов только Down).
     -->
 
+    <!--
+      Сдвиг шеврона Expander'а к видимому центру строки: считает ExpanderChrome.AlignOffset
+      по FontFamily и FontSize, объявлен внутри шаблона ниже по правилу StaticResource.
+    -->
+    <helpers:FontCenterOffsetConverter x:Key="FontCenterOffset" />
+
     <!-- ToolTip -->
     <Style TargetType="ToolTip">
         <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
@@ -635,10 +641,10 @@
                                         <!--
                                           Поворот вокруг центра: без RenderTransformOrigin шеврон крутился
                                           вокруг точки (0,0) и при повороте улетал влево за пределы кнопки.
-                                          Вертикальный сдвиг оптической доводки приходит от Expander'а
-                                          (helpers:ExpanderChrome.ChevronOffset): вложенный шаблон ToggleButton
-                                          видит TemplatedParent'ом сам ToggleButton, find-предок нужен для значений
-                                          с места вызова. Сдвиг после вращения точку вращения не двигает.
+                                          Вертикальный сдвиг оптической доводки приходит по привязке из
+                                          метрик предка-Expander'а (FontCenterOffset): бокс строки и видимый
+                                          центр строки расходятся, и величина расхода меняется со шрифтом
+                                          и кеглем, поэтому ручной сдвиг с места вызова на них не полагается.
                                         -->
                                         <Path x:Name="Chevron"
                                               Width="5"
@@ -653,7 +659,16 @@
                                             <Path.RenderTransform>
                                                 <TransformGroup>
                                                     <RotateTransform />
-                                                    <TranslateTransform Y="{Binding Path=(helpers:ExpanderChrome.ChevronOffset), RelativeSource={RelativeSource FindAncestor, AncestorType=Expander}}" />
+                                                    <TranslateTransform>
+                                                        <TranslateTransform.Y>
+                                                            <MultiBinding Converter="{StaticResource FontCenterOffset}">
+                                                                <Binding Path="FontFamily"
+                                                                         RelativeSource="{RelativeSource FindAncestor, AncestorType=Expander}" />
+                                                                <Binding Path="FontSize"
+                                                                         RelativeSource="{RelativeSource FindAncestor, AncestorType=Expander}" />
+                                                            </MultiBinding>
+                                                        </TranslateTransform.Y>
+                                                    </TranslateTransform>
                                                 </TransformGroup>
                                             </Path.RenderTransform>
                                         </Path>

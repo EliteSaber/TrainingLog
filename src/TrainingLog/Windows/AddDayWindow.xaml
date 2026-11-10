@@ -414,7 +414,6 @@
                           Margin="0,10,0,0"
                           HorizontalAlignment="Stretch"
                           IsExpanded="{Binding Current.IsNotesExpanded, Mode=TwoWay}"
-                          helpers:ExpanderChrome.ChevronOffset="-2"
                           Visibility="{Binding HasCurrent,
                                                Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Expander.Header>
