@@ -12,6 +12,7 @@
         FontSize="{DynamicResource BodySize}"
         Background="{DynamicResource WindowBackground}"
         Foreground="{DynamicResource TextPrimary}"
+        Style="{DynamicResource AppWindowStyle}"
         Title="Планы"
         Width="520"
         Height="560"
@@ -39,11 +40,16 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <!-- Полоса заголовка: отрицательные отступы снимают отступ корневой сетки — полоса от краёв окна. -->
+        <helpers:TitleBar Grid.Row="0"
+                          Margin="-12,-12,-12,12" />
+
         <!-- Отдельной строкой над поиском, а не рядом с ним: в одной строке с полем кнопка читалась бы как действие над результатом поиска. -->
-        <Button Grid.Row="0"
+        <Button Grid.Row="1"
                 Margin="0,0,0,10"
                 HorizontalAlignment="Stretch"
                 Style="{StaticResource GlassButtonSoft}"
@@ -51,7 +57,7 @@
                 helpers:Hotkey.Id="Plans.Add"
                 Content="Добавить" />
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -71,7 +77,7 @@
                      Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}" />
         </Grid>
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 Margin="0,12,0,4"
                 Padding="4,5"
                 Background="{DynamicResource SurfaceAlt}"
@@ -114,7 +120,7 @@
         </Border>
 
         <!-- Область списка снимает с себя отступ корневой сетки по бокам: полоса прокрутки живёт внутри ScrollViewer. -->
-        <Grid Grid.Row="3"
+        <Grid Grid.Row="4"
               Margin="-12,0,-12,0">
             <ScrollViewer helpers:ScrollBarGutter.Left="2"
                           VerticalScrollBarVisibility="Auto">
@@ -260,5 +266,11 @@
                        Text="Планы отсутствуют"
                        Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
+
+        <!-- Рамка окна: элемент-обводка поверх содержимого, до самых краёв окна (как на главном). -->
+        <Border Grid.RowSpan="5"
+                Margin="-12,-12,-12,-12"
+                IsHitTestVisible="False"
+                Style="{StaticResource WindowFrame}" />
     </Grid>
 </Window>

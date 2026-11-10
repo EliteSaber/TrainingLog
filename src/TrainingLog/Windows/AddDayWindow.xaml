@@ -12,6 +12,7 @@
         FontSize="{DynamicResource BodySize}"
         Background="{DynamicResource WindowBackground}"
         Foreground="{DynamicResource TextPrimary}"
+        Style="{DynamicResource AppWindowStyle}"
         Title="{Binding Title}"
         Width="760"
         Height="480"
@@ -52,11 +53,16 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0">
+        <!-- Полоса заголовка: отрицательные отступы снимают отступ корневой сетки — полоса от краёв окна. -->
+        <helpers:TitleBar Grid.Row="0"
+                          Margin="-16,-16,-16,16" />
+
+        <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -92,7 +98,7 @@
           Центрирование стоит на ItemsControl, а не на родительской сетке: центрированный элемент
           меряется под своё содержимое, и колонка * его не ограничит — перенос умрёт (ловушка 29).
         -->
-        <ItemsControl Grid.Row="1"
+        <ItemsControl Grid.Row="2"
                       Margin="0,12,0,0"
                       HorizontalAlignment="Center"
                       ItemsSource="{Binding Exercises}">
@@ -151,7 +157,7 @@
           Кнопки сохранения не блокируются: на дне, где подтягивание идёт, сохранять нечего, и их
           гасит CanAccept. Отдельное состояние кнопок разошлось бы с правилом пригодности.
         -->
-        <Grid Grid.Row="2"
+        <Grid Grid.Row="3"
               Margin="0,12,0,0"
               IsEnabled="{Binding CanFill}">
             <Grid.ColumnDefinitions>
@@ -311,10 +317,12 @@
                                     </Grid.RowDefinitions>
 
                                     <!--
-                                      Поле веса — с чуть более тёмным системным фоном, чтобы отличаться
-                                      от повторений под ним: подсказки не видно, пока в поле не наведёшь
-                                      мышь. Оттенок системный, поэтому в тёмной теме он остаётся темнее
-                                      фона окна, а не становится светлым пятном.
+                                      Поле веса — с подложкой SurfaceAlt, темнее полей повторений:
+                                      строки читаются попарно, и без различия подложек колонки
+                                      сливаются. Раньше красилось системным ControlBrush, светлая
+                                      тема переправила на белый FieldBackground, и различие
+                                      пропало; теперь подложка из палитры — тёмная тема перепишет
+                                      значение сама.
 
                                       AllowedCharsInput отбрасывает всё, кроме цифр и разделителей, — и
                                       при наборе, и при вставке. Разбор в модели остаётся: «5,5.5»
@@ -327,7 +335,7 @@
                                              Width="84"
                                              Padding="4,3"
                                              HorizontalContentAlignment="Center"
-                                             Background="{DynamicResource FieldBackground}"
+                                             Background="{DynamicResource SurfaceAlt}"
                                              helpers:AllowedCharsInput.Allowed="DigitsWithSeparators"
                                              helpers:SetFieldNavigation.Part="Weight"
                                              ToolTip="Вес, кг"
@@ -566,7 +574,7 @@
             </Button>
         </Grid>
 
-        <Grid Grid.Row="3"
+        <Grid Grid.Row="4"
               Margin="0,16,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -721,5 +729,11 @@
                                 IsOpen="{Binding Hint.IsVisible}"
                                 Text="{Binding Hint.Text}" />
         </Grid>
+
+        <!-- Рамка окна: элемент-обводка поверх содержимого, до самых краёв окна (как на главном). -->
+        <Border Grid.RowSpan="5"
+                Margin="-16,-16,-16,-16"
+                IsHitTestVisible="False"
+                Style="{StaticResource WindowFrame}" />
     </Grid>
 </Window>

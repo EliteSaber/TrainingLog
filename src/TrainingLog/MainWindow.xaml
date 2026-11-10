@@ -13,6 +13,7 @@
         FontSize="{DynamicResource BodySize}"
         Background="{DynamicResource WindowBackground}"
         Foreground="{DynamicResource TextPrimary}"
+        Style="{DynamicResource AppWindowStyle}"
         Title="{Binding Title}"
         Height="560"
         Width="900"
@@ -82,11 +83,19 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0">
+        <!--
+          Полоса заголовка вместо системной. Отрицательные отступы снимают отступ корневой сетки —
+          тот же приём, что у разделителя ниже: полоса обязана идти от самих краёв окна.
+        -->
+        <helpers:TitleBar Grid.Row="0"
+                          Margin="-16,-16,-16,16" />
+
+        <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -185,7 +194,7 @@
           обрезает только само окно. Отступ на детей намеренно не переносится: он один на всё окно,
           и на него же опирается правило положения подсказки.
         -->
-        <Border Grid.Row="1"
+        <Border Grid.Row="2"
                 Margin="-16,16,-16,0"
                 BorderBrush="{DynamicResource LineSoft}"
                 BorderThickness="0,1,0,0"
@@ -197,7 +206,7 @@
           строки дня, поэтому дата, подписи и числа остались на прежних местах — и с полосой, и без
           неё.
         -->
-        <Grid Grid.Row="2"
+        <Grid Grid.Row="3"
               Margin="-16,0,-16,0">
             <!--
           Прокрутка по обеим осям: ширина дня не зависит от ширины окна, и длинный день просто
@@ -626,7 +635,7 @@
           скруглённом варианте — 4). Иконку «+» несет содержимое: Stroke привязан
           к Foreground кнопки, и триггеры состояний красят иконку вместе с текстом.
         -->
-        <Button Grid.Row="3"
+        <Button Grid.Row="4"
                 Margin="0,16,0,0"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
@@ -677,5 +686,16 @@
                             Kind="{Binding Hint.Kind}"
                             Lifetime="{Binding Hint.Lifetime}"
                             Text="{Binding Hint.Text}" />
+
+        <!--
+          Рамка окна: системную снял WindowChrome, и окно сливалось со светлым столом.
+          Элемент-обводка поверх содержимого: отрицательные отступы снимают отступ корневой
+          сетки — тот же приём, что у полосы заголовка; IsHitTestVisible=False не перехватывает
+          ни мышь у краёв, ни полосу захвата. На развёрнутом окне рама гасится стилем.
+        -->
+        <Border Grid.RowSpan="5"
+                Margin="-16,-16,-16,-16"
+                IsHitTestVisible="False"
+                Style="{StaticResource WindowFrame}" />
     </Grid>
 </Window>

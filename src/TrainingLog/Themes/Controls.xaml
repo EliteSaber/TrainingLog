@@ -600,17 +600,29 @@
     <!--
       Expander: шеврон поворачивается открытием, тело Expander' ниже. Только ExpandDirection=Down
       (в проекте другого нет), поэтому один шаблон вместо четырёх направленных.
+
+      Тело фактонтно и шапке — Grid со строками Auto и *, а не StackPanel: StackPanel никогда не
+      отдаёт содержимому остаток главной оси, и примечание окна дня, обязанное растянуться на
+      *-строку редактора, рисуется в естественную одну строку, а запас высоты остаётся пустотой
+      под телом. У Expander'ов с Auto-высотой (списки планов) вид не меняется: строка * измеряется
+      как Auto, пока контент не растянут.
     -->
     <Style TargetType="Expander">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Expander">
-                    <StackPanel>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
                         <ToggleButton x:Name="HeaderSite"
+                                      Grid.Row="0"
                                       HorizontalAlignment="Stretch"
                                       HorizontalContentAlignment="Left"
                                       Content="{TemplateBinding Header}"
@@ -686,11 +698,12 @@
                             </ToggleButton.Template>
                         </ToggleButton>
                         <ContentPresenter x:Name="ExpandSite"
+                                          Grid.Row="1"
                                           Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="Stretch"
                                           Focusable="False"
                                           Visibility="Collapsed" />
-                    </StackPanel>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsExpanded" Value="True">
                             <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />

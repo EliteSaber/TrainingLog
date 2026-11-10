@@ -12,6 +12,7 @@
         FontSize="{DynamicResource BodySize}"
         Background="{DynamicResource WindowBackground}"
         Foreground="{DynamicResource TextPrimary}"
+        Style="{DynamicResource AppWindowStyle}"
         Title="Импорт упражнений"
         Width="560"
         Height="520"
@@ -45,10 +46,15 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+
+        <!-- Полоса заголовка: отрицательные отступы снимают отступ корневой сетки — полоса от краёв окна. -->
+        <helpers:TitleBar Grid.Row="0"
+                          Margin="-16,-16,-16,16" />
 
         <!--
           Путь в колонке `*`, а не в Auto: путь длинный, и в Auto-колонке он раздвинул бы окно, а
@@ -57,7 +63,7 @@
           Высота поля равна высоте ряда, а ряд задаёт кнопка «Выбрать файл…»: VerticalAlignment
           не задан, иначе поле оказалось бы на пару пикселей короче (ловушка 39).
         -->
-        <Grid Grid.Row="0">
+        <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -93,7 +99,7 @@
           Сводка о загрузке. Отдельной строкой, а не подсказкой у поля: она объясняет, куда делись
           строки файла, и обязана дождаться, пока её прочитают.
         -->
-        <TextBlock Grid.Row="1"
+        <TextBlock Grid.Row="2"
                    Margin="0,8,0,0"
                    Foreground="{DynamicResource TextSecondary}"
                    TextWrapping="Wrap"
@@ -104,7 +110,7 @@
           Примечание в `*`-колонке: оно длинное и переносится по словам, а горизонтальная панель
           меряет содержимое бесконечной шириной и перенос сломала бы (ловушка 29).
         -->
-        <Grid Grid.Row="2"
+        <Grid Grid.Row="3"
               Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -124,7 +130,7 @@
                        Text="Текущие упражнения будут удалены: из планов они тоже исчезнут, а в журнале тренировок останутся только названия." />
         </Grid>
 
-        <TextBlock Grid.Row="3"
+        <TextBlock Grid.Row="4"
                    Margin="0,12,0,4"
                    FontWeight="SemiBold"
                    Text="Упражнения, по одному в строке" />
@@ -134,7 +140,7 @@
           здесь вреден и отменяет растяжение (ловушка 12). Перенос выключен намеренно — одна строка
           это одно упражнение, и перенос сбил бы это соответствие.
         -->
-        <TextBox Grid.Row="4"
+        <TextBox Grid.Row="5"
                  Padding="4,3"
                  AcceptsReturn="True"
                  TextWrapping="NoWrap"
@@ -143,7 +149,7 @@
                  Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
 
         <!-- Отказ живёт до успеха, а не пять секунд в подсказке: упражнения не записаны. -->
-        <TextBlock Grid.Row="5"
+        <TextBlock Grid.Row="6"
                    Margin="0,10,0,0"
                    Foreground="{DynamicResource TextError}"
                    TextWrapping="Wrap"
@@ -158,7 +164,7 @@
           подтверждение и может отказать, а команда выполнилась бы в любом случае.
           Серое состояние задано IsEnabled, а не CanExecute.
         -->
-        <StackPanel Grid.Row="6"
+        <StackPanel Grid.Row="7"
                     Margin="0,16,0,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
@@ -175,5 +181,11 @@
                     helpers:Hotkey.Id="Import.Cancel"
                     IsCancel="True" />
         </StackPanel>
+
+        <!-- Рамка окна: элемент-обводка поверх содержимого, до самых краёв окна (как на главном). -->
+        <Border Grid.RowSpan="8"
+                Margin="-16,-16,-16,-16"
+                IsHitTestVisible="False"
+                Style="{StaticResource WindowFrame}" />
     </Grid>
 </Window>

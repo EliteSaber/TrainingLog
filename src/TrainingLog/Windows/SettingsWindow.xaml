@@ -12,6 +12,7 @@
         FontSize="{DynamicResource BodySize}"
         Background="{DynamicResource WindowBackground}"
         Foreground="{DynamicResource TextPrimary}"
+        Style="{DynamicResource AppWindowStyle}"
         Title="Параметры"
         Width="520"
         Height="560"
@@ -36,12 +37,17 @@
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0">
+        <!-- Полоса заголовка: отрицательные отступы снимают отступ корневой сетки — полоса от краёв окна. -->
+        <helpers:TitleBar Grid.Row="0"
+                          Margin="-16,-16,-16,16" />
+
+        <TabControl Grid.Row="1">
 
             <TabItem Header="Общие">
                 <Grid Margin="0,12,0,0">
@@ -396,7 +402,7 @@
           ширину, и перенос перестал бы работать (ловушка 29). Стоит вне вкладок: отказ записи
           может случиться и из вкладки горячих клавиш.
         -->
-        <TextBlock Grid.Row="1"
+        <TextBlock Grid.Row="2"
                    Margin="0,12,0,0"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource TextError}"
@@ -407,7 +413,7 @@
           IsDefault один в окне: иначе Enter звал бы обе кнопки. Кнопки вне вкладок: сохраняется
           и число дней, и назначения сразу — два разных «Сохранить» разъехались бы.
         -->
-        <StackPanel Grid.Row="2"
+        <StackPanel Grid.Row="3"
                     Margin="0,16,0,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
@@ -437,5 +443,11 @@
                             DismissCommand="{Binding Hint.DismissCommand}"
                             IsOpen="{Binding Hint.IsVisible}"
                             Text="{Binding Hint.Text}" />
+
+        <!-- Рамка окна: элемент-обводка поверх содержимого, до самых краёв окна (как на главном). -->
+        <Border Grid.RowSpan="4"
+                Margin="-16,-16,-16,-16"
+                IsHitTestVisible="False"
+                Style="{StaticResource WindowFrame}" />
     </Grid>
 </Window>

@@ -1,0 +1,150 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework">
+    <!--
+      Хром окна вместо системного заголовка. Окна через AppWindowStyle получают WindowChrome:
+      CaptionHeight 36 делает верхнюю полосу (TitleBar) зоной перетаскивания и двойного клика
+      «развернуть/восстановить», интерактивные элементы внутри полосы выходят из зоны через
+      WindowChrome.IsHitTestVisibleInChrome — иначе клик по кнопкам считался бы перетаскиванием.
+
+      WindowStyle не трогается (SingleBorderWindow): WindowChrome подменяет надпись и рамку, но
+      окно остаётся настоящим — тень, скруглённые углы Windows 11, анимации разворота и сворачивания
+      системные. GlassFrameThickness="0" снимает остаток системной рамки, UseAeroCaptionButtons="False"
+      прячет системные кнопки — их рисует TitleBar. ResizeBorderThickness задаёт полосу захвата за
+      края: ResizeMode у окон CanResize, и без полосы тянуть окно было бы нечем. Полоса равна 4px,
+      а не 7-8: она лежит поверх края контента и отбирала бы у него мышь — при 7px из-под мыши
+      выпадал горизонтальный скроллбар списка, прижатый к правому краю окна. 4px достаточно,
+      чтобы тянуть окно с первого раза, и скроллбар остаётся доступен.
+    -->
+    <Style x:Key="AppWindowStyle" TargetType="Window">
+        <Setter Property="shell:WindowChrome.WindowChrome">
+            <Setter.Value>
+                <shell:WindowChrome CaptionHeight="36"
+                                    ResizeBorderThickness="4"
+                                    GlassFrameThickness="0"
+                                    CornerRadius="6"
+                                    UseAeroCaptionButtons="False" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+      Кнопки полосы. Фон появляется только при наведении и нажатии — цвета палитры, никаких
+      литеральных чисел: ControlHover уже подсвечивает строки, пункты меню и стрелки подсказки,
+      тёмная тема переопределит значения сама. В шаблоне фон — TemplateBinding, а не триггеры
+      по TargetName: иначе в производном стиле кнопки закрытия наведение перекрывалось бы
+      триггером базового шаблона (триггеры шаблона сильнее стилевых).
+    -->
+    <Style x:Key="CaptionButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Width" Value="44" />
+        <Setter Property="Height" Value="36" />
+        <!--
+          Не в таб-порядке: кнопки полосы — экранные дубликаты «свернуть» и Alt+F4, фокус
+          внутри них уходил бы в пустоту перед содержимым окна.
+        -->
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource ControlHover}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryPressed}" />
+            </Trigger>
+            <!--
+              Неактивное окно: кнопки глушатся — так серел системный заголовок. Триггер после
+              наведения и нажатия: у неактивного окна наведение всё равно читается как
+              «неактивно» — активным окно станет только по клику.
+            -->
+            <DataTrigger Binding="{Binding IsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!--
+      «Закрыть»: полоса целиком в тоне ошибки и светлый крест — так он читается
+      и на светлой теме, и на будущей тёмной. Цвет глифа — Foreground кнопки: пути внутри
+      контента привязаны к нему и перекрашиваются триггером вместе с полосой.
+
+      Шаблон свой, а не базовый: кнопка упирается в правый верхний угол окна, который
+      Windows 11 режет скруглённым контуром, и прямоугольная заливка наведения выходила бы
+      за скругление. Радиус заливки — 8, под системную кривую: её значение сменить нельзя,
+      меняется только выбор «круглые/прямые углы», поэтому линии и заливки повторяют ≈8;
+      при большем радиусе заливку у углов срежет системным клипом, при меньшем угол
+      останется без заливки. SnapsToDevicePixels у заливки выключен: снап выравнивает
+      концы дуги по пиксельной сетке, и на стыках дуги с прямыми участками остаются
+      1px ступеньки — те самые «уголки»; системная кривая — непрерывная (не окружность),
+      и пиксель расхождения с нашей дугой неизбежен, снап лишь усиливает его в ступеньку.
+      На развёрнутом окне углы системы квадратные, и скруглённый угол оставил бы выемку
+      цвета заголовка у самого края — там радиус гасится.
+    -->
+    <Style x:Key="CaptionCloseButton" TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Corner"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="0,8,0,0">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                            <Setter TargetName="Corner" Property="CornerRadius" Value="0" />
+                        </DataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource CloseHover}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextOnError}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource CloseHover}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextOnError}" />
+            </Trigger>
+            <!-- Неактивное окно: кнопка глушится, как у базового стиля (триггер последним). -->
+            <DataTrigger Binding="{Binding IsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!--
+      Рамка окна. WindowChrome снял системную рамку, собственную рисует собой элемент
+      WindowFrame в каждом окне. Толщина 2, а не 1: в светлом тоне линии таблиц тот же 1px
+      читается частью разметки, и окно теряет контур; 2px отделяет рамку от линий. На
+      развёрнутом окне рама гасится: края окна совпадают
+      с гранями экрана, и обводка резалась бы пополам по всему периметру. Радиус 4 — по
+      решению владельца: линия пройдёт глубже системного скругления (DWM режет силуэт по
+      непрерывной кривой ≈8, сменить её значение нельзя), и на самом углу окна линии не
+      будет; на развёрнутом окне радиус не мешает — рама там гасится.
+    -->
+    <Style x:Key="WindowFrame" TargetType="Border">
+        <Setter Property="BorderBrush" Value="{DynamicResource WindowBorder}" />
+        <Setter Property="BorderThickness" Value="2" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                <Setter Property="BorderThickness" Value="0" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+</ResourceDictionary>

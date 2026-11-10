@@ -28,6 +28,14 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      Логотип на полосе заголовка. ApplicationIcon даёт exe-иконку (панель задач, Alt+Tab),
+      но для Image внутри окна .ico должен быть ещё и WPF-ресурсом — иначе Source не найдётся.
+    -->
+    <Resource Include="Assets\AppIcon.ico" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>

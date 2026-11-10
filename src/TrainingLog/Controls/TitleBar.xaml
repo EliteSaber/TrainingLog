@@ -1,0 +1,185 @@
+<UserControl x:Class="TrainingLog.Controls.TitleBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+             Focusable="False">
+
+    <!--
+      Полоса заголовка вместо системной. Один контрол на все окна: логотип, название и три
+      кнопки. Название читается у окна (Title), поэтому привязки вида Title="{Binding Title}"
+      работают без изменений — у главного окна и окна дня их задаёт модель представления.
+
+      Перетаскивание за полосу, двойной клик и захват за края делает WindowChrome (Themes/Chrome.xaml):
+      контрол рисует только содержимое и кнопки. Кнопкам проставлено
+      WindowChrome.IsHitTestVisibleInChrome — без него клик по кнопке считался бы перетаскиванием
+      окна: зона над ними входит в CaptionHeight.
+
+      Отрицательные отступы при вставке в окно (Margin="-M,-M,-M,N" на месте использования) —
+      тот же приём, что у разделителя главного окна: элемент должен выходить на края окна из-под
+      отступа корневой сетки, а обрезает только само окно.
+
+      Признак активного окна — Window.IsActive, а не модель: окно одно, состояние одно. У
+      неактивного окна название глушится (TextSecondary), логотип бледнеет, а кнопки полосы
+      глушатся стилями (Themes/Chrome.xaml) — так серел системный заголовок. Сильный маркер
+      активного окна — линия под полосой: постоянно LineSoft, как разделитель, а у активного
+      окна — Accent.
+    -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!--
+                  Стили кнопок полосы: их же может поднять и Theme.xaml, поэтому StaticResource здесь.
+                  Путь относительный, а не pack://application — дизайнер XAML (XDG0003 «не найден
+                  themes/chrome.xaml») pack-URI из словаря контрола не резолвит; рантайму и сборке
+                  всё равно, а дизайнеру подавление ошибки было бы вечным.
+                -->
+                <ResourceDictionary Source="../Themes/Chrome.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid Height="36">
+        <StackPanel Margin="12,0,0,0"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center">
+            <Image Width="16"
+                   Height="16"
+                   Source="/Assets/AppIcon.ico">
+                <Image.Style>
+                    <Style TargetType="Image">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                <Setter Property="Opacity" Value="0.55" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Image.Style>
+            </Image>
+
+            <!--
+              Название у окна, а не у контрола, и урезание при переполнении: длинный заголовок
+              не ужимает кнопки, клавиши полосы важнее текста. DynamicResource на кегль и тон
+              не ставится: наследуется от окна, как весь текст окон; тон у неактивного окна
+              гасит триггер.
+            -->
+            <TextBlock Margin="8,0,0,0"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </StackPanel>
+
+        <StackPanel HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <Button Click="OnMinimizeClick"
+                    ToolTip="Свернуть"
+                    Style="{StaticResource CaptionButton}"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                <Path Width="12"
+                      Height="12"
+                      Data="M3,8 H11"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                      StrokeThickness="1" />
+            </Button>
+
+            <!--
+              Развернуть/восстановить одной кнопкой: глиф и подсказка переключаются по состоянию
+              окна. Показ глифов задан не кнопке, а самим путям: триггеры кнопки не умеют
+              именовать элементы контента, а у путей собственные DataTrigger'ы.
+            -->
+            <Button Click="OnStateClick"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+                        <!--
+                          Подсказка локальным значением не ставится: локальное значение сильнее
+                          стилевого триггера, и «Восстановить» на развёрнутом окно не появилось бы.
+                        -->
+                        <Setter Property="ToolTip" Value="Развернуть" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                                <Setter Property="ToolTip" Value="Восстановить" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+                <Grid>
+                    <Path Width="12"
+                          Height="12"
+                          Data="M3,3 H10 V10 H3 Z"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+
+                    <Path Width="12"
+                          Height="12"
+                          Data="M2.5,5 H8.5 V11 H2.5 Z M5,5 V1 H11 V7 H8.5"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+                </Grid>
+            </Button>
+
+            <Button Click="OnCloseClick"
+                    ToolTip="Закрыть"
+                    Style="{StaticResource CaptionCloseButton}"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                <Path Width="12"
+                      Height="12"
+                      Data="M3,3 L10,10 M10,3 L3,10"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                      StrokeThickness="1" />
+            </Button>
+        </StackPanel>
+
+        <!--
+          Линия под полосой: постоянная работает разделителем между полосой и содержимым
+          (у окон без собственной шапки его больше нет), акцентная читается признаком
+          активного окна. IsHitTestVisible=False: линия в зоне CaptionHeight и не должна
+          забирать перетаскивание за полосу.
+        -->
+        <Border VerticalAlignment="Bottom"
+                IsHitTestVisible="False"
+                BorderThickness="0,0,0,1">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="BorderBrush" Value="{DynamicResource LineSoft}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                            <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+        </Border>
+    </Grid>
+</UserControl>

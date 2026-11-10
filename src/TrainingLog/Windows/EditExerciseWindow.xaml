@@ -12,6 +12,7 @@
         FontSize="{DynamicResource BodySize}"
         Background="{DynamicResource WindowBackground}"
         Foreground="{DynamicResource TextPrimary}"
+        Style="{DynamicResource AppWindowStyle}"
         Title="Редактирование упражнения"
         Width="380"
         SizeToContent="Height"
@@ -31,10 +32,15 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <!-- Полоса заголовка: отрицательные отступы снимают отступ корневой сетки — полоса от краёв окна. -->
+        <helpers:TitleBar Grid.Row="0"
+                          Margin="-16,-16,-16,16" />
+
         <!-- Background="Transparent" обязателен: с null-фоном подпись ловит клик только по буквам (ловушка 13). -->
-        <TextBlock Grid.Row="0"
+        <TextBlock Grid.Row="1"
                    Background="Transparent"
                    Text="Название упражнения"
                    helpers:ClickToFocus.Target="{Binding ElementName=NameBox}" />
@@ -45,7 +51,7 @@
           VerticalScrollBarVisibility="Hidden", и без предела поле растёт бесконечно.
         -->
         <TextBox x:Name="NameBox"
-                 Grid.Row="1"
+                 Grid.Row="2"
                  Margin="0,8,0,0"
                  AcceptsReturn="False"
                  MaxHeight="96"
@@ -56,7 +62,7 @@
                  VerticalScrollBarVisibility="Auto"
                  Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
 
-        <StackPanel Grid.Row="2"
+        <StackPanel Grid.Row="3"
                     Margin="0,16,0,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
@@ -72,5 +78,11 @@
                     helpers:Hotkey.Id="EditExercise.Cancel"
                     IsCancel="True" />
         </StackPanel>
+
+        <!-- Рамка окна: элемент-обводка поверх содержимого, до самых краёв окна (как на главном). -->
+        <Border Grid.RowSpan="4"
+                Margin="-16,-16,-16,-16"
+                IsHitTestVisible="False"
+                Style="{StaticResource WindowFrame}" />
     </Grid>
 </Window>
