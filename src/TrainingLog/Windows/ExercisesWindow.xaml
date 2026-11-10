@@ -98,7 +98,11 @@
                     </Button.Content>
                 </Button>
 
-                <Button Margin="2,0,0,0"
+                <!--
+                  Отрицательный margin сжимает воздух из резервов шаблона 6+6 до 8, тела
+                  кнопок не соприкасаются — механика в ловушке 47.
+                -->
+                <Button Margin="-4,0,0,0"
                         Style="{StaticResource GlassButtonIconSoft}"
                         Click="OnExportClick"
                         IsEnabled="{Binding CanExport}"
