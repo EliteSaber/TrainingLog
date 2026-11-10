@@ -219,16 +219,16 @@
                 <!--
           Список фокусируем и гасим его стрелочную навигацию. Фокус — цель для BlurOnKeys:
           Esc и Enter уводят клавиатурный фокус с поля количества дней сюда. Продвижение
-          выделения списку даёт окно в OnDaysListKeyDown (PreviewKeyDown): с всплыванием
-          клавишу перехватил бы ScrollViewer над списком — прокрутил содержимое и погасил
-          нажатие. DirectionalNavigation=None держит про запас неназначенные стрелки: без
-          значения по умолчанию (Continue) они перескакивали бы фокусом по кнопкам строк,
-          «как по tab», вместо честного скролла содержимого.
+          выделения стрелками ведёт окно целиком (OnWindowPreviewKeyDown): туннель у корня
+          маршрута доходит до обработчика при любом фокусе и гасит нажатие прежде, чем
+          ScrollViewer успел прокрутить содержимое всплывающей стрелкой. DirectionalNavigation=None
+          держит про запас неназначенные стрелки: без значения по умолчанию (Continue) они
+          перескакивали бы фокусом по кнопкам строк, «как по tab», вместо честного скролла
+          содержимого.
         -->
                 <ItemsControl x:Name="DaysList"
                               ItemsSource="{Binding Days}"
                               Focusable="True"
-                              PreviewKeyDown="OnDaysListKeyDown"
                               kb:KeyboardNavigation.DirectionalNavigation="None"
                               helpers:RowSelection.Enabled="True"
                               MouseDoubleClick="OnDayDoubleClick">

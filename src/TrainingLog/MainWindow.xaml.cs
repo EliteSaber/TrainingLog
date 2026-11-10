@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using TrainingLog.Controls;
@@ -22,7 +23,7 @@ public partial class MainWindow : Window
     /// <summary>Шаги выделения списка: id назначения к сдвигу строк.</summary>
     /// <remarks>
     /// Статичное поле, а не локальный массив на нажатие: обработчик срабатывает по каждой
-    /// вертикальной стрелке, пока фокус застрял на списке.
+    /// вертикальной стрелке, кем бы ни держался клавиатурный фокус в окне.
     /// </remarks>
     private static readonly (string Id, int Delta)[] StepKeys =
     [
@@ -54,10 +55,6 @@ public partial class MainWindow : Window
             .Invoke("Main.OpenSettings", () => Run(_viewModel.OpenSettingsCommand))
             .Invoke("Main.Apply", () => Run(_viewModel.ApplyCommand))
             .Invoke("Main.AddDay", () => Run(_viewModel.AddDayCommand))
-            // Стрелки выделения — не кнопки и не строковые действия: они меняют выделение
-            // списка сами, а умолчания у них Up и Down.
-            .Invoke("Main.SelectedUp", () => RowSelection.Move(DaysList, -1))
-            .Invoke("Main.SelectedDown", () => RowSelection.Move(DaysList, 1))
             .Row("Main.EditDay", DaysList, row =>
             {
                 if (row is DayRowViewModel day)
@@ -77,6 +74,10 @@ public partial class MainWindow : Window
         // Изменение места базы: модель докладывает событием, якорь и показ — здесь.
         _viewModel.DatabaseAddressChanged += OnDatabaseAddressChanged;
 
+        // Стрелки выделения слушаются на окне: туннель у корня маршрута не зависит от того,
+        // где живёт клавиатурный фокус (см. OnWindowPreviewKeyDown).
+        PreviewKeyDown += OnWindowPreviewKeyDown;
+
         Closed += OnClosed;
         Loaded += OnLoaded;
     }
@@ -91,21 +92,31 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Двигает выделение строк стрелками, пока фокус на списке дней.</summary>
+    /// <summary>Двигает выделение строк стрелками на назначенные жесты.</summary>
     /// <remarks>
-    /// Обычную доставку клавиши перехватывает ScrollViewer над списком: он обрабатывает
-    /// вертикальные стрелки как прокручивание, пока фокус у его потомков, и гасит нажатие
-    /// прежде, чем оно всплывёт до привязок окна. Поэтому вызов и гашение — туннелированием
-    /// на самом списке: Handled в PreviewKeyDown подавляет всплывание целиком, скроллер
-    /// не видит нажатие, а окно не исполняет привязку второй раз.
+    /// Обработчик висит на окне (туннель у корня маршрута), а не на списке дней: так клавиша
+    /// доходит сюда при любом положении клавиатурного фокуса. Перехват на самом списке завязывал
+    /// выделение на редкое состояние «фокус внутри поддерева списка»: любой клик по строке или
+    /// по кнопке, меню правой кнопки и возврат из окна дня уводят клавиатуру из него, и тогда
+    /// всплывающую стрелку первым съедает ScrollViewer над списком — прокрутив содержимое
+    /// и погасив нажатие. Handled на корне гасит всё дерево сразу: и скроллер, и привязки окна
+    /// стрелку больше не видят.
+    ///
+    /// Поле ввода — исключение: там стрелки двигают каретку, и выделение строк их не отнимает.
+    /// Контекстные меню, попапы и окно дня живут в своих HWND-деревьях и маршрутизируют клавиши
+    /// отдельно, поэтому их клавиатуру корневой туннель чужого окна не задевает.
     ///
     /// Совпадение берётся с назначенными жестами через <see cref="HotkeyService"/>, а не
     /// с захардкоженным Up/Down: клавишу назначают в окне параметров, и файл настроек обязан
-    /// звучать в списке так же, как в привязке окна. Несовпавшая клавиша не гасится: это
-    /// не назначение, за ней остаётся обычное поведение (скролл, прочее).
+    /// звучать здесь же. Несовпавшая клавиша не гасится: это не назначение.
     /// </remarks>
-    private void OnDaysListKeyDown(object sender, KeyEventArgs e)
+    private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (Keyboard.FocusedElement is TextBoxBase)
+        {
+            return;
+        }
+
         // Один статичный перечень шагов: оба назначения опрашиваются у каждого нажатия,
         // и первым совпавшим список заканчивает обработку.
         foreach (var (id, delta) in StepKeys)
@@ -263,6 +274,7 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        PreviewKeyDown -= OnWindowPreviewKeyDown;
         AllowedCharsInput.RemoveRejectedHandler(this, OnInputRejected);
         AllowedCharsInput.RemoveAcceptedHandler(this, OnInputAccepted);
         _viewModel.DatabaseAddressChanged -= OnDatabaseAddressChanged;
