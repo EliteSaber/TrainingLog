@@ -48,12 +48,16 @@ jobs:
         run: dotnet test TrainingLog.sln -c Release --no-build
 
       # Лёгкая сборка: один exe, все dll внутри. Нужен .NET 10 Desktop Runtime.
+      # IncludeNativeLibrariesForSelfExtract обязателен: без него нативные dll не попадают
+      # в бандл и остаются рядом с exe в каталоге публикации — workflow берёт один exe,
+      # и без этой библиотеки не загружается e_sqlite3 из Microsoft.Data.Sqlite
+      # (DllNotFoundException при первом Migrate()).
       - name: Публикация лёгкой сборки одним файлом
-        run: dotnet publish src/TrainingLog -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:Version=${{ steps.ver.outputs.version }} -o artifacts/single --nologo
+        run: dotnet publish src/TrainingLog -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=${{ steps.ver.outputs.version }} -o artifacts/single --nologo
 
       # Тяжёлая сборка: папка со своим рантаймом, запускается без установленного .NET.
       - name: Публикация сборки со своим рантаймом
-        run: dotnet publish src/TrainingLog -c Release -r win-x64 --self-contained true -p:Version=${{ steps.ver.outputs.version }} -o artifacts/selfcontained --nologo
+        run: dotnet publish src/TrainingLog -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=${{ steps.ver.outputs.version }} -o artifacts/selfcontained --nologo
 
       - name: Упаковка
         shell: pwsh
