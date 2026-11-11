@@ -214,6 +214,14 @@ public sealed class HotkeyBinder
     /// <summary>Нажимает кнопку целиком: клавиша равнозначна клику мышью.</summary>
     private static void PressButton(FrameworkElement element)
     {
+        // Команда с ложным CanExecute глушит и кнопку, а Invoke на невключённом элементе
+        // бросает ElementNotEnabledException: клавиша равнозначна клику мышью, а клик по
+        // выключенной кнопке — тишина.
+        if (!element.IsEnabled)
+        {
+            return;
+        }
+
         // Через peer любого ButtonBase, а не ButtonAutomationPeer конкретно Button: так же
         // нажимаются RepeatButton и ToggleButton, а Invoke выполняет команду с её CanExecute
         // и ReadLocalValue семантики IsDefault/IsCancel — RaiseEvent(Click) команды не зовёт (ловушка 7).
@@ -234,7 +242,8 @@ public sealed class HotkeyBinder
     }
 
     /// <summary>Обёртка исполнителя под <see cref="KeyBinding"/>: гасить нечем, гасит сама команда.</summary>
-    /// <remarks>CanExecute всегда true: строка не выделена — молчит исполнитель, он это знает сам.</remarks>
+    /// <remarks>CanExecute всегда true: неизбежные отказы гасятся в исполнителях — строка без
+    /// выделения молчит, выключенная кнопка молчит в <see cref="PressButton"/>.</remarks>
     private sealed class Executor(Action invoke) : ICommand
     {
         public event EventHandler? CanExecuteChanged
