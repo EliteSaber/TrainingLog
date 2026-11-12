@@ -48,6 +48,22 @@ public sealed class AppSettings
     /// <summary>Масштаб кегля в процентах. Пригодность проверяет <see cref="FontRules"/>.</summary>
     public int FontSizePercent { get; set; } = DefaultFontSizePercent;
 
+    /// <summary>Тема оформления, пока пользователь ничего не выбрал.</summary>
+    /// <remarks>
+    /// Своё имя держится ради симметрии с другими умолчаниями класса: и хранилище, и окно
+    /// параметров пользуются им, а не константой правила.
+    /// </remarks>
+    public const string DefaultTheme = ThemeRules.Default;
+
+    /// <summary>
+    /// Тема оформления: светлая, тёмная или системная.
+    /// </summary>
+    /// <remarks>
+    /// Строкой, а не перечислением: файл настроек правят руками, и значение должно читаться
+    /// глазами. Канон задаёт <see cref="ThemeRules"/>, пригодность проверяет он же.
+    /// </remarks>
+    public string Theme { get; set; } = DefaultTheme;
+
     /// <summary>Полный адрес файла базы: сохранённые директория и наименование вместе.</summary>
     public string DatabasePath => Path.Combine(DatabaseDirectory, DatabaseName);
 

@@ -23,8 +23,8 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Тема целиком (палитра, кнопки, контролы) — ловушка 6: ресурсы окна живут в окне -->
-                <ResourceDictionary Source="pack://application:,,,/Themes/Theme.xaml" />
+                <!-- Стили темы — ловушка 6: ресурсы окна живут в окне. Палитра и токены шрифта живут на уровне приложения: своими оконными экземплярами они перекрыли бы подмену. -->
+                <ResourceDictionary Source="pack://application:,,,/TrainingLog;component/Themes/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Ресурсы объявлены в окне, а не в App.xaml: окно должно создаваться без приложения (ловушка 6). -->

@@ -17,15 +17,26 @@
                   Ловушка 6 окна не задевает: она требует ресурсов у окон, а не запрещает
                   ресурсы приложения.
                 -->
-                <ResourceDictionary Source="pack://application:,,,/Themes/Fonts.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/TrainingLog;component/Themes/Fonts.xaml" />
 
                 <!--
-                  Тема — тоже на уровне приложения: отдельные визуальные деревья (ToolTip,
+                  Стили темы — тоже на уровне приложения: отдельные визуальные деревья (ToolTip,
                   ContextMenu, dropdown ComboBox) не поднимаются к окну, и без этой копии
-                  DynamicResource в них нашёл бы пустоту. Оконные словари не мешают: их копии
-                  — те же значения; этот словарь и есть будущий переключатель темы.
+                  DynamicResource в них нашёл бы пустоту. Оконные копии не мешают: в них те же
+                  стили.
                 -->
-                <ResourceDictionary Source="pack://application:,,,/Themes/Theme.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/TrainingLog;component/Themes/Styles.xaml" />
+
+                <!--
+                  Палитра — только здесь, на уровне приложения, и по той же причине, что и
+                  токены шрифта: иначе оконный экземпляр перекрыл бы подмену. Светлая — умолчание,
+                  чтобы цвета были и в дизайнере, и до первого вызова переключателя.
+
+                  Переключатель темы (Services/AppTheme) не подменяет этот словарь, а перезаписывает
+                  его значения на тёмные: словарь остаётся на месте, и окна, открытые позже, берут
+                  из него актуальные цвета.
+                -->
+                <ResourceDictionary Source="pack://application:,,,/TrainingLog;component/Themes/Palette.Light.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

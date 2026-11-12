@@ -65,6 +65,9 @@ public partial class SettingsWindow : Window
             // сами — ответственность, как и у диалогов, интерфейсная, поэтому окно.
             AppFonts.Apply(_viewModel.SelectedFont.Name, _viewModel.SelectedScale);
 
+            // Тема — тем же порядком: применённая тема обязана совпадать с записанной.
+            AppTheme.Apply(_viewModel.SelectedTheme.Value);
+
             // Файл переписан: сервис перечитает его и соберёт живущие окна пересборкой привязок.
             // Windows-диалоги привязки пересоздают при показе, поэтому здесь только живущие.
             _hotkeys.NotifyChanged();
@@ -81,6 +84,13 @@ public partial class SettingsWindow : Window
             or nameof(SettingsViewModel.SelectedScale))
         {
             AppFonts.Apply(_viewModel.SelectedFont.Name, _viewModel.SelectedScale);
+        }
+
+        // Тема — тем же предпросмотром: палитра перезаписывается на месте, и все открытые окна
+        // перерисовываются по ссылкам DynamicResource.
+        if (e.PropertyName == nameof(SettingsViewModel.SelectedTheme))
+        {
+            AppTheme.Apply(_viewModel.SelectedTheme.Value);
         }
     }
 
@@ -318,6 +328,7 @@ public partial class SettingsWindow : Window
         if (!_viewModel.Accepted)
         {
             AppFonts.Apply(_viewModel.SavedFontName, _viewModel.SavedFontSizePercent);
+            AppTheme.Apply(_viewModel.SavedTheme);
         }
 
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;

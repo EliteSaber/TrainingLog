@@ -142,6 +142,48 @@ public sealed class AppSettingsStoreTests
         Assert.Equal(content, File.ReadAllText(settings.FilePath));
     }
 
+    /// <summary>Тема из файла читается: значение доезжает до модели как есть.</summary>
+    [Fact]
+    public void Load_ТемаИзФайла_Читается()
+    {
+        using var settings = new TemporarySettings();
+        settings.Write("""{"Theme": "Dark"}""");
+
+        var loaded = settings.Store.Load();
+
+        Assert.Equal(ThemeRules.Dark, loaded.Theme);
+    }
+
+    /// <summary>Темы в файле нет — умолчание: «не записано» значит «как в системе».</summary>
+    [Fact]
+    public void Load_ТемыНет_Умолчание()
+    {
+        using var settings = new TemporarySettings();
+        settings.Write("""{"DaysCount": 5}""");
+
+        var loaded = settings.Store.Load();
+
+        Assert.Equal(ThemeRules.Default, loaded.Theme);
+    }
+
+    /// <summary>
+    /// Негодная тема откатывается к умолчанию в памяти, а файл не переписывается: правят его
+    /// руками, и молчаливая замена испортила бы недописанное — тот же договор, что у DaysCount.
+    /// </summary>
+    [Fact]
+    public void Load_НегоднаяТема_ОткатываетсяКУмолчанию_ФайлНеПереписывается()
+    {
+        const string content = """{"Theme": "Тёмная"}""";
+
+        using var settings = new TemporarySettings();
+        settings.Write(content);
+
+        var loaded = settings.Store.Load();
+
+        Assert.Equal(ThemeRules.Default, loaded.Theme);
+        Assert.Equal(content, File.ReadAllText(settings.FilePath));
+    }
+
     /// <summary>Отступы при записи: в файл заглядывают глазами, когда правят руками.</summary>
     [Fact]
     public void Save_ПишетJsonСОтступами()

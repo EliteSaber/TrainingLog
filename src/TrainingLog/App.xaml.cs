@@ -30,9 +30,16 @@ public partial class App : Application
         // и выбор в параметрах «опаздывал» на первоотрисовку.
         AppFonts.Apply(settings.FontFamily, settings.FontSizePercent);
 
+        // Тема — тоже до показа окон: палитра перезаписывается на месте, и первое окно должно
+        // рисоваться уже в выбранной теме, а не в светлой.
+        AppTheme.Apply(settings.Theme);
+
         var mainWindow = _services.GetRequiredService<MainWindow>();
         MainWindow = mainWindow;
         mainWindow.Show();
+
+        // Слежение за темой Windows: окно показано, у него есть handle.
+        SystemThemeWatcher.Attach(mainWindow);
     }
 
     protected override void OnExit(ExitEventArgs e)

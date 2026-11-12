@@ -28,7 +28,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <!--
-                  Стили кнопок полосы: их же может поднять и Theme.xaml, поэтому StaticResource здесь.
+                  Стили кнопок полосы: их же может поднять и Styles.xaml, поэтому StaticResource здесь.
                   Путь относительный, а не pack://application — дизайнер XAML (XDG0003 «не найден
                   themes/chrome.xaml») pack-URI из словаря контрола не резолвит; рантайму и сборке
                   всё равно, а дизайнеру подавление ошибки было бы вечным.

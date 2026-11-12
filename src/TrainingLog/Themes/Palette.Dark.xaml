@@ -1,0 +1,142 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <!--
+      Тёмная палитра: те же токены, что и в Palette.Light.xaml, и те же ключи — набор ключей
+      проверяется тестом. Переключатель темы (Services/AppTheme) перезаписывает значения
+      светлой палитры этими, и DynamicResource-ссылки обновляются сами.
+
+      Тон тот же холодный, что у светлой темы, только наоборот: фон тёмно-сине-серый, текст
+      светло-голубой. Акценты светлее своих светлых — на тёмном фоне тёмный акцент не
+      читается, и рамка фокуса поля должна быть видна.
+
+      Рамка окна (WindowBorder) светлее линий, а не темнее: на тёмном фоне тёмная рамка
+      слилась бы с ним, и окно потеряло бы контур — ровно то, ради чего рамка и нужна.
+    -->
+    <sys:String x:Key="PaletteId">Dark</sys:String>
+
+    <SolidColorBrush x:Key="WindowBackground" Color="#1B2027" />
+    <SolidColorBrush x:Key="TextPrimary" Color="#DCE8F4" />
+    <SolidColorBrush x:Key="TextPrimaryPressed" Color="#AFCFE6" />
+    <SolidColorBrush x:Key="TextSecondary" Color="#7E8C99" />
+    <SolidColorBrush x:Key="TextError" Color="#F0818A" />
+
+    <!-- Кнопка закрытия на полосе: крест остаётся светлым — он лежит на красной подложке -->
+    <SolidColorBrush x:Key="TextOnError" Color="#FFFFFF" />
+
+    <!-- Системный красный кнопки закрытия Windows: тот же, что у светлой темы -->
+    <SolidColorBrush x:Key="CloseHover" Color="#E81123" />
+
+    <!-- Линии: на тёмном фоне линия должна быть светлее фона, а не темнее -->
+    <SolidColorBrush x:Key="LineSoft" Color="#262D35" />
+    <SolidColorBrush x:Key="LineStrong" Color="#39434D" />
+
+    <!-- Рамка окна: светлее линий, иначе окно теряет контур на тёмном фоне -->
+    <SolidColorBrush x:Key="WindowBorder" Color="#47535F" />
+
+    <!-- Подложки: выделение строки — синее, чтобы читалось как выбор, а не как серая полоса -->
+    <SolidColorBrush x:Key="RowHighlight" Color="#21384A" />
+    <SolidColorBrush x:Key="SurfaceAlt" Color="#262D35" />
+
+    <!-- Акценты: светлее светлых — на тёмном фоне тёмный акцент не виден -->
+    <SolidColorBrush x:Key="Accent" Color="#3FB6F0" />
+    <SolidColorBrush x:Key="AccentStrong" Color="#6FC8F2" />
+
+    <!-- Поля: тёмное полотно, рамка до наведения, тёплый захват горячих клавиш -->
+    <SolidColorBrush x:Key="FieldBackground" Color="#1F252B" />
+    <SolidColorBrush x:Key="FieldBorder" Color="#3A434D" />
+    <SolidColorBrush x:Key="CaptureSurface" Color="#3B3320" />
+    <SolidColorBrush x:Key="CaptureBorder" Color="#D9A72A" />
+
+    <!-- Наведение: строки списков, пункты меню, стрелки в StatusHint -->
+    <SolidColorBrush x:Key="ControlHover" Color="#2C343D" />
+
+    <!--
+      Текст на светлой системной подложке: календарь в попапе остаётся системным (сетку дней
+      рисует тема WPF, своя — отдельная большая работа), а текст в нём берётся из Foreground
+      самого DatePicker. Значение тёмное и в тёмной теме тоже: подложка календаря всегда
+      светлая, и светлый текст на ней не читался бы.
+    -->
+    <SolidColorBrush x:Key="TextOnLightSurface" Color="#1B1F24" />
+
+    <!-- Подложка подсказки: чуть светлее окна, иначе блок слился бы с фоном -->
+    <SolidColorBrush x:Key="HintSurface" Color="#222831" Opacity="0.95" />
+
+    <!--
+      Кисти стеклянных кнопок: те же двенадцать ключей, тело — тёмное стекло. Устройство то же,
+      что у светлой темы: сверху светлее, снизу темнее, нажатое тело темнее покоя, фаска на
+      нажатой переворачивается.
+
+      Отблеск (AddDayStreak) приглушён против светлой темы: белый блик на светлом стекле почти
+      не виден, а на тёмном бил бы резкой белой полосой.
+
+      Внутренняя тень снизу (AddDayInnerBottom) — чёрная, а не синяя, как в светлой теме:
+      на тёмном теле синяя тень не читается, а чёрная читается как тень.
+    -->
+    <LinearGradientBrush x:Key="AddDayGlass" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#39424C" />
+        <GradientStop Offset="0.38" Color="#2E363F" />
+        <GradientStop Offset="0.52" Color="#252C34" />
+        <GradientStop Offset="1" Color="#1D232A" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayGlassHover" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#414B56" />
+        <GradientStop Offset="0.35" Color="#343D47" />
+        <GradientStop Offset="0.52" Color="#28313A" />
+        <GradientStop Offset="1" Color="#1F262E" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayGlassActive" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#20262D" />
+        <GradientStop Offset="0.5" Color="#1A2027" />
+        <GradientStop Offset="1" Color="#151A20" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayGlassDisabled" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#262D35" />
+        <GradientStop Offset="0.38" Color="#222931" />
+        <GradientStop Offset="0.52" Color="#1F252B" />
+        <GradientStop Offset="1" Color="#1B2026" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayBevel" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#4A5561" />
+        <GradientStop Offset="0.45" Color="#313B45" />
+        <GradientStop Offset="1" Color="#1A222A" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayBevelHover" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#525E6A" />
+        <GradientStop Offset="0.45" Color="#38434F" />
+        <GradientStop Offset="1" Color="#1E2831" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayBevelActive" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#1A222A" />
+        <GradientStop Offset="0.55" Color="#333E49" />
+        <GradientStop Offset="1" Color="#4A5561" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayBevelDisabled" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#3A424B" />
+        <GradientStop Offset="0.45" Color="#333A43" />
+        <GradientStop Offset="1" Color="#2B323A" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayInnerBottom" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#00000000" />
+        <GradientStop Offset="1" Color="#73000000" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayInnerBottomDisabled" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#00000000" />
+        <GradientStop Offset="1" Color="#38000000" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AddDayStreak" StartPoint="0,1" EndPoint="0.6,0">
+        <GradientStop Offset="0" Color="#00FFFFFF" />
+        <GradientStop Offset="0.6" Color="#4CFFFFFF" />
+        <GradientStop Offset="1" Color="#00FFFFFF" />
+    </LinearGradientBrush>
+</ResourceDictionary>

@@ -512,6 +512,64 @@ public sealed class SettingsViewModelTests
         Assert.Equal(listing.Count, position);
     }
 
+    /// <summary>Тема открывается на сохранённой: пустое поле снесло бы настройку первым же сохранением.</summary>
+    [Fact]
+    public void Тема_ОткрываетсяНаСохранённой()
+    {
+        using var settings = new TemporarySettings();
+        settings.Store.Save(new AppSettings
+        {
+            Theme = ThemeRules.Dark,
+        });
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.Equal(ThemeRules.Dark, viewModel.SelectedTheme.Value);
+        Assert.Equal(ThemeRules.Dark, viewModel.SavedTheme);
+    }
+
+    /// <summary>Темы в файле нет — умолчание, и откат возвращает то же: окно открылось не зная выбора.</summary>
+    [Fact]
+    public void Тема_БезЗаписи_Умолчание()
+    {
+        using var settings = new TemporarySettings();
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.Equal(ThemeRules.Default, viewModel.SelectedTheme.Value);
+        Assert.Equal(ThemeRules.Default, viewModel.SavedTheme);
+    }
+
+    /// <summary>Выбранная тема пишется тем же «Сохранить», что и остальные настройки.</summary>
+    [Fact]
+    public void Save_ВыбраннаяТема_ПишетсяВФайл()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store)
+        {
+            SelectedTheme = new ThemeOption(ThemeRules.Dark, "Тёмная"),
+        };
+
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.Equal(ThemeRules.Dark, new AppSettingsStore(settings.FilePath).Load().Theme);
+    }
+
+    /// <summary>Смена темы поднимает уведомление: окно по нему перекрашивает приложение.</summary>
+    [Fact]
+    public void Тема_Смена_Уведомляет()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var notified = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => notified.Add(args.PropertyName);
+
+        viewModel.SelectedTheme = new ThemeOption(ThemeRules.Dark, "Тёмная");
+
+        Assert.Contains(nameof(SettingsViewModel.SelectedTheme), notified);
+    }
+
     /// <summary>Строка поиска по id: каталог у теста один на все группы.</summary>
     private static HotkeyRowViewModel HotkeyRow(SettingsViewModel viewModel, string id) =>
         viewModel.HotkeyGroups.SelectMany(group => group.Rows).Single(row => row.Id == id);

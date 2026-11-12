@@ -87,6 +87,11 @@ public sealed class AppSettingsStore
             settings.FontSizePercent = AppSettings.DefaultFontSizePercent;
         }
 
+        // Тема — тем же договором, что и масштаб шрифта: негодное значение откатывается к
+        // умолчанию только в памяти, файл правят руками, и переписывать его после опечатки
+        // не нужно.
+        settings.Theme = ThemeRules.Normalize(settings.Theme);
+
         // «Hotkeys»: null JSON-десериализатор пишет и поверх инициализатора AppSettings, и
         // дальше HotkeyService упал бы на null-источнике. Умолчание вместо секции — тот же
         // договор, что у DaysCount вне диапазона: значение в памяти заменяется, файл не трогается.

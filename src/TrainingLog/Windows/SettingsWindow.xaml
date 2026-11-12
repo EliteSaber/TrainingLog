@@ -27,8 +27,8 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Тема целиком (палитра, кнопки, контролы) — ловушка 6: ресурсы окна живут в окне -->
-                <ResourceDictionary Source="pack://application:,,,/Themes/Theme.xaml" />
+                <!-- Стили темы — ловушка 6: ресурсы окна живут в окне. Палитра и токены шрифта живут на уровне приложения: своими оконными экземплярами они перекрыли бы подмену. -->
+                <ResourceDictionary Source="pack://application:,,,/TrainingLog;component/Themes/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -52,6 +52,7 @@
             <TabItem Header="Общие">
                 <Grid Margin="0,12,0,0">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -248,6 +249,37 @@
                                   ItemsSource="{Binding ScaleOptions}"
                                   SelectedItem="{Binding SelectedScale}" />
                     </Grid>
+
+                    <!--
+                      Тема оформления: выбор из трёх значений. Поле и подпись — как у остальных
+                      строк вкладки.
+
+                      Показывается подпись, а в файл пишется значение: у пункта их два, и
+                      ComboBox берёт подпись через DisplayMemberPath.
+                    -->
+                    <Grid Grid.Row="5" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Background="Transparent"
+                                   TextWrapping="Wrap"
+                                   Text="Тема"
+                                   helpers:ClickToFocus.Target="{Binding ElementName=ThemeBox}" />
+
+                        <ComboBox x:Name="ThemeBox"
+                                  Grid.Column="1"
+                                  Margin="8,0,0,0"
+                                  Width="160"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Center"
+                                  ItemsSource="{Binding ThemeOptions}"
+                                  SelectedItem="{Binding SelectedTheme}"
+                                  DisplayMemberPath="Display" />
+                    </Grid>
                 </Grid>
             </TabItem>
 
@@ -366,7 +398,15 @@
                                              PreviewLostKeyboardFocus="OnCaptureLostFocus"
                                              ToolTip="Нажмите комбинацию; Esc — вернуть предыдущую">
                                         <TextBox.Style>
-                                            <Style TargetType="TextBox">
+                                            <!--
+                                              BasedOn обязателен: локальный стиль вытесняет неявный
+                                              стиль TextBox из Controls.xaml, и без BasedOn поле осталось
+                                              бы с системным видом — в светлой теме это незаметно
+                                              (системное поле тоже белое), а в тёмной белое поле с
+                                              чёрным текстом читается как чужое, и надпись
+                                              «Комбинация…» на подложке захвата не видна.
+                                            -->
+                                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsCapturing}" Value="True">
                                                         <Setter Property="BorderBrush" Value="{DynamicResource CaptureBorder}" />

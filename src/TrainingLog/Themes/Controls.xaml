@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:helpers="clr-namespace:TrainingLog.Controls">
+                    xmlns:helpers="clr-namespace:TrainingLog.Controls"
+                    xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework">
     <!--
       Единый вид контролов: поля, галочки, комбобоксы, кнопки строк, подсказки, меню,
       вкладки, спойлеры, прокрутка. Неявные стили (без x:Key): любой TextBox/CheckBox/... в окне и в отдельном
@@ -69,14 +70,142 @@
                                       VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
                             <Setter TargetName="Frame" Property="Background" Value="{DynamicResource RowHighlight}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+
+        <Style.Triggers>
+            <!--
+              Рамка фокуса — триггером стиля, а не шаблона. Триггер шаблона пишет цвет прямо в
+              «Frame» и перекрывает любой стиль, а поле захвата горячих клавиш подсвечивается
+              своей рамкой (CaptureBorder) — и перекрывать её нельзя: подсветка захвата была бы
+              не видна вовсе.
+
+              Порядок отсюда: производный стиль (захват) → базовый стиль (фокус) → значения
+              стиля, поэтому золотая рамка захвата побеждает синюю фокусную.
+            -->
+            <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!--
+      Кнопка календаря в поле даты: плоская иконка, как стрелка у ComboBox. Отдельный стиль
+      и не стеклянный по двум причинам. Стеклянный недоступен: StaticResource внутри словаря
+      видит только свои ресурсы, а стили кнопок лежат в GlassButton.xaml — соседнем словаре
+      (у окон он виден, потому что разметка окна разбирается после слияния). И стекло здесь
+      было бы пятном: кнопка — часть поля, а не действие.
+    -->
+    <Style x:Key="DatePickerButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Surface"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="2"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource ControlHover}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+      DatePicker: поле даты в окне дня.
+
+      Системный DatePicker в светлой теме от наших полей неотличим — системное поле тоже
+      белое, как FieldBackground, — и это скрывало, что стиля у него нет вовсе. В тёмной теме
+      он остаётся белым и выбивается из ряда, поэтому шаблон свой.
+
+      Текст даты — обычное поле приложения: DatePickerTextBox подхватывает неявный стиль
+      TextBox и получает наши цвета, рамку и акцент в фокусе. Кнопка календаря — плоская
+      иконка рядом с полем. Попап — системный календарь: сетку дней рисует тема WPF, а своя
+      тема календаря — отдельная большая работа.
+
+      Части шаблона — те, что ждёт сам DatePicker (PART_Root, PART_TextBox, PART_Button,
+      PART_Popup): переименуешь — и он перестанет находить поле и кнопку. В частности, кнопка
+      должна быть Button, а не ToggleButton: DatePicker подписывается на её Click.
+
+      Foreground задан отдельным токеном: DatePicker привязывает к нему Foreground календаря,
+      а подложка календаря всегда светлая — в тёмной теме обычный TextPrimary дал бы светлый
+      текст на белом.
+    -->
+    <Style TargetType="DatePicker">
+        <Setter Property="Foreground" Value="{DynamicResource TextOnLightSurface}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DatePicker">
+                    <Grid x:Name="PART_Root">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!--
+                          Стиль указан явно: неявный ищется по точному типу, а DatePickerTextBox —
+                          подтип TextBox, и своего неявного стиля у него нет. Без явного стиля поле
+                          осталось бы системным (и в светлой теме это не видно: системное поле тоже
+                          белое).
+
+                          {x:Type TextBox} — ссылка на неявный стиль по его ключу-типу; он объявлен
+                          в этом же словаре, поэтому и виден.
+                        -->
+                        <primitives:DatePickerTextBox x:Name="PART_TextBox"
+                                                       Grid.Column="0"
+                                                       VerticalAlignment="Center"
+                                                       Style="{StaticResource {x:Type TextBox}}" />
+
+                        <Button x:Name="PART_Button"
+                                Grid.Column="1"
+                                Margin="4,0,0,0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource DatePickerButton}"
+                                ToolTip="Выбрать дату">
+                            <!--
+                              Глиф календаря нарисован, а не взят из файла: готовой иконки в
+                              проекте нет, а иконки приложения рисуются путями. Цвет — Foreground
+                              кнопки, как у прочих иконок: при наведении кнопка светлеет.
+                            -->
+                            <Path Width="14"
+                                  Height="14"
+                                  Stretch="Uniform"
+                                  Data="M 2.5,3.5 L 13.5,3.5 L 13.5,14 L 2.5,14 Z M 2.5,6.5 L 13.5,6.5 M 5,1.5 L 5,4.5 M 11,1.5 L 11,4.5"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.1"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" />
+                        </Button>
+
+                        <!--
+                          Содержимое попапа подставляет сам DatePicker (свой Calendar), поэтому
+                          здесь оно пустое. Положение — от поля даты, а не от кнопки.
+                        -->
+                        <Popup x:Name="PART_Popup"
+                               AllowsTransparency="True"
+                               PlacementTarget="{Binding ElementName=PART_Root}"
+                               StaysOpen="False" />
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

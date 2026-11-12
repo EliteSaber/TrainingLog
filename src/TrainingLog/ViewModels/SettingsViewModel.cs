@@ -19,6 +19,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     // Поле под SelectedFont: свойство написано вручную, см. комментарий у него.
     private FontCatalog.FontFamilyOption _selectedFont;
 
+    // Поле под SelectedTheme: свойство тоже написано вручную, см. комментарий у него.
+    private ThemeOption _selectedTheme;
+
     /// <param name="store">Файл настроек.</param>
     /// <param name="fonts">Каталог шрифтов системы; без него (тесты) в списке только «по цепочке».</param>
     public SettingsViewModel(AppSettingsStore store, FontCatalog? fonts = null)
@@ -54,6 +57,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         // без сохранения. Перечитывать файл на закрытии незачем: правки в окно извне не приходят.
         SavedFontName = fontFamily;
         SavedFontSizePercent = _selectedScale;
+
+        // Тема — тем же порядком: из файла, срез файла для отката, а предпросмотр перекрашивает
+        // окна сразу. Канон задаёт правило (ThemeRules), подписи — список пунктов ниже.
+        var theme = ThemeRules.Normalize(settings.Theme);
+
+        ThemeOptions = BuildThemeOptions();
+        _selectedTheme = ThemeOptions.FirstOrDefault(option => option.Value == theme)
+            ?? ThemeOptions.First(option => option.Value == ThemeRules.Default);
+        SavedTheme = theme;
 
         HotkeyGroups = BuildHotkeyGroups(settings.Hotkeys);
         HotkeyListing = BuildHotkeyListing(HotkeyGroups);
@@ -146,6 +158,37 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Масштаб кегля, записанный в файле на момент открытия окна.</summary>
     public int SavedFontSizePercent { get; }
 
+    /// <summary>Пункты выбора темы: значение и подпись.</summary>
+    /// <remarks>
+    /// Строятся один раз в конструкторе: список из трёх пунктов не меняется, а пересобирать его
+    /// при каждом показе вкладки незачем.
+    /// </remarks>
+    public IReadOnlyList<ThemeOption> ThemeOptions { get; }
+
+    /// <summary>Выбранная тема оформления.</summary>
+    /// <remarks>
+    /// Свойство написано вручную, а не <c>[ObservableProperty]</c>: ComboBox присылает null, когда
+    /// выбранный пункт пропадает из списка, и null в модели означал бы «темы нет». Тот же приём,
+    /// что у выбранного шрифта.
+    /// </remarks>
+    public ThemeOption SelectedTheme
+    {
+        get => _selectedTheme;
+        set
+        {
+            if (value is not null)
+            {
+                SetProperty(ref _selectedTheme, value);
+            }
+        }
+    }
+
+    /// <summary>Тема, записанная в файл на момент открытия окна.</summary>
+    /// <remarks>
+    /// Отдаётся окну отката: выход без сохранения возвращает предпросмотр к этому срезу.
+    /// </remarks>
+    public string SavedTheme { get; }
+
     /// <summary>Подсказка об отказе по вводу.</summary>
     public HintState Hint { get; } = new();
 
@@ -222,6 +265,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 DatabaseName = DatabaseNameRules.ToFileName(DatabaseName),
                 FontFamily = SelectedFont.Name,
                 FontSizePercent = SelectedScale,
+                Theme = SelectedTheme.Value,
                 Hotkeys = AssignedHotkeys(),
             }))
         {
@@ -317,6 +361,18 @@ public sealed partial class SettingsViewModel : ObservableObject
             ? [new FontCatalog.FontFamilyOption(FontRules.DefaultFontFamily)]
             : [.. FontCatalog.Families()];
 
+    /// <summary>Пункты выбора темы: подписи на русском, значения канонические.</summary>
+    /// <remarks>
+    /// Порядок пунктов — порядок вкладки, а не порядок правила: пользователь выбирает сверху
+    /// вниз, и «системная» стоит последней, как запасной вариант.
+    /// </remarks>
+    private static IReadOnlyList<ThemeOption> BuildThemeOptions() =>
+    [
+        new ThemeOption(ThemeRules.Light, "Светлая"),
+        new ThemeOption(ThemeRules.Dark, "Тёмная"),
+        new ThemeOption(ThemeRules.System, "Системная"),
+    ];
+
     /// <summary>Имя из файла: непустое — как есть, пустое — гарнитура по умолчанию.</summary>
     private static string ResolveFontName(string? font) =>
         FontRules.NormalizeName(font) is { Length: > 0 } name
@@ -362,6 +418,14 @@ public sealed partial class SettingsViewModel : ObservableObject
         return listing;
     }
 }
+
+/// <summary>Пункт выбора темы: каноническое значение и подпись для окна.</summary>
+/// <remarks>
+/// Отдельный тип, а не строка: в списке показывается подпись, а в файл пишется значение, и одно
+/// поле не может быть и тем, и другим. Значение — канон правила (ThemeRules), подпись — текст
+/// окна.
+/// </remarks>
+public sealed record ThemeOption(string Value, string Display);
 
 /// <summary>Группа вкладки горячих клавиш: назначения одного окна.</summary>
 public sealed class HotkeyGroupViewModel(string windowName, IReadOnlyList<HotkeyRowViewModel> rows)

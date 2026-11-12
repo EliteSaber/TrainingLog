@@ -1,0 +1,19 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+      Стили темы: стеклянные кнопки, стили контролов, хром окна. Палитры здесь нет — она лежит
+      на уровне приложения (Palette.Light.xaml и Palette.Dark.xaml, см. App.xaml). Оконный
+      экземпляр палитры перекрыл бы подмену (очередь поиска DynamicResource: элемент → окно →
+      приложение) — ровно как токены шрифта.
+
+      Окна и Application вливают только этот словарь: палитра, шрифты и прочее оформление живут
+      на уровне приложения.
+
+      Порядок внутри обязателен: StaticResource видит только ранее влитые словари.
+    -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="pack://application:,,,/TrainingLog;component/Themes/GlassButton.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/TrainingLog;component/Themes/Controls.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/TrainingLog;component/Themes/Chrome.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+</ResourceDictionary>
