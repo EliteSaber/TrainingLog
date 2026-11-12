@@ -673,6 +673,43 @@ public sealed class EditPlanViewModelTests
         Assert.Equal([squat.Name], viewModel.SelectedExercises.Select(row => row.Name));
     }
 
+    /// <summary>Отметка по команде — та же галочка, что и клик по строке справочника.</summary>
+    [Fact]
+    public async Task ToggleCheckCommand_ОтмечаетУпражнение_СоставМеняется()
+    {
+        using var database = new TemporaryDatabase();
+        await database.Repository.AddAsync(new Exercise { Name = "Приседание" });
+
+        var viewModel = CreateViewModel(database, new TrainingPlan(), isNew: true);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        var row = viewModel.AllExercises.Single();
+
+        viewModel.ToggleCheckCommand.Execute(row);
+
+        Assert.True(row.IsChecked);
+        Assert.Equal([row.Name], viewModel.SelectedExercises.Select(item => item.Name));
+
+        viewModel.ToggleCheckCommand.Execute(row);
+
+        Assert.False(row.IsChecked);
+        Assert.Empty(viewModel.SelectedExercises);
+    }
+
+    /// <summary>Пустой строкой команду не отметить: отмечать нечего.</summary>
+    [Fact]
+    public async Task ToggleCheckCommand_БезСтроки_Молчит()
+    {
+        using var database = new TemporaryDatabase();
+        var viewModel = CreateViewModel(database, new TrainingPlan(), isNew: true);
+        await viewModel.InitializeCommand.ExecuteAsync(null);
+
+        viewModel.ToggleCheckCommand.Execute(null);
+
+        Assert.Empty(viewModel.SelectedExercises);
+        Assert.All(viewModel.AllExercises, row => Assert.False(row.IsChecked));
+    }
+
     private static EditPlanViewModel CreateViewModel(TemporaryDatabase database, TrainingPlan plan, bool isNew) =>
         new(plan, isNew, database.PlanRepository, database.Repository);
 

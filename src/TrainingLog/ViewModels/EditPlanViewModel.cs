@@ -120,6 +120,15 @@ public sealed partial class EditPlanViewModel : ObservableObject
     /// <summary>Упражнения плана в порядке выполнения, с номерами.</summary>
     public ObservableCollection<PlanExerciseSelection> SelectedExercises => _selectedExercises;
 
+    /// <summary>Активный блок окна: «Все упражнения» или «Порядок в плане».</summary>
+    /// <remarks>
+    /// Живёт в модели, а не в окне: подсветку заголовка и границы блока читает привязка, а
+    /// переключает блок окно — по клику мышью и по клавишам влево и вправо. Стрелки выделения
+    /// и «Пробел» работают в активном блоке, поэтому его состояние — общее для мыши и клавиш.
+    /// </remarks>
+    [ObservableProperty]
+    private PlanBlock _activeBlock = PlanBlock.Exercises;
+
     /// <summary>Изменения приняты и сохранены. Окно выставляет <c>DialogResult</c> по нему.</summary>
     public bool Accepted { get; private set; }
 
@@ -395,6 +404,24 @@ public sealed partial class EditPlanViewModel : ObservableObject
         SetChecked(row, false);
     }
 
+    /// <summary>
+    /// Переключает отметку упражнения: та же галочка, что и клик по строке справочника.
+    /// </summary>
+    /// <remarks>
+    /// Отдельная команда, а не присваивание свойства из окна: и клик по строке, и «Пробел»
+    /// приводят состав в одно состояние, а состояние считает модель.
+    /// </remarks>
+    [RelayCommand]
+    private void ToggleCheck(PlanExerciseSelection? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        SetChecked(row, !row.IsChecked);
+    }
+
     [RelayCommand(CanExecute = nameof(CanAccept))]
     private async Task AcceptAsync()
     {
@@ -557,4 +584,14 @@ public sealed partial class EditPlanViewModel : ObservableObject
             _isApplyingChecks = false;
         }
     }
+}
+
+/// <summary>Блок окна правки плана: слева — справочник, справа — состав.</summary>
+public enum PlanBlock
+{
+    /// <summary>«Все упражнения»: справочник с отметками вхождения в план.</summary>
+    Exercises,
+
+    /// <summary>«Порядок в плане»: состав по порядку выполнения.</summary>
+    Order,
 }

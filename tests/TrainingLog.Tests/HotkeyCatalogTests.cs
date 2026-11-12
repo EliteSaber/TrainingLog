@@ -38,23 +38,50 @@ public sealed class HotkeyCatalogTests
                 group.Actions.Select(action => action.Name).Distinct().Count()));
     }
 
-    /// <summary>Умолчания — только «Сохранить» окна дня и стрелки выделения журнала.</summary>
+    /// <summary>Умолчания — «Сохранить» окна дня, стрелки журнала и клавиши окна плана.</summary>
     /// <remarks>
     /// Второе умолчание памятью держится плохо: у пользователя нет вкладки «какие клавиши из
     /// коробки», кроме этой самой строки умолчания.
     /// </remarks>
     [Fact]
-    public void Умолчания_ТолькоУСохранитьИСтрелокЖурнала()
+    public void Умолчания_СохранитьСтрелкиЖурналаИКлавишиПлана()
     {
         var defaults = HotkeyCatalog.Groups
             .SelectMany(group => group.Actions)
             .Where(action => action.DefaultGesture is not null)
             .ToDictionary(action => action.Id, action => action.DefaultGesture!);
 
-        Assert.Equal(3, defaults.Count);
+        Assert.Equal(8, defaults.Count);
         Assert.Equal("Ctrl+S", defaults["Day.Save"]);
         Assert.Equal("Up", defaults["Main.SelectedUp"]);
         Assert.Equal("Down", defaults["Main.SelectedDown"]);
+        Assert.Equal("Up", defaults["EditPlan.SelectedUp"]);
+        Assert.Equal("Down", defaults["EditPlan.SelectedDown"]);
+        Assert.Equal("Space", defaults["EditPlan.ToggleCheck"]);
+        Assert.Equal("Left", defaults["EditPlan.BlockLeft"]);
+        Assert.Equal("Right", defaults["EditPlan.BlockRight"]);
+    }
+
+    /// <summary>В окне две одинаковые комбинации спорят: умолчания внутри группы не повторяются.</summary>
+    /// <remarks>
+    /// Конфликт считается по окну: <c>KeyBinding</c> живёт в окне, и одна комбинация в двух
+    /// окнах выполняет два разных действия, ни за что не споря. Внутри окна — спор, и вкладка
+    /// «Горячие клавиши» такой ход отвергнет.
+    /// </remarks>
+    [Fact]
+    public void Умолчания_ВГруппеНеПовторяются()
+    {
+        Assert.All(
+            HotkeyCatalog.Groups,
+            group =>
+            {
+                var defaults = group.Actions
+                    .Where(action => action.DefaultGesture is not null)
+                    .Select(action => action.DefaultGesture!)
+                    .ToList();
+
+                Assert.Equal(defaults.Count, defaults.Distinct().Count());
+            });
     }
 
     /// <summary>Слотам каталогом обещаны все номера подряд от 1 до 12.</summary>

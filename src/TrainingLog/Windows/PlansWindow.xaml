@@ -164,6 +164,8 @@
                                     BorderThickness="1">
                                 <Border.Style>
                                     <Style TargetType="Border">
+                                        <!-- Прозрачный фон ловит мышь по всей строке: без него клик проходит насквозь там, где ничего не нарисовано, и строка выделяется только по буквам (ловушка 13). -->
+                                        <Setter Property="Background" Value="Transparent" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Path=(helpers:RowSelection.IsSelected), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
                                                 <Setter Property="Background" Value="{DynamicResource RowHighlight}" />

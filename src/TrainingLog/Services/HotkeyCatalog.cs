@@ -14,10 +14,10 @@ public enum HotkeyKind
 }
 
 /// <summary>Одно назначаемое действие: id, имя по-русски, умолчание.</summary>
-/// <summary>
-/// Умолчание есть не у всех: «Сохранить» окна дня с Ctrl+S, стрелки выделения журнала с Up/Down —
-/// у остальных его нет.
-/// </summary>
+/// <remarks>
+/// Умолчание есть не у всех: «Сохранить» окна дня с Ctrl+S, стрелки выделения журнала с Up/Down,
+/// стрелки и пробел окна плана — у остальных его нет.
+/// </remarks>
 public sealed record HotkeyAction(string Id, string Name, string? DefaultGesture, HotkeyKind Kind)
 {
     /// <summary>Пометка строковых и слотовых назначений: видна рядом с именем действия.</summary>
@@ -35,8 +35,8 @@ public sealed record HotkeyGroup(string WindowName, IReadOnlyList<HotkeyAction> 
 /// <summary>Каталог назначений: все кнопки всех окон, порядок групп = порядок вкладки.</summary>
 /// <remarks>
 /// Контракты, проверяемые тестом: id уникальны глобально, в группе имена не повторяются,
-/// умолчания — «Сохранить» окна дня и стрелки выделения журнала. Слоты окна дня перечислены
-/// явно, диапазон 1–12.
+/// умолчания — «Сохранить» окна дня, стрелки выделения журнала и клавиши окна плана.
+/// Слоты окна дня перечислены явно, диапазон 1–12.
 /// </remarks>
 public static class HotkeyCatalog
 {
@@ -116,6 +116,13 @@ public static class HotkeyCatalog
             new HotkeyAction("EditPlan.MoveUp", "Выше (↑)", null, HotkeyKind.Row),
             new HotkeyAction("EditPlan.MoveDown", "Ниже (↓)", null, HotkeyKind.Row),
             new HotkeyAction("EditPlan.Remove", "Убрать (✕)", null, HotkeyKind.Row),
+            // Одна пара стрелок на оба блока: две пары в одном окне конфликтовали бы между собой
+            // («Up» занят дважды), а вкладка считает конфликт по окну.
+            new HotkeyAction("EditPlan.SelectedUp", "Строка выше (↑)", "Up", HotkeyKind.Window),
+            new HotkeyAction("EditPlan.SelectedDown", "Строка ниже (↓)", "Down", HotkeyKind.Window),
+            new HotkeyAction("EditPlan.ToggleCheck", "Отметка упражнения", "Space", HotkeyKind.Row),
+            new HotkeyAction("EditPlan.BlockLeft", "Блок слева: все упражнения (←)", "Left", HotkeyKind.Window),
+            new HotkeyAction("EditPlan.BlockRight", "Блок справа: порядок в плане (→)", "Right", HotkeyKind.Window),
         ]),
 
         new HotkeyGroup("Параметры",
