@@ -15,8 +15,8 @@
 Готовые сборки лежат на странице релизов:
 https://github.com/EliteSaber/TrainingLog/releases/latest
 
-- `TrainingLog-1.1.0-win-x64.exe` — один файл, нужен .NET 10 Desktop Runtime;
-- `TrainingLog-1.1.0-win-x64-selfcontained.zip` — ничего доустанавливать не надо.
+- `TrainingLog-1.2.0-win-x64.exe` — один файл, нужен .NET 10 Desktop Runtime;
+- `TrainingLog-1.2.0-win-x64-selfcontained.zip` — ничего доустанавливать не надо.
 
 Настройки `settings.json` пишутся рядом с программой и при отсутствии создаются при
 первом запуске. База SQLite лежит в `%LOCALAPPDATA%\TrainingLog\exercises.db`,
