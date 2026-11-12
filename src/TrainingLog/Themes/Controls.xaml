@@ -595,6 +595,10 @@
             <Trigger Property="Role" Value="SubmenuHeader">
                 <Setter TargetName="GestureText" Property="Visibility" Value="Visible" />
             </Trigger>
+            <!-- Пустой столбик под сочетание клавиш убираем так же, как в MenuItemSubmenuItem -->
+            <Trigger Property="InputGestureText" Value="">
+                <Setter TargetName="GestureText" Property="Visibility" Value="Collapsed" />
+            </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
 
@@ -634,6 +638,15 @@
             <Trigger Property="Role" Value="SubmenuItem">
                 <Setter TargetName="GestureText" Property="Visibility" Value="Visible" />
             </Trigger>
+            <!--
+              Пустой столбик под сочетание клавиш: Hidden по WPF всё равно занимает место в вёрстке,
+              и пустой GestureText оставлял справа от каждого пункта 24 px пустоты (его
+              Margin="24,0,0,0"). Сочетаний в меню нет — колонку убираем вместе с пустотой.
+              Триггер после триггера роли: срабатывают оба, и последний выигрывает.
+            -->
+            <Trigger Property="InputGestureText" Value="">
+                <Setter TargetName="GestureText" Property="Visibility" Value="Collapsed" />
+            </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
 
@@ -657,13 +670,26 @@
         </Style.Triggers>
     </Style>
 
+    <!--
+      Разделитель: линия от края до края — так же, как остальные разделители приложения (линия под
+      шапкой, нижние разделители строк журнала). Горизонтального отступа нет: карточка меню сама
+      отступает от своего края рамкой в 1 px, и линия упирается в её внутренний край. Вертикальные
+      3 px — зазор между соседними пунктами меню.
+
+      Ловушка: этот стиль неявный, и внутри ContextMenu он не действует. У Separator есть
+      DefaultStyleKey, а тема WPF регистрирует его стилем ПО КЛЮЧУ {x:Type Separator} — тематический
+      стиль по умолчанию перебивает неявный стиль из дерева ресурсов. Меню получало тему: линия со
+      сдвигом 30 px (место под галочку) и цвет #D7D7D7, одинаковый в обеих темах. Объявление стиля
+      в ContextMenu.Resources не помогает — помогает только явное назначение:
+      Style="{StaticResource {x:Type Separator}}".
+    -->
     <Style TargetType="Separator">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Separator">
                     <Border Height="1"
-                            Margin="6,3"
-                            Background="{DynamicResource LineSoft}"
+                            Margin="0,3"
+                            Background="{DynamicResource MenuSeparator}"
                             SnapsToDevicePixels="True" />
                 </ControlTemplate>
             </Setter.Value>

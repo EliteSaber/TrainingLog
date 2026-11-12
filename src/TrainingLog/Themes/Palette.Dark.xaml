@@ -31,6 +31,12 @@
     <SolidColorBrush x:Key="LineSoft" Color="#262D35" />
     <SolidColorBrush x:Key="LineStrong" Color="#39434D" />
 
+    <!--
+      Разделитель меню — отдельный токен: мягкая линия (#262D35) на карточке меню (#1F252B)
+      почти не видна, а разделитель должен читаться. Тон взят у рамки поля (#3A434D).
+    -->
+    <SolidColorBrush x:Key="MenuSeparator" Color="#3A434D" />
+
     <!-- Рамка окна: светлее линий, иначе окно теряет контур на тёмном фоне -->
     <SolidColorBrush x:Key="WindowBorder" Color="#47535F" />
 
