@@ -63,12 +63,33 @@ public static class AppFonts
     {
         var name = FontRules.NormalizeName(fontFamily);
 
-        return name.Length > 0
-           && Fonts.SystemFontFamilies.FirstOrDefault(family =>
-                   string.Equals(family.Source, name, StringComparison.OrdinalIgnoreCase)) is { } installed
-            ? installed
-            : new FontFamily(FontRules.DefaultFontFamily);
+        if (name.Length == 0)
+        {
+            return new FontFamily(FontRules.DefaultFontFamily);
+        }
+
+        // Найденное семейство запоминается: перечисление системных шрифтов WPF считает через
+        // COM и стоит дорого, а Apply зовётся на каждое движение ползунка масштаба в окне
+        // параметров. Ненайденное не запоминается — шрифт, установленный при работающем
+        // приложении, обязан найтись с первой попытки.
+        if (Installed.TryGetValue(name, out var cached))
+        {
+            return cached;
+        }
+
+        if (Fonts.SystemFontFamilies.FirstOrDefault(family =>
+                string.Equals(family.Source, name, StringComparison.OrdinalIgnoreCase)) is not { } installed)
+        {
+            return new FontFamily(FontRules.DefaultFontFamily);
+        }
+
+        Installed[name] = installed;
+
+        return installed;
     }
+
+    /// <summary>Установленные семейства, найденные по имени. Живёт на нити интерфейса.</summary>
+    private static readonly Dictionary<string, FontFamily> Installed = new(StringComparer.OrdinalIgnoreCase);
 
     private static void ApplySize(
         ResourceDictionary resources,

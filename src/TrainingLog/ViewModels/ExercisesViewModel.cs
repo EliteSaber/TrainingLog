@@ -217,6 +217,7 @@ public sealed partial class ExercisesViewModel : ObservableObject
     /// <c>Clear</c> + <c>Add</c> заставлял WPF пересоздать контейнеры всех строк на каждый символ
     /// фильтра. Здесь удаляются только ушедшие строки, новые вставляются на свои места, а
     /// перестановки идут через <c>Move</c> — контейнеры сохранившихся упражнений переиспользуются.
+    /// Порядок действий и поиск места элемента — общие с планами, см. <see cref="VisibleSync"/>.
     /// </remarks>
     private void RebuildVisible()
     {
@@ -237,35 +238,6 @@ public sealed partial class ExercisesViewModel : ObservableObject
 
         var target = query.ToList();
 
-        // Ушедшие из фильтра — удаляются, сохранившиеся остаются на своих местах.
-        for (var index = Visible.Count - 1; index >= 0; index--)
-        {
-            if (!target.Contains(Visible[index]))
-            {
-                Visible.RemoveAt(index);
-            }
-        }
-
-        // Остальные ставятся по порядку: перестановка — Move, появление — Insert.
-        for (var index = 0; index < target.Count; index++)
-        {
-            var exercise = target[index];
-
-            if (index < Visible.Count && ReferenceEquals(Visible[index], exercise))
-            {
-                continue;
-            }
-
-            var currentIndex = Visible.IndexOf(exercise);
-
-            if (currentIndex >= 0)
-            {
-                Visible.Move(currentIndex, index);
-            }
-            else
-            {
-                Visible.Insert(index, exercise);
-            }
-        }
+        VisibleSync.Sync(Visible, target);
     }
 }

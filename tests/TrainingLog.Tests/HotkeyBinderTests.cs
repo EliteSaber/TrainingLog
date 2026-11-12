@@ -9,6 +9,7 @@ using TrainingLog.Services;
 namespace TrainingLog.Tests;
 
 /// <summary>Нажатие Window-кнопки биндером: выключенная молчит, включённая исполняет команду.</summary>
+[Collection(WpfTestGroup.Name)]
 public sealed class HotkeyBinderTests
 {
     /// <summary>Клавиша по выключенной кнопке — тишина, а не исключение.</summary>

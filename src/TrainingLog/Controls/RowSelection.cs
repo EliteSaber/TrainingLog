@@ -1,15 +1,22 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace TrainingLog.Controls;
 
 /// <summary>Выделение строки списка кликом: списки в проекте — ItemsControl без выделения.</summary>
 /// <remarks>
-/// Клик по строке выделяет её, повторный клик снимает. Конкретно строки ходят своими рамками,
-/// поэтому подсветка задаётся слабым системным цветом на контейнере — стилем контейнеров,
-/// а не перестройкой шаблонов. Нажатия по кнопкам внутри строки выделение не меняют: кнопки
-/// сами гасят MouseDown, и клик «Редактировать» не должен выделять строку.
+/// Клик по строке выделяет её, повторный клик снимает. Подсветка задаётся слабым системным
+/// цветом на рамке строки триггером разметки. Нажатия по кнопкам внутри строки выделение не
+/// меняют: кнопки сами гасят MouseDown, и клик «Редактировать» не должен выделять строку.
+///
+/// Признак выделения хранится в двух видах. Панель с переработкой контейнеров отдаёт один
+/// контейнер разным строкам, и оставленный на контейнере признак подсветил бы чужую строку, —
+/// поэтому у элементов, реализующих <see cref="ISelectableRow"/>, признак живёт на элементе
+/// и привязка подсветки читает его из данных. Спискам без переработки признак на контейнере
+/// никуда не девался. Само выделение в обоих видах — элемент данных, запомненный на списке:
+/// перечитывание списка заменяет элементы, и мёртвое выделение молчит (ловушка 18).
 /// </remarks>
 public static class RowSelection
 {
@@ -24,7 +31,8 @@ public static class RowSelection
     /// <summary>Признак выделенной строки у её контейнера: читается триггером подсветки.</summary>
     /// <remarks>
     /// Живёт на контейнере потому, что он переживает перечитывание строк целиком — по ловушке 18
-    /// строки могут пересоздаваться, и выделение честно пропадает вместе с ними.
+    /// строки могут пересоздаваться, и выделение честно пропадает вместе с ними. Спискам с
+    /// переработкой контейнеров этот признак не годится — см. <see cref="ISelectableRow"/>.
     /// </remarks>
     public static readonly DependencyProperty IsSelectedProperty =
         DependencyProperty.RegisterAttached("IsSelected", typeof(bool), typeof(RowSelection));
@@ -40,31 +48,24 @@ public static class RowSelection
     public static bool GetIsSelected(DependencyObject element) =>
         (bool)element.GetValue(IsSelectedProperty);
 
-    // Контейнер выделенной строки: ищется кликом и держится на списке, отдаётся Item().
-    // Отдельный контейнер: тип без nullable-суффикса, typeof с «?» для ссылочных типов запрещён.
-    private static readonly DependencyProperty SelectedContainerProperty =
+    // Выделенный элемент данных списка: ищется кликом, двигается стрелками, отдаётся Item().
+    private static readonly DependencyProperty SelectedItemProperty =
         DependencyProperty.RegisterAttached(
-            "SelectedContainer",
-            typeof(FrameworkElement),
+            "SelectedItem",
+            typeof(object),
             typeof(RowSelection));
 
     /// <summary>Выделенная строка данных, иначе <c>null</c>.</summary>
     /// <remarks>
-    /// Контейнер должен дожить до этого момента: после перечитывания списка объект в поле
-    /// мёртвый, и выделение по нему не отдаётся — комбинация молчит.
+    /// Элемент обязан дожить до этого момента: после перечитывания списка объект в поле
+    /// мёртвый, и выделение по нему не отдаётся — комбинация молчит. Мёртвым элемент считается,
+    /// когда его больше нет в списке.
     /// </remarks>
     public static object? Item(ItemsControl list)
     {
-        if (list.GetValue(SelectedContainerProperty) is not FrameworkElement container)
-        {
-            return null;
-        }
+        var item = list.GetValue(SelectedItemProperty);
 
-        // Мёртвый контейнер больше не внутрь этого списка: перечитывание могло его заменить.
-        var alive = container is ContentPresenter presentation
-            && ItemsControl.ItemsControlFromItemContainer(presentation) == list;
-
-        return alive && GetIsSelected(container) ? container.DataContext : null;
+        return item is not null && list.Items.IndexOf(item) >= 0 ? item : null;
     }
 
     /// <summary>Сдвигает выделение строк на <paramref name="delta"/> позиций: стрелки выделения.</summary>
@@ -73,9 +74,10 @@ public static class RowSelection
     /// и без предварительного клика мышью. За краями списка выделение остаётся на месте —
     /// зацикливание уводило бы строку из видимой области неожиданно для глаза.
     ///
-    /// Мёртвый после перечитывания контейнер считается «без выделения» — выделение умирает вместе
-    /// со строками по ловушке 18 — так же, как его читает <see cref="Item"/>. Строка для выделения
-    /// даётся генератором, а не обходом визуального дерева: контейнеры перечисляются им же.
+    /// Мёртвое после перечитывания выделение считается «без выделения» — выделение умирает
+    /// вместе со строками по ловушке 18 — так же, как его читает <see cref="Item"/>. Строка за
+    /// видимой областью не помеха: у списка с виртуализацией панель сама генерирует её и
+    /// прокручивает к ней (<see cref="VirtualizingPanel.BringIndexIntoViewPublic(int)"/>).
     /// </remarks>
     public static void Move(ItemsControl list, int delta)
     {
@@ -88,46 +90,118 @@ public static class RowSelection
             return;
         }
 
-        var generator = list.ItemContainerGenerator;
+        var selected = list.GetValue(SelectedItemProperty);
+        var currentIndex = selected is not null ? list.Items.IndexOf(selected) : -1;
 
-        var index = list.GetValue(SelectedContainerProperty) is FrameworkElement selected
-            && GetIsSelected(selected)
-                ? generator.IndexFromContainer(selected)
-                : -1;
-
-        // Мёртвый контейнер за пределами списка даёт -1: выделение пропало, и начинаем
-        // с края по направлению шага — как и без выделения вовсе.
-        index = index < 0
+        // Мёртвый или снятый элемент даёт -1: выделение пропало, и начинаем с края по
+        // направлению шага — как и без выделения вовсе.
+        var index = currentIndex < 0
             ? delta > 0 ? 0 : count - 1
-            : Math.Clamp(index + delta, 0, count - 1);
+            : Math.Clamp(currentIndex + delta, 0, count - 1);
 
-        // Нереализованный контейнер не заменяется: виртуализации в списках нет, а дождаться
-        // поколения на заявку клавиши нечем.
-        if (generator.ContainerFromIndex(index) is not FrameworkElement container)
+        var item = list.Items[index];
+        var container = list.ItemContainerGenerator.ContainerFromIndex(index) as FrameworkElement;
+
+        ClearSelection(list, selected);
+
+        if (item is ISelectableRow row)
+        {
+            row.IsSelected = true;
+        }
+        else if (container is not null)
+        {
+            SetIsSelected(container, true);
+        }
+
+        list.SetValue(SelectedItemProperty, item);
+
+        // Список внутри ScrollViewer видит запрос BringIntoView сквозь строку: контейнеры
+        // росли вверх от низа, и без докрутки выделение уходило бы за нижний край окна.
+        if (container is not null)
+        {
+            container.BringIntoView();
+        }
+        else if (FindPanel(list) is { } panel)
+        {
+            panel.BringIndexIntoViewPublic(index);
+        }
+    }
+
+    /// <summary>Контейнер строки элемента, иначе <c>null</c>.</summary>
+    /// <remarks>
+    /// Список с виртуализацией может не держать контейнер для строки за видимой областью:
+    /// панель сначала генерирует и прокручивает её, и контейнер забирается после раскладки.
+    /// </remarks>
+    public static FrameworkElement? Container(ItemsControl list, object item)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        ArgumentNullException.ThrowIfNull(item);
+
+        if (list.ItemContainerGenerator.ContainerFromItem(item) is FrameworkElement container)
+        {
+            return container;
+        }
+
+        var index = list.Items.IndexOf(item);
+
+        if (index < 0 || FindPanel(list) is not { } panel)
+        {
+            return null;
+        }
+
+        panel.BringIndexIntoViewPublic(index);
+        list.UpdateLayout();
+
+        return list.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
+    }
+
+    /// <summary>Панель с виртуализацией внутри списка, иначе <c>null</c>.</summary>
+    /// <remarks>
+    /// Обход визуального дерева, а не готового свойства: у <see cref="ItemsControl"/> хост
+    /// панелей internal, а сама панель может лежать глубже — ScrollViewer в шаблоне списка
+    /// стоит между презентатором и списком. Глубина дерева списка мала, обход дёшев.
+    /// </remarks>
+    private static VirtualizingStackPanel? FindPanel(DependencyObject root)
+    {
+        if (root is VirtualizingStackPanel panel)
+        {
+            return panel;
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(root);
+
+        for (var index = 0; index < count; index++)
+        {
+            if (FindPanel(VisualTreeHelper.GetChild(root, index)) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    // Признак снимается с прежней строки: у элементов он едет с ними сам, у контейнеров
+    // прежний контейнер ищется по элементу.
+    private static void ClearSelection(ItemsControl list, object? item)
+    {
+        if (item is null)
         {
             return;
         }
 
-        if (list.GetValue(SelectedContainerProperty) is FrameworkElement previous
-            && !ReferenceEquals(previous, container))
+        if (item is ISelectableRow row)
         {
-            SetIsSelected(previous, false);
+            row.IsSelected = false;
+
+            return;
         }
 
-        SetIsSelected(container, true);
-        list.SetValue(SelectedContainerProperty, container);
-
-        // Список внутри ScrollViewer видит запрос BringIntoView сквозь строку: контейнеры
-        // росли вверх от низа, и без докрутки выделение уходило бы за нижний край окна.
-        container.BringIntoView();
+        if (list.ItemContainerGenerator.ContainerFromItem(item) is FrameworkElement container)
+        {
+            SetIsSelected(container, false);
+        }
     }
-
-    /// <summary>Сам контейнер выделенной строки, иначе <c>null</c>: нужен для поиска кнопок внутри.</summary>
-    public static FrameworkElement? Container(ItemsControl list) =>
-        list.GetValue(SelectedContainerProperty) is FrameworkElement container
-        && GetIsSelected(container)
-            ? container
-            : null;
 
     private static void OnEnabledChanged(
         DependencyObject element,
@@ -163,13 +237,29 @@ public static class RowSelection
             return;
         }
 
-        if (list.GetValue(SelectedContainerProperty) is FrameworkElement previous
-            && !ReferenceEquals(previous, container))
+        var item = container.DataContext;
+        var previous = list.GetValue(SelectedItemProperty);
+
+        // Повторный клик по выделенной строке снимает выделение.
+        if (ReferenceEquals(previous, item))
         {
-            SetIsSelected(previous, false);
+            ClearSelection(list, item);
+            list.SetValue(SelectedItemProperty, null);
+
+            return;
         }
 
-        SetIsSelected(container, (bool)container.GetValue(IsSelectedProperty) is false);
-        list.SetValue(SelectedContainerProperty, container);
+        ClearSelection(list, previous);
+
+        if (item is ISelectableRow row)
+        {
+            row.IsSelected = true;
+        }
+        else
+        {
+            SetIsSelected(container, true);
+        }
+
+        list.SetValue(SelectedItemProperty, item);
     }
 }

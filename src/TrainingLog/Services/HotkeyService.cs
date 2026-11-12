@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows.Input;
 using TrainingLog.Core.Settings;
 
@@ -66,8 +67,12 @@ public sealed class HotkeyService
     /// <summary>Canonical-строку комбинации переводит в KeyGesture; негодную — null.</summary>
     private static KeyGesture? ToGesture(string? text)
     {
+        // IsDefined после TryParse: парсинг принимает и числовые значения перечисления,
+        // а клавиша должна быть именованной. Числа отсекает правило разбора, IsDefined —
+        // страховка на случай других неопределённых значений.
         if (!HotkeyRules.TryParse(text, out var combo)
-            || !Enum.TryParse(combo.Key, ignoreCase: true, out Key key))
+            || !Enum.TryParse(combo.Key, ignoreCase: true, out Key key)
+            || !Enum.IsDefined(key))
         {
             return null;
         }
@@ -78,7 +83,7 @@ public sealed class HotkeyService
         }
         // Клавиши без модификаторов KeyGesture принимает не все: буквы требуют модификатор.
         // Такое назначение нигде не заработало бы, и считаем его умолчанием, а не ошибкой.
-        catch (NotSupportedException)
+        catch (Exception exception) when (exception is NotSupportedException or InvalidEnumArgumentException)
         {
             return null;
         }

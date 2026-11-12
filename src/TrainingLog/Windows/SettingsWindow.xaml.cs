@@ -245,7 +245,7 @@ public partial class SettingsWindow : Window
     /// <remarks>
     /// Якорь берётся из <see cref="AllowedCharsInput.RejectedEventArgs.Field"/>, а не из
     /// <c>e.Source</c>: событие всплывает от поля до окна, и на приёмнике <c>Source</c> уже не
-    /// поле (ловушка 35). Отсчёт перезапускается явно — повторный отказ даёт тот же текст,
+    /// поле (ловушка 41). Отсчёт перезапускается явно — повторный отказ даёт тот же текст,
     /// состояние подсказки не меняется, и без этого она погасла бы на середине набора.
     /// </remarks>
     private void OnInputRejected(object sender, RoutedEventArgs e)

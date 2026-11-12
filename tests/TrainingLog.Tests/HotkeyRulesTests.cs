@@ -61,6 +61,12 @@ public sealed class HotkeyRulesTests
     [InlineData("Control+Ctrl+S")]
     [InlineData("S+F1")]
     [InlineData("Ctrl+Shift+S+F1")]
+    // Часть из одних цифр — значение перечисления Key, а не имя клавиши («1» — это Key.Cancel):
+    // «999» в WPF-слое и вовсе неопределённое значение. Цифровые клавиши пишутся D0–D9.
+    [InlineData("Ctrl+1")]
+    [InlineData("Ctrl+999")]
+    [InlineData("1")]
+    [InlineData("1+Ctrl")]
     public void TryParse_НегодныеЗаписи_Отказ(string? text)
     {
         Assert.False(HotkeyRules.TryParse(text, out _));

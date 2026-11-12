@@ -58,12 +58,14 @@ public sealed class HotkeyServiceTests
     /// <summary>Негодная строка файла и неизвестное имя клавиши — умолчание, а не исключение.</summary>
     /// <remarks>
     /// Файл правят руками: «Ctrl+» — чайник не дописал, «SpaceInvaders» — опечатка. Обе записи
-    /// обязаны пропасть в умолчание, а не уронить запуск.
+    /// обязаны пропасть в умолчание, а не уронить запуск. «Ctrl+999» — число: правило разбора
+    /// его отвергает раньше Enum-парсинга, который принял бы его как значение перечисления.
     /// </remarks>
     [Theory]
     [InlineData("Ctrl+")]
     [InlineData(" SpaceInvaders ")]
     [InlineData("SpaceInvaders")]
+    [InlineData("Ctrl+999")]
     public void Resolve_НегоднаяСтрока_Умолчание(string text)
     {
         using var settings = new TemporarySettings();

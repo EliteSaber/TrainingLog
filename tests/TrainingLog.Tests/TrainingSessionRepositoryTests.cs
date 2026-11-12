@@ -452,6 +452,87 @@ public sealed class TrainingSessionRepositoryTests
         Assert.Empty(await database.SessionRepository.GetAsync());
     }
 
+    /// <summary>
+    /// Порядок упражнений и подходов при чтении — по номеру, а не по порядку строк в базе.
+    /// </summary>
+    /// <remarks>
+    /// Строки лежат в базе в физическом порядке вставки, и он не обязан совпадать с порядком
+    /// выполнения: номер (`Order`) задаёт хранилище, а физический порядок — дело случая. Чтение
+    /// обязано сортировать по номеру, иначе строка дня показала бы упражнения и подходы как
+    /// попало. Проверка на данных, вставленных нарочно вразнобой: при обычной записи порядок
+    /// строк совпадает с номером, и проверка прошла бы вхолостую.
+    ///
+    /// Все четыре пути чтения обязаны вести себя одинаково: журнал берёт день и последние дни
+    /// разными запросами, и разный порядок в них выглядел бы как «иногда список перепутан».
+    /// </remarks>
+    [Fact]
+    public async Task Чтение_ПорядокУпражненийИПодходов_ПоНомеру()
+    {
+        using var database = new TemporaryDatabase();
+        var squat = await AddExerciseAsync(database, "Приседание");
+        var bench = await AddExerciseAsync(database, "Жим");
+        var plan = await AddPlanAsync(database, "Ноги", squat, bench);
+
+        var date = new DateOnly(2026, 10, 5);
+
+        // Запись вставляется мимо репозитория: он перенумеровывает строки по порядку, а
+        // нужен физический порядок, не совпадающий с номером.
+        using (var context = database.Factory.CreateDbContext())
+        {
+            var session = new TrainingSession { Date = date, PlanId = plan.Id, PlanName = plan.Name };
+
+            context.TrainingSessions.Add(session);
+
+            await context.SaveChangesAsync();
+
+            var first = new ExerciseEntry { ExerciseId = squat.Id, ExerciseName = squat.Name, Order = 2 };
+            var second = new ExerciseEntry { ExerciseId = bench.Id, ExerciseName = bench.Name, Order = 1 };
+
+            // Строки связи вставляются вразнобой с номерами.
+            session.Exercises.Add(first);
+            session.Exercises.Add(second);
+
+            await context.SaveChangesAsync();
+
+            foreach (var set in new[]
+            {
+                new TrainingSet { ExerciseEntryId = first.Id, Order = 3, Repetitions = 12, Weight = 50m },
+                new TrainingSet { ExerciseEntryId = first.Id, Order = 1, Repetitions = 10, Weight = 40m },
+                new TrainingSet { ExerciseEntryId = first.Id, Order = 2, Repetitions = 11, Weight = 45m },
+            })
+            {
+                context.TrainingSets.Add(set);
+            }
+
+            await context.SaveChangesAsync();
+
+            // Порядок строк в базе — по вставке, и он по замыслу не совпадает с номером:
+            // без этой проверки тест незаметно стал бы пустым.
+            Assert.Equal(
+                ["Приседание", "Жим"],
+                context.ExerciseEntries
+                    .OrderBy(entry => entry.Id)
+                    .Select(entry => entry.ExerciseName));
+        }
+
+        var byDate = await database.SessionRepository.GetByDateAsync(date);
+        var latest = Assert.Single(await database.SessionRepository.GetLatestAsync(5));
+        var byPeriod = Assert.Single(await database.SessionRepository.GetAsync(date, date));
+        var previous = await database.SessionRepository.GetPreviousByPlanAsync(plan.Id, date.AddDays(1));
+
+        foreach (var session in new[] { byDate, latest, byPeriod, previous })
+        {
+            Assert.NotNull(session);
+
+            // Порядок как пришёл, без сортировки: сортировка скрыла бы сам дефект.
+            Assert.Equal([1, 2], session!.Exercises.Select(entry => entry.Order));
+            Assert.Equal([1, 2, 3], session.Exercises.Single(entry => entry.ExerciseName == "Приседание").Sets.Select(set => set.Order));
+
+            // По номеру: «Жим» — первый, хотя в базу он вставлен вторым.
+            Assert.Equal(["Жим", "Приседание"], session.Exercises.Select(entry => entry.ExerciseName));
+        }
+    }
+
     private static async Task<Exercise> AddExerciseAsync(TemporaryDatabase database, string name)
     {
         var exercise = new Exercise { Name = name };

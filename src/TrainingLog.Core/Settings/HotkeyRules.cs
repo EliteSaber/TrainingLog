@@ -80,7 +80,18 @@ public static class HotkeyRules
             return false;
         }
 
-        combo = new HotkeyCombo(modifiers, CanonicalKey(keys[0]));
+        var keyPart = keys[0];
+
+        // Часть из одних цифр — не имя клавиши, а число: Enum-парсинг в WPF-слое принял бы его
+        // как значение перечисления Key («1» — это Key.Cancel, а не клавиша «1», её имя D1),
+        // и негодная запись превратилась бы в неожиданное назначение. Цифровые клавиши
+        // записываются именами D0–D9.
+        if (keyPart.All(char.IsDigit))
+        {
+            return false;
+        }
+
+        combo = new HotkeyCombo(modifiers, CanonicalKey(keyPart));
 
         return true;
     }

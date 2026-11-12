@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -5,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using TrainingLog.Controls;
 using TrainingLog.Services;
 using TrainingLog.ViewModels;
@@ -30,6 +32,18 @@ public partial class MainWindow : Window
         ("Main.SelectedUp", -1),
         ("Main.SelectedDown", 1),
     ];
+
+    /// <summary>Прокрутка журнала: скролл живёт в шаблоне списка, окно берёт его по имени.</summary>
+    private ScrollViewer? _journalScroll;
+
+    /// <summary>Дата строки, которая сейчас сверху журнала: по ней журнал возвращается на место.</summary>
+    private DateOnly? _journalTopDate;
+
+    /// <summary>Смещение, при котором запомнено верхнее место: по нему видно, что журнал прокручен.</summary>
+    private double _journalTopOffset;
+
+    /// <summary>Дата, к которой журнал возвращается: она же замораживает запомненное место.</summary>
+    private DateOnly? _restoreDate;
 
     public MainWindow(MainViewModel viewModel, HotkeyService hotkeys)
     {
@@ -73,6 +87,10 @@ public partial class MainWindow : Window
 
         // Изменение места базы: модель докладывает событием, якорь и показ — здесь.
         _viewModel.DatabaseAddressChanged += OnDatabaseAddressChanged;
+
+        // Перечитывание журнала сдвигает содержимое вниз: окно запоминает верхнее место и
+        // возвращает журнал на ту же строку (OnDaysChanged).
+        _viewModel.Days.CollectionChanged += OnDaysChanged;
 
         // Стрелки выделения слушаются на окне: туннель у корня маршрута не зависит от того,
         // где живёт клавиатурный фокус (см. OnWindowPreviewKeyDown).
@@ -137,11 +155,14 @@ public partial class MainWindow : Window
     /// <remarks>
     /// Логика та же, что у клика по кнопке, и якорь тоже нужен: имя у кнопок в строке данных
     /// отсутствует — кнопка находится поиском внутри выделенного дня. Примечание у найденной
-    /// кнопки есть по построению поиска, и показывается оно так же, как по клику.
+    /// кнопки есть по построению поиска, и показывается оно так же, как по клику. Контейнер
+    /// выделенного дня берётся через <see cref="RowSelection.Container(ItemsControl,object)"/>;
+    /// журнал виртуализован, и за видимой областью контейнера может не быть — помощник доводит
+    /// строку в видимую область сам.
     /// </remarks>
     private void ShowNote(object row)
     {
-        if (DaysList.ItemContainerGenerator.ContainerFromItem(row) is not FrameworkElement container)
+        if (RowSelection.Container(DaysList, row) is not FrameworkElement container)
         {
             return;
         }
@@ -278,6 +299,156 @@ public partial class MainWindow : Window
         AllowedCharsInput.RemoveRejectedHandler(this, OnInputRejected);
         AllowedCharsInput.RemoveAcceptedHandler(this, OnInputAccepted);
         _viewModel.DatabaseAddressChanged -= OnDatabaseAddressChanged;
+        _viewModel.Days.CollectionChanged -= OnDaysChanged;
+
+        if (_journalScroll is { } scroll)
+        {
+            scroll.ScrollChanged -= OnJournalScrolled;
+        }
+    }
+
+    /// <summary>Журнал прокрутили: запоминаем строку, которая теперь сверху.</summary>
+    /// <remarks>
+    /// Запоминается верхняя видимая строка, а не смещение: перечитывание пересобирает список
+    /// целиком, и прежние строки уходят — остаётся только дата, по которой строка ищется заново.
+    /// </remarks>
+    private void OnJournalScrolled(object? sender, ScrollChangedEventArgs e)
+    {
+        if (_journalScroll is not { } scroll)
+        {
+            return;
+        }
+
+        if (TopVisibleRow(scroll) is not { } container
+            || container.DataContext is not DayRowViewModel day)
+        {
+            return;
+        }
+
+        _journalTopDate = day.Date;
+        _journalTopOffset = scroll.VerticalOffset;
+    }
+
+    /// <summary>Список дней перечитали: журнал возвращается на ту же строку, что была сверху.</summary>
+    /// <remarks>
+    /// Перечитывание пересобирает список целиком, и новый день сверху сдвигает содержимое вниз:
+    /// смещение прокрутки остаётся прежним, а на экране оказывается другая строка. Возврат нужен
+    /// пользователю, который читал журнал, — он смотрел на конкретные дни.
+    ///
+    /// Возврат отложен до раскладки: сразу после пересборки контейнеров ещё нет, и место строки
+    /// незнаемо. Дата верхней строки запоминается при прокрутке, а перечитывание её замораживает:
+    /// иначе следующая же прокрутка перебила бы возврат.
+    ///
+    /// У верха журнала возврата нет: там пользователь и так видит начало, и новый день должен
+    /// появиться перед глазами, а не под ними.
+    /// </remarks>
+    private void OnDaysChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action is not (NotifyCollectionChangedAction.Reset or NotifyCollectionChangedAction.Add))
+        {
+            return;
+        }
+
+        // Возврат уже запланирован: перечитывание идёт сбросом и добавлением строк по одной.
+        if (_restoreDate is not null)
+        {
+            return;
+        }
+
+        if (_journalTopDate is not { } date || _journalTopOffset <= 0.5)
+        {
+            return;
+        }
+
+        _restoreDate = date;
+
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(RestoreJournalTop));
+    }
+
+    /// <summary>Возвращает журнал на строку, которая была сверху до перечитывания.</summary>
+    private void RestoreJournalTop()
+    {
+        var date = _restoreDate;
+
+        _restoreDate = null;
+
+        if (date is not { } wanted || _journalScroll is not { } scroll)
+        {
+            return;
+        }
+
+        // Строка ищется по дате: перечитывание создаёт новые строки, и прежний объект в списке
+        // больше не живёт — переживает пересборку только дата.
+        var index = IndexOfDay(wanted);
+
+        if (index < 0 || DaysList.ItemContainerGenerator.ContainerFromIndex(index) is not FrameworkElement container)
+        {
+            return;
+        }
+
+        // Место строки в содержимом: от края окна к содержимому прибавляется прокрутка.
+        var place = container.TransformToAncestor(scroll).Transform(new Point(0, 0)).Y;
+
+        scroll.ScrollToVerticalOffset(place + scroll.VerticalOffset);
+    }
+
+    /// <summary>Номер строки журнала с такой датой; минус — такой даты в журнале нет.</summary>
+    private int IndexOfDay(DateOnly date)
+    {
+        var index = 0;
+
+        foreach (var day in _viewModel.Days)
+        {
+            if (day.Date == date)
+            {
+                return index;
+            }
+
+            index++;
+        }
+
+        return -1;
+    }
+
+    /// <summary>Контейнер строки, которая сейчас сверху журнала.</summary>
+    /// <remarks>
+    /// Берутся построенные контейнеры, а не все строки списка: построенных единицы, а строк
+    /// сотни, и перебор всех индексов на каждое движение прокрутки стоил бы дорого.
+    /// </remarks>
+    private static FrameworkElement? TopVisibleRow(ScrollViewer scroll)
+    {
+        if (scroll.Content is not FrameworkElement presenter)
+        {
+            return null;
+        }
+
+        // В скролле лежит ItemsPresenter, а в нём — панель, а в панели — построенные строки.
+        if (VisualTreeHelper.GetChildrenCount(presenter) == 0)
+        {
+            return null;
+        }
+
+        var panel = VisualTreeHelper.GetChild(presenter, 0);
+        var count = VisualTreeHelper.GetChildrenCount(panel);
+
+        for (var index = 0; index < count; index++)
+        {
+            if (VisualTreeHelper.GetChild(panel, index) is not FrameworkElement container)
+            {
+                continue;
+            }
+
+            var place = container.TransformToAncestor(scroll).Transform(new Point(0, 0)).Y;
+
+            // Строка видна, если её низ опускается ниже верхней границы окна. Место отсчитывается
+            // от края окна: прокрутка из него уже вычта.
+            if (place + container.ActualHeight > 0)
+            {
+                return container;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -312,6 +483,14 @@ public partial class MainWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnLoaded;
+
+        // Скролл журнала живёт в шаблоне списка, и взять его иначе нечем: имя шаблона.
+        _journalScroll = DaysList.Template.FindName("DaysScroll", DaysList) as ScrollViewer;
+
+        if (_journalScroll is { } scroll)
+        {
+            scroll.ScrollChanged += OnJournalScrolled;
+        }
 
         _viewModel.LoadCommand.Execute(null);
     }
@@ -401,7 +580,7 @@ public partial class MainWindow : Window
     /// <remarks>
     /// Из разметки это не выразить: у <c>ContextMenu</c> отдельное логическое дерево, внутрь него не
     /// наследуется <c>DataContext</c> и не доходит поиск предка до окна — в отличие от привязки
-    /// <c>PlacementTarget.DataContext</c> в меню шестерёнки (ловушки 1 и 41). Здесь нужны оба
+    /// <c>PlacementTarget.DataContext</c> в меню шестерёнки (ловушки 1 и 52). Здесь нужны оба
     /// значения сразу. Событие <c>ContextMenuOpening</c> поднимается до показа меню, поэтому к
     /// моменту вычисления привязок оба значения уже на месте.
     /// </remarks>

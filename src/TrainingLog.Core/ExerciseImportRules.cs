@@ -64,6 +64,75 @@ public static class ExerciseImportRules
     }
 
     /// <summary>
+    /// Есть ли в поле хоть одна строка, которая попадёт в справочник при записи: тот же ответ,
+    /// что «<see cref="PrepareForSave"/> не пуст», но без построения списка.
+    /// </summary>
+    /// <remarks>
+    /// Кнопка сохранения проверяется на каждый символ в поле, и при тысячах строк каждая
+    /// проверка платила бы полной пересборкой списка. Здесь первое же годное имя завершает
+    /// работу, а имя ищется в множестве справочника по <see cref="ReadOnlySpan{Char}"/> —
+    /// без единой аллокации. Повторы внутри поля на ответ не влияют: отбор повторов не
+    /// выбрасывает первое вхождение, поэтому «есть принятое» и «есть годная строка» — одно и то же.
+    /// </remarks>
+    public static bool HasSavable(string? text, IReadOnlySet<string> existingNames, bool replaceExisting)
+    {
+        ArgumentNullException.ThrowIfNull(existingNames);
+
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+
+        // Множество обычно HashSet: тогда имя ищется span'ом без аллокаций. Прочие реализации
+        // IReadOnlySet обслуживаются обычным Contains — предикат обязан работать с любым.
+        HashSet<string>.AlternateLookup<ReadOnlySpan<char>>? lookup = existingNames is HashSet<string> set
+            ? set.GetAlternateLookup<ReadOnlySpan<char>>()
+            : null;
+
+        var remaining = text.AsSpan();
+
+        while (!remaining.IsEmpty)
+        {
+            var newline = remaining.IndexOf('\n');
+            ReadOnlySpan<char> line;
+
+            if (newline < 0)
+            {
+                line = remaining;
+                remaining = [];
+            }
+            else
+            {
+                line = remaining[..newline];
+                remaining = remaining[(newline + 1)..];
+            }
+
+            line = line.Trim();
+
+            if (line.IsEmpty || line.Length > NameRules.MaxNameLength)
+            {
+                continue;
+            }
+
+            if (replaceExisting)
+            {
+                return true;
+            }
+
+            var exists = lookup is { } names
+                ? names.Contains(line)
+                : existingNames.Contains(line.ToString());
+
+            if (!exists)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Делит текст на строки. И <c>\r\n</c>, и <c>\n</c> считаются концом строки: текст приходит
     /// и из файла, где переводы строк пишет редактор, и из поля окна, где их пишет пользователь.
     /// </summary>

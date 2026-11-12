@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using TrainingLog.Core.Models;
+using TrainingLog.Controls;
 
 namespace TrainingLog.ViewModels;
 
@@ -15,8 +17,34 @@ namespace TrainingLog.ViewModels;
 /// позиции, а вес стоит ровно над своим повторением. У <c>Grid</c> число колонок зависело бы от
 /// числа упражнений вместо числа подходов, и ширина разъезжалась бы между строками.
 /// </remarks>
-public sealed class DayRowViewModel
+public sealed class DayRowViewModel : INotifyPropertyChanged, ISelectableRow
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private bool _isSelected;
+
+    /// <summary>Выделена ли строка.</summary>
+    /// <remarks>
+    /// Признак живёт на элементе данных, а не на контейнере: список журнала виртуализован,
+    /// контейнеры перерабатываются, и оставленный на контейнере признак подсветил бы чужую
+    /// строку. Перечитывание журнала заменяет элементы целиком, и выделение вместе со
+    /// старыми строками исчезает — как и раньше (ловушка 18).
+    /// </remarks>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value)
+            {
+                return;
+            }
+
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
+
     /// <summary>
     /// Ширина столбца подхода. Задана один раз и одинакова для всех подходов всех дней — иначе вес
     /// и повторения одного подхода разъедутся по ширине.

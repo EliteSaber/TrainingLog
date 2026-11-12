@@ -120,43 +120,9 @@ public sealed partial class PlansViewModel : ObservableObject
     /// <param name="current">Видимая коллекция, которую приводят к целевому порядку.</param>
     /// <param name="target">Порядок, который должен получиться.</param>
     public static void SyncVisible<T>(ObservableCollection<T> current, IReadOnlyList<T> target)
+        where T : notnull
     {
-        ArgumentNullException.ThrowIfNull(current);
-        ArgumentNullException.ThrowIfNull(target);
-
-        // С конца, чтобы удаление не сдвигало ещё не просмотренные элементы.
-        for (var index = current.Count - 1; index >= 0; index--)
-        {
-            if (!target.Contains(current[index]))
-            {
-                current.RemoveAt(index);
-            }
-        }
-
-        for (var position = 0; position < target.Count; position++)
-        {
-            if (position >= current.Count)
-            {
-                current.Add(target[position]);
-                continue;
-            }
-
-            if (EqualityComparer<T>.Default.Equals(current[position], target[position]))
-            {
-                continue;
-            }
-
-            var actual = current.IndexOf(target[position]);
-
-            if (actual < 0)
-            {
-                current.Insert(position, target[position]);
-            }
-            else if (actual != position)
-            {
-                current.Move(actual, position);
-            }
-        }
+        VisibleSync.Sync(current, target);
     }
 
     [RelayCommand]

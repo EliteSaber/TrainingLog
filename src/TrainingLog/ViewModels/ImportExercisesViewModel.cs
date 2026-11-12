@@ -17,7 +17,11 @@ public sealed partial class ImportExercisesViewModel : ObservableObject
     /// Названия текущего справочника. Нужны для отсечения того, что в него уже есть: проверка
     /// идёт по памяти, а не запросом к базе на каждый символ в поле.
     /// </summary>
-    private IReadOnlyList<string> _existingNames = [];
+    /// <remarks>
+    /// Множество, а не список: <see cref="CanSave"/> ищет в нём имя на каждый символ в поле, и
+    /// перебор списка платил бы за каждую проверку. Множество строится один раз при загрузке.
+    /// </remarks>
+    private IReadOnlySet<string> _existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
     public ImportExercisesViewModel(IExerciseRepository repository)
     {
@@ -75,7 +79,7 @@ public sealed partial class ImportExercisesViewModel : ObservableObject
     {
         var all = await _repository.GetAllAsync().ConfigureAwait(true);
 
-        _existingNames = all.Select(exercise => exercise.Name).ToList();
+        _existingNames = all.Select(exercise => exercise.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -117,7 +121,11 @@ public sealed partial class ImportExercisesViewModel : ObservableObject
     public void ShowRefusal(string message) => Status = message;
 
     /// <summary>Есть чем наполнить справочник: пустое поле и одни отбракованные строки его не гасят.</summary>
-    public bool CanSave => PrepareNames().Count > 0;
+    /// <remarks>
+    /// Дешёвый предикат, а не полный пересчёт: свойство проверяется на каждый символ в поле.
+    /// Ответ обязан совпадать с «<see cref="PrepareNames"/> не пуст» — проверяется тестом.
+    /// </remarks>
+    public bool CanSave => ExerciseImportRules.HasSavable(Text, _existingNames, ClearExisting);
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()

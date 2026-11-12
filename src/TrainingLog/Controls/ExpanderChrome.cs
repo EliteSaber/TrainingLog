@@ -22,5 +22,33 @@ public static class ExpanderChrome
 {
     /// <summary>Вертикальный сдвиг шеврона в пикселях: отрицательный — вверх от центра бокса.</summary>
     public static double AlignOffset(FontFamily font, double fontSize) =>
-        fontSize * (font.Baseline - new Typeface(font.Source).CapsHeight / 2 - font.LineSpacing / 2);
+        fontSize * OffsetRatio(font);
+
+    /// <summary>
+    /// Доля кегля, на которую шеврон уходит от центра бокса: она зависит только от семейства.
+    /// </summary>
+    /// <remarks>
+    /// Доводку считает конвертер, а он срабатывает на каждом <see cref="Expander"/> при каждой
+    /// раскладке. Метрики семейства от того не меняются, а <see cref="Typeface"/> на каждый вызов
+    /// создавался заново — имя семейства разбиралось и шрифт искался заново. Запомненная доля
+    /// переживает и смену кегля (домножается на него), и повторные раскладки.
+    /// </remarks>
+    private static double OffsetRatio(FontFamily font)
+    {
+        var source = font.Source;
+
+        if (Ratios.TryGetValue(source, out var ratio))
+        {
+            return ratio;
+        }
+
+        ratio = font.Baseline - new Typeface(source).CapsHeight / 2 - font.LineSpacing / 2;
+
+        Ratios[source] = ratio;
+
+        return ratio;
+    }
+
+    /// <summary>Запомненная доля сдвига по семействам. Живёт на нити интерфейса.</summary>
+    private static readonly Dictionary<string, double> Ratios = new(StringComparer.Ordinal);
 }

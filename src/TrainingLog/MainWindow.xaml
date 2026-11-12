@@ -52,7 +52,7 @@
             <!--
               Меню строки дня. DataContext задаётся не здесь, а при открытии, в
               OnDayContextMenuOpening: у ContextMenu отдельное логическое дерево, и до окна
-              добраться из него нельзя (ловушка 41). Поэтому и команда, и её параметр приходят
+              добраться из него нельзя (ловушка 52). Поэтому и команда, и её параметр приходят
               сверху — из открывающего кода, а не привязкой.
 
               Контекстное меню открывается само по правому клику в любом месте строки:
@@ -60,7 +60,7 @@
               клик по названию плана или по столбцу подхода попадает в меню дня.
 
               Побочный эффект тот же, что у меню шестерёнки: пока меню открыто, окно не получает
-              наведения (ловушка 34). В строке дня наведения нет, так что это видно только по
+              наведения (ловушка 43). В строке дня наведения нет, так что это видно только по
               курсору.
             -->
             <ContextMenu x:Key="DayContextMenu">
@@ -209,14 +209,6 @@
         <Grid Grid.Row="3"
               Margin="-16,0,-16,0">
             <!--
-          Прокрутка по обеим осям: ширина дня не зависит от ширины окна, и длинный день просто
-          обрезался бы. Зазор слева от полосы — тот же ScrollBarGutter, а отступ строки справа живёт
-          отдельно и снимается конвертером.
-        -->
-        <ScrollViewer helpers:ScrollBarGutter.Left="2"
-                      HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Auto">
-                <!--
           Список фокусируем и гасим его стрелочную навигацию. Фокус — цель для BlurOnKeys:
           Esc и Enter уводят клавиатурный фокус с поля количества дней сюда. Продвижение
           выделения стрелками ведёт окно целиком (OnWindowPreviewKeyDown): туннель у корня
@@ -225,14 +217,49 @@
           держит про запас неназначенные стрелки: без значения по умолчанию (Continue) они
           перескакивали бы фокусом по кнопкам строк, «как по tab», вместо честного скролла
           содержимого.
+
+          ScrollViewer живёт в шаблоне списка, а не над ним (ловушка 38): иначе высота списка не
+          ограничена, панель строила бы все дни разом, и журнал на сотни дней тормозил бы каждым
+          перечитыванием. В шаблоне связка ScrollViewer + ItemsPresenter + CanContentScroll
+          работает как у ListBox'а: строится только видимое, а контейнеры при прокрутке
+          переиспользуются (Recycling), и строка дня на сотни элементов стоит единицы миллисекунд.
+          Попиксельная единица (ScrollUnit) держит прокрутку плавной: дни разной высоты,
+          и пошаговая прокрутка дёргала бы их целиком.
         -->
-                <ItemsControl x:Name="DaysList"
-                              ItemsSource="{Binding Days}"
-                              Focusable="True"
-                              kb:KeyboardNavigation.DirectionalNavigation="None"
-                              helpers:RowSelection.Enabled="True"
-                              MouseDoubleClick="OnDayDoubleClick">
-                    <ItemsControl.ItemTemplate>
+            <ItemsControl x:Name="DaysList"
+                          ItemsSource="{Binding Days}"
+                          Focusable="True"
+                          kb:KeyboardNavigation.DirectionalNavigation="None"
+                          helpers:RowSelection.Enabled="True"
+                          MouseDoubleClick="OnDayDoubleClick"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          VirtualizingPanel.ScrollUnit="Pixel">
+                <ItemsControl.Template>
+                    <ControlTemplate TargetType="ItemsControl">
+                        <!--
+                          Прокрутка по обеим осям: ширина дня не зависит от ширины окна, и длинный
+                          день просто обрезался бы. Зазор слева от полосы — тот же ScrollBarGutter,
+                          а отступ строки справа живёт отдельно и снимается конвертером.
+
+                          Имя нужно окну: скролл живёт в шаблоне, и взять его можно только по имени
+                          шаблона — журнал держит место при перечитывании (OnDaysChanged).
+                        -->
+                        <helpers:RowScrollViewer x:Name="DaysScroll"
+                                              helpers:ScrollBarGutter.Left="2"
+                                              CanContentScroll="True"
+                                              HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter />
+                        </helpers:RowScrollViewer>
+                    </ControlTemplate>
+                </ItemsControl.Template>
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <!--
                               Пять строк дня: план, упражнения, вес, повторения и примечание. Дата стоит
@@ -282,7 +309,13 @@
                                     <Style TargetType="Border">
                                         <Setter Property="Background" Value="Transparent" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Path=(helpers:RowSelection.IsSelected), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="True">
+                                            <!--
+                                              Признак выделения живёт на элементе данных, а не на
+                                              контейнере: контейнеры переиспользуются панелью, и
+                                              оставленный на контейнере признак подсветил бы чужую
+                                              строку (ISelectableRow).
+                                            -->
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                                 <Setter Property="Background" Value="{DynamicResource RowHighlight}" />
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -377,7 +410,7 @@
                                           Grid.RowSpan на четыре строки, а VerticalContentAlignment
                                           обязателен: у ItemsControl содержимое выравнивается вверх,
                                           панель меряется под своё содержимое, и без растяжения линии
-                                          дошли бы только до шапки (ловушки 40 и 39).
+                                          дошли бы только до шапки (ловушки 51 и 50).
 
                                           Ширину блока даёт модель, и по той же формуле считаются
                                           столбцы веса и повторений, поэтому обе линии попадают точно на
@@ -421,7 +454,7 @@
 
                                           TextAlignment центрирует строки внутри заданной ширины.
                                           HorizontalAlignment на самом TextBlock не ставится: по
-                                          ловушке 29 центрированный элемент меряется под своё
+                                          ловушке 35 центрированный элемент меряется под своё
                                           содержимое, и перенос перестаёт работать. Ширину задаёт
                                           Border, и она равна ширине блока упражнения — той же, что
                                           занимают его подходы.
@@ -454,14 +487,14 @@
                                           вправо: колонку задаёт дата (около 170 px), а «Повторения»
                                           занимает около 68, и оставшись слева, подписи оторвались бы от
                                           чисел. Собственный Margin справа — зазор до значений:
-                                          расстояние задаётся на самих соседях (ловушка 37).
+                                          расстояние задаётся на самих соседях (ловушка 48).
 
                                           Значение центрирует TextAlignment, то есть строки внутри
                                           заданной ширины. HorizontalAlignment у значений бесполезен:
                                           слот у ребёнка горизонтального StackPanel равен
                                           DesiredSize.Width, а Width и есть это самое желаемое
-                                          (ловушка 39), а центрировать сам элемент нельзя — он меряется
-                                          под своё содержимое (ловушка 29).
+                                          (ловушка 50), а центрировать сам элемент нельзя — он меряется
+                                          под своё содержимое (ловушка 35).
                                         -->
                                         <TextBlock Grid.Column="0"
                                                    Grid.Row="2"
@@ -531,7 +564,7 @@
                                           сквозными от первого списка — ещё одна пара линий на том же месте
                                           была бы просто вдвое темнее. Вид по наличию примечания задан
                                           DataTrigger, а не конвертером: правило одно на оба места с
-                                          маркерами в окне дня (ловушка 43).
+                                          маркерами в окне дня (ловушка 54).
 
                                           Кнопка объявлена раньше прочерка, а прочерк занимает всю рамку:
                                           в Grid рисуется последним объявленным, и нажатие по прочерку
@@ -577,7 +610,7 @@
                                                                   шириной блока вышла бы за край на
                                                                   соседнее упражнение. Обрезка работает
                                                                   только без переноса, поэтому перенос
-                                                                  здесь не задан (ловушка 36).
+                                                                  здесь не задан (ловушка 44).
                                                                 -->
                                                                 <TextBlock Text="Показать"
                                                                            TextAlignment="Center"
@@ -589,7 +622,7 @@
                                                               HorizontalAlignment="Center" на нём
                                                               бесполезен: слот у ребёнка рамки с
                                                               заданной шириной совпадает с ней самой,
-                                                              а центрирует TextAlignment (ловушка 39).
+                                                              а центрирует TextAlignment (ловушка 50).
                                                               Тон бледный — примечания нет, и читаться
                                                               это должно как пустота, а не как значение.
                                                             -->
@@ -618,7 +651,6 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </ScrollViewer>
 
             <TextBlock HorizontalAlignment="Center"
                        VerticalAlignment="Center"
@@ -668,7 +700,7 @@
 
 <!--
           Подсказка окна — тот же контрол, что в окне дня: нарисована поверх содержимого и ничего не
-          сдвигает (ловушки 34 и 32). Показываются ею два разных сообщения — отказ по вводу в
+          сдвигает (ловушки 43 и 40). Показываются ею два разных сообщения — отказ по вводу в
           «Количество дней» и примечание упражнения по кнопке «Показать»; тон и срок задаёт модель
           (Hint.Kind и Hint.Lifetime).
 

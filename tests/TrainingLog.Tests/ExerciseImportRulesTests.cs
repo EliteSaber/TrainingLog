@@ -107,6 +107,59 @@ public sealed class ExerciseImportRulesTests
         Assert.Empty(names);
     }
 
+    /// <summary>
+    /// Предикат и полный пересчёт обязаны отвечать одинаково: кнопка проверяется предикатом на
+    /// каждый символ в поле, а решение о записи принимает полный пересчёт.
+    /// </summary>
+    /// <remarks>
+    /// Множество справочника — {"Жим"}: случай «всё в справочнике» при <c>replaceExisting: false</c>
+    /// и случай «одно новое» при очистке дают оба исхода.
+    /// </remarks>
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(null, false)]
+    [InlineData("", true)]
+    [InlineData("   \n \n", false)]
+    [InlineData("Жим", false)]
+    [InlineData("Жим", true)]
+    [InlineData("Жим\nТяга", false)]
+    [InlineData("Жим\nЖим", false)]
+    [InlineData("  Жим  \r\nТяга", false)]
+    [InlineData("Жим\nТяга", true)]
+    public void HasSavable_ОтвечаетТотЖеОтветЧтоИПолныйПересчёт(string? text, bool replaceExisting)
+    {
+        var existing = new HashSet<string>(["Жим"], StringComparer.OrdinalIgnoreCase);
+
+        var expected = ExerciseImportRules.PrepareForSave(
+                ExerciseImportRules.SplitLines(text),
+                existing,
+                replaceExisting)
+            .Count > 0;
+
+        Assert.Equal(expected, ExerciseImportRules.HasSavable(text, existing, replaceExisting));
+    }
+
+    /// <summary>Дубль от справочника отсекается без различий регистра, как при полном пересчёте.</summary>
+    [Fact]
+    public void HasSavable_РегистрНеимеТЗначения()
+    {
+        var existing = new HashSet<string>(["жим"], StringComparer.OrdinalIgnoreCase);
+
+        Assert.False(ExerciseImportRules.HasSavable("Жим", existing, replaceExisting: false));
+        Assert.True(ExerciseImportRules.HasSavable("Тяга", existing, replaceExisting: false));
+    }
+
+    /// <summary>Слишком длинная строка отбраковывается, и за ней находится годная.</summary>
+    [Fact]
+    public void HasSavable_ДлиннаяСтрокаПропускаетсяГодноеИмяНаходится()
+    {
+        var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var tooLong = new string('а', NameRules.MaxNameLength + 1);
+
+        Assert.True(ExerciseImportRules.HasSavable(tooLong + "\nЖим", existing, replaceExisting: false));
+        Assert.False(ExerciseImportRules.HasSavable(tooLong, existing, replaceExisting: false));
+    }
+
     [Fact]
     public void SplitLines_ОбаПереводаСтроки_СчитаютсяКонцомСтроки()
     {

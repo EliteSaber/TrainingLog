@@ -18,7 +18,7 @@ namespace TrainingLog.Controls;
 /// при первом же копировании.
 ///
 /// Показывается элементом поверх содержимого окна, а не окном Popup: второе окно WPF отнимает у
-/// главного окна наведение и курсор, и окно выглядит «мёртвым» до закрытия подсказки (ловушка 34).
+/// главного окна наведение и курсор, и окно выглядит «мёртвым» до закрытия подсказки (ловушка 43).
 /// </remarks>
 public partial class StatusHint : UserControl
 {
@@ -492,7 +492,7 @@ public partial class StatusHint : UserControl
     /// <remarks>
     /// Слушается <em>превью</em> с <c>handledEventsToo</c> и без <c>e.Handled</c>: нажатие должно и
     /// дальше попасть в кнопку окна, а этим раньше занимался <c>StaysOpen="False"</c> у
-    /// <c>Popup</c>, который попутно отнимал у окна наведение и курсор (ловушка 34).
+    /// <c>Popup</c>, который попутно отнимал у окна наведение и курсор (ловушка 43).
     /// </remarks>
     private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

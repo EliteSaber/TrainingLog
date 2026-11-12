@@ -101,15 +101,17 @@ public sealed class AppSettingsStoreTests
         Assert.Equal("F2", reread.Hotkeys["Exercises.Add"]);
     }
 
-    /// <summary>Секции нет, она пустая или негодное содержимое файла — словарь пуст, не null.</summary>
+    /// <summary>Секции нет, она пустая, null или негодное содержимое файла — словарь пуст, не null.</summary>
     /// <remarks>
     /// Пустой словарь, а не null: разбор назначений и умолчаний живёт в WPF-слое, и «отсутствует»
-    /// и «пусто» обязаны объясняться там одним значением.
+    /// и «пусто» обязаны объясняться там одним значением. Явный null в файле JSON-десериализатор
+    /// пишет и поверх инициализатора AppSettings — без нормализации дальше падал бы HotkeyService.
     /// </remarks>
     [Theory]
     [InlineData("{}")]
     [InlineData("""{"DaysCount": 5}""")]
     [InlineData("""{"Hotkeys": {}}""")]
+    [InlineData("""{"Hotkeys": null}""")]
     [InlineData("{ это не json")]
     public void Load_СекцииГорячихКлавишНет_ПустойСловарь(string content)
     {
@@ -117,6 +119,27 @@ public sealed class AppSettingsStoreTests
         settings.Write(content);
 
         Assert.Empty(settings.Store.Load().Hotkeys);
+    }
+
+    /// <summary>
+    /// Пустые и пробельные комбинации назначения не дают: записи отбрасываются, годные остаются.
+    /// Файл не переписывается — тот же договор, что у DaysCount.
+    /// </summary>
+    [Fact]
+    public void Load_ПустыеКомбинацииОтбрасываются_ГодныеОстаются_ФайлНеПереписывается()
+    {
+        const string content = """
+            {"Hotkeys": {"Day.Save": "Ctrl+S", "Exercises.Add": "", "Plans.Open": "   "}}
+            """;
+
+        using var settings = new TemporarySettings();
+        settings.Write(content);
+
+        var loaded = settings.Store.Load();
+
+        Assert.Equal(["Day.Save"], [.. loaded.Hotkeys.Keys]);
+        Assert.Equal("Ctrl+S", loaded.Hotkeys["Day.Save"]);
+        Assert.Equal(content, File.ReadAllText(settings.FilePath));
     }
 
     /// <summary>Отступы при записи: в файл заглядывают глазами, когда правят руками.</summary>

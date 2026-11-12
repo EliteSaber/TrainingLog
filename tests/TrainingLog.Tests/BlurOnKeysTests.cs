@@ -10,6 +10,7 @@ namespace TrainingLog.Tests;
 /// на событие — тест не ловит в принципе. Сама постановка фокуса в STA-тесте не проверяется:
 /// без PresentationSource клавиатурный фокус не ставится.
 /// </remarks>
+[Collection(WpfTestGroup.Name)]
 public sealed class BlurOnKeysTests
 {
     /// <summary>Годный перечень разбирается с сохранением порядка: дубли не переупорядочивать.</summary>

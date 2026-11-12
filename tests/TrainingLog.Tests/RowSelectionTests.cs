@@ -8,6 +8,7 @@ using TrainingLog.Controls;
 namespace TrainingLog.Tests;
 
 /// <summary>Подписка выделения строк: тип делегата обязан совпадать с типом события.</summary>
+[Collection(WpfTestGroup.Name)]
 public sealed class RowSelectionTests
 {
     /// <summary>Применение и снятие Enabled не бросает: делегат подписки типизирован событием.</summary>
@@ -174,5 +175,109 @@ public sealed class RowSelectionTests
 
             Assert.Equal("а", RowSelection.Item(list));
         });
+    }
+
+    /// <summary>
+    /// У строки с признаком на элементе (<see cref="ISelectableRow"/>) флаг едет с элементом:
+    /// прежняя строка гаснет, выделенная горит. Такие строки идут в списках с виртуализацией.
+    /// </summary>
+    [Fact]
+    public void Move_СтрокаСПризнакомНаЭлементе_ФлагПереносится()
+    {
+        StaRunner.Run(() =>
+        {
+            var list = ListWithItems(new SelectableRow(), new SelectableRow(), new SelectableRow());
+
+            RowSelection.Move(list, 1);
+            RowSelection.Move(list, 1);
+
+            var rows = list.Items.OfType<SelectableRow>().ToList();
+
+            Assert.True(rows[1].IsSelected);
+            Assert.False(rows[0].IsSelected);
+            Assert.Same(rows[1], RowSelection.Item(list));
+        });
+    }
+
+    /// <summary>Клик по выделенной строке с признаком на элементе снимает выделение.</summary>
+    [Fact]
+    public void Click_ПовторныйПоВыделеннойСтроке_СнимаетВыделение()
+    {
+        StaRunner.Run(() =>
+        {
+            var list = ListWithItems(new SelectableRow(), new SelectableRow());
+
+            RowSelection.Move(list, 1);
+
+            var first = (System.Windows.UIElement)list.ItemContainerGenerator.ContainerFromIndex(0)!;
+
+            first.RaiseEvent(new MouseButtonEventArgs(
+                Mouse.PrimaryDevice,
+                Environment.TickCount,
+                MouseButton.Left)
+            {
+                RoutedEvent = Mouse.MouseDownEvent,
+            });
+
+            var rows = list.Items.OfType<SelectableRow>().ToList();
+
+            Assert.False(rows[0].IsSelected);
+            Assert.Null(RowSelection.Item(list));
+        });
+    }
+
+    /// <summary>Перечитывание списка заменяет элементы, и выделение молчит вместе со старыми строками.</summary>
+    /// <remarks>
+    /// Журнал пересобирается новыми строками дня на каждое перечитывание: элемент в поле умирает,
+    /// и комбинация над выделенной строкой обязана молчать, а не открыть чужой день.
+    /// </remarks>
+    [Fact]
+    public void Item_ПослеПеречитывания_Молчит()
+    {
+        StaRunner.Run(() =>
+        {
+            var list = ListWithItems(new SelectableRow(), new SelectableRow());
+
+            RowSelection.Move(list, 1);
+
+            Assert.NotNull(RowSelection.Item(list));
+
+            list.Items.Clear();
+            list.Items.Add(new SelectableRow());
+            list.Items.Add(new SelectableRow());
+
+            Assert.Null(RowSelection.Item(list));
+        });
+    }
+
+    private static ItemsControl ListWithItems(params object[] items)
+    {
+        var list = new ItemsControl
+        {
+            Template = (ControlTemplate)XamlReader.Parse(
+                "<ControlTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\"" +
+                "                xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
+                "  <Border><ItemsPresenter /></Border>" +
+                "</ControlTemplate>"),
+        };
+
+        RowSelection.SetEnabled(list, true);
+
+        foreach (var item in items)
+        {
+            list.Items.Add(item);
+        }
+
+        list.ApplyTemplate();
+        list.Measure(new Size(400, double.PositiveInfinity));
+        list.Arrange(new Rect(0, 0, 400, 300));
+
+        return list;
+    }
+
+    /// <summary>Строка с признаком на элементе: то же, что <c>DayRowViewModel</c>, но без журнала.</summary>
+    private sealed class SelectableRow : ISelectableRow
+    {
+        public bool IsSelected { get; set; }
     }
 }

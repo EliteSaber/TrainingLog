@@ -87,6 +87,16 @@ public sealed class AppSettingsStore
             settings.FontSizePercent = AppSettings.DefaultFontSizePercent;
         }
 
+        // «Hotkeys»: null JSON-десериализатор пишет и поверх инициализатора AppSettings, и
+        // дальше HotkeyService упал бы на null-источнике. Умолчание вместо секции — тот же
+        // договор, что у DaysCount вне диапазона: значение в памяти заменяется, файл не трогается.
+        // Записи с пустой комбинацией отбрасываются: назначения они не дают, а словарь должен
+        // остаться чистым.
+        settings.Hotkeys = settings.Hotkeys?
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
+            .ToDictionary(pair => pair.Key, pair => pair.Value)
+            ?? [];
+
         if (IsMissing(settings.DatabaseDirectory) || IsMissing(settings.DatabaseName))
         {
             settings.DatabaseDirectory = IsMissing(settings.DatabaseDirectory)
