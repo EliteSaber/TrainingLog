@@ -169,6 +169,16 @@ public sealed partial class EditPlanViewModel : ObservableObject
             return -1;
         }
 
+        // Перестановка через Move, а не через удаление и вставку: контейнер строки едет вместе
+        // со строкой, и признак выделения на нём сохраняется. На удалении контейнер пересоздаётся,
+        // и подсветка гаснет (см. Controls.RowSelection). Тот же приём, что в VisibleSync.
+        if (items is ObservableCollection<T> collection)
+        {
+            collection.Move(index, target);
+
+            return target;
+        }
+
         // Элемент берётся до удаления: после RemoveAt по индексу лежит уже следующий.
         var item = items[index];
 

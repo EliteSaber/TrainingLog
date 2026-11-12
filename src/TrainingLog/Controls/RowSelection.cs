@@ -68,6 +68,24 @@ public static class RowSelection
         return item is not null && list.Items.IndexOf(item) >= 0 ? item : null;
     }
 
+    /// <summary>Снимает выделение: ни строки, ни подсветки.</summary>
+    /// <remarks>
+    /// Нужен там, где строки пересоздаются целиком: пересборка состава плана меняет набор строк,
+    /// и прежнее выделение осталось бы в данных без подсветки — горячие клавиши работали бы по
+    /// строке, которой на экране нет. Перестановка строк сюда не относится: там контейнер едет
+    /// вместе со строкой, и выделение сохраняется само.
+    /// </remarks>
+    public static void Clear(ItemsControl list)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+
+        var item = list.GetValue(SelectedItemProperty);
+
+        ClearSelection(list, item);
+
+        list.SetValue(SelectedItemProperty, null);
+    }
+
     /// <summary>Сдвигает выделение строк на <paramref name="delta"/> позиций: стрелки выделения.</summary>
     /// <remarks>
     /// Без выделения шаг вниз выделяет первую строку, вверх — последнюю: стрелки обязаны работать

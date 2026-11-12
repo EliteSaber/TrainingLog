@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using TrainingLog.Core.Models;
 using TrainingLog.Core.Repositories;
 using TrainingLog.ViewModels;
@@ -370,6 +372,24 @@ public sealed class EditPlanViewModelTests
 
         Assert.Equal(-1, EditPlanViewModel.Move(items, index, delta: -1));
         Assert.Equal(["а", "б", "в"], items);
+    }
+
+    /// <summary>
+    /// Наблюдаемая коллекция переставляется через Move: элемент не пересоздаётся, и контейнер
+    /// строки едет вместе с ним — признак выделения на контейнере сохраняется.
+    /// </summary>
+    [Fact]
+    public void Move_НаблюдаемаяКоллекция_ПереставляетБезПересоздания()
+    {
+        var items = new ObservableCollection<string> { "а", "б", "в" };
+        var actions = new List<NotifyCollectionChangedAction>();
+
+        items.CollectionChanged += (_, args) => actions.Add(args.Action);
+
+        Assert.Equal(0, EditPlanViewModel.Move(items, index: 1, delta: -1));
+
+        Assert.Equal(["б", "а", "в"], items);
+        Assert.Equal([NotifyCollectionChangedAction.Move], actions);
     }
 
     /// <summary>Модель обязана удержать порядок базы, а не пересобрать список по алфавиту.</summary>

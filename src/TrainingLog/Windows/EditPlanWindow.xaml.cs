@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -61,6 +62,15 @@ public partial class EditPlanWindow : Window
         // Клик мышью переводит стрелки в тот блок, по которому кликнули.
         PreviewMouseDown += OnWindowPreviewMouseDown;
 
+        // Пересборка состава меняет строки целиком: прежнего выделения на экране больше нет,
+        // и снимать его надо вместе с ними.
+        //
+        // Подписка на коллекцию списка, а не на модель: список подписан на свою коллекцию раньше
+        // окна, и перестановка строк доходит до окна уже сделанной. Из модели она пришла бы
+        // раньше, и раскладка в момент обработчика была бы ещё прежней — полоса прокрутилась бы
+        // по старому месту.
+        ((INotifyCollectionChanged)SelectedList.Items).CollectionChanged += OnSelectedExercisesChanged;
+
         Closed += OnClosed;
         Loaded += OnLoaded;
     }
@@ -79,6 +89,18 @@ public partial class EditPlanWindow : Window
     private ItemsControl ActiveList =>
         _viewModel.ActiveBlock == PlanBlock.Exercises ? AllList : SelectedList;
 
+    /// <summary>Фокус в поле ввода или в поле «На основе»: там стрелки и пробел — свои.</summary>
+    /// <remarks>
+    /// Чужое окно в счёт не идёт: клавиши в него уходят мимо нашего окна, и каретка чужого поля
+    /// не должна отнимать у нас стрелки.
+    /// </remarks>
+    private bool IsEditingField =>
+        Keyboard.FocusedElement is TextBoxBase or ComboBox && IsInThisWindow(Keyboard.FocusedElement);
+
+    /// <summary>Находится ли элемент в этом окне.</summary>
+    private bool IsInThisWindow(object focused) =>
+        focused is DependencyObject element && ReferenceEquals(Window.GetWindow(element), this);
+
     /// <summary>
     /// Двигает выделение строк, переключает блок и ставит отметку по назначенным жестам.
     /// </summary>
@@ -94,7 +116,7 @@ public partial class EditPlanWindow : Window
     /// </remarks>
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (Keyboard.FocusedElement is TextBoxBase or ComboBox)
+        if (IsEditingField)
         {
             return;
         }
@@ -204,6 +226,47 @@ public partial class EditPlanWindow : Window
         Run(_viewModel.ToggleCheckCommand, pressed);
     }
 
+    /// <summary>Состав изменился: пересборка снимает выделение, перестановка ведёт строку в вид.</summary>
+    /// <remarks>
+    /// Перестановка строк (Move) выделением не трогает: контейнер едет вместе со строкой, и
+    /// выделение остаётся видимым. А вот пересборка («На основе», «Сбросить») пересоздаёт
+    /// контейнеры, и выделение в данных пережило бы их — горячие клавиши работали бы по невидимой
+    /// строке.
+    /// </remarks>
+    private void OnSelectedExercisesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Reset:
+                RowSelection.Clear(SelectedList);
+                break;
+
+            case NotifyCollectionChangedAction.Move:
+                if (e.NewItems?[0] is PlanExerciseSelection moved)
+                {
+                    BringIntoView(moved);
+                }
+
+                break;
+        }
+    }
+
+    /// <summary>Показывает перемещённую строку: уехав за край окна, она должна вернуться в вид.</summary>
+    /// <remarks>
+    /// Так же ведёт себя выбор стрелками (<see cref="RowSelection.Move"/>): контейнер строки просит
+    /// показать себя. Просьба отрабатывает при раскладке — той самой, что переставляет строки, —
+    /// поэтому полоса сдвигается вместе с ними и строка за край не уезжает даже на кадр. Раскладку
+    /// прогонять отсюда нельзя: список переставит строки позже, и полоса прокрутилась бы по
+    /// старому месту.
+    /// </remarks>
+    private void BringIntoView(PlanExerciseSelection row)
+    {
+        if (RowSelection.Container(SelectedList, row) is { } container)
+        {
+            container.BringIntoView();
+        }
+    }
+
     /// <summary>Совпадает ли нажатие с назначенным жестом действия.</summary>
     private bool Matches(string id, KeyEventArgs e) =>
         _hotkeys.Resolve(id) is { } gesture && HotkeyService.Matches(gesture, e.Key, Keyboard.Modifiers);
@@ -287,6 +350,7 @@ public partial class EditPlanWindow : Window
     {
         PreviewKeyDown -= OnWindowPreviewKeyDown;
         PreviewMouseDown -= OnWindowPreviewMouseDown;
+        ((INotifyCollectionChanged)SelectedList.Items).CollectionChanged -= OnSelectedExercisesChanged;
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }
 }

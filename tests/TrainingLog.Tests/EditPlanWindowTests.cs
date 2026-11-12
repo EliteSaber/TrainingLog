@@ -250,13 +250,163 @@ public sealed class EditPlanWindowTests
         });
     }
 
+    /// <summary>Перестановка строки не гасит подсветку: контейнер едет вместе со строкой.</summary>
+    /// <remarks>
+    /// Проверяется признак на контейнере — то, что читает триггер подсветки. На удалении и
+    /// вставке контейнер пересоздаётся, и признак пропадал бы вместе с подсветкой.
+    /// </remarks>
+    [Fact]
+    public void ПеремещениеСтроки_ПодсветкаОстаётся()
+    {
+        StaRunner.Run(() =>
+        {
+            using var database = new TemporaryDatabase();
+            using var settings = new TemporarySettings();
+
+            var window = OpenWindow(database, settings);
+
+            try
+            {
+                var viewModel = (EditPlanViewModel)window.DataContext;
+                var list = (ItemsControl)window.FindName("SelectedList")!;
+
+                // Второе упражнение в состав: первую строку сдвинуть некуда.
+                viewModel.AllExercises[0].IsChecked = true;
+
+                // Контейнер новой строки появляется при раскладке.
+                window.UpdateLayout();
+
+                Click(RowOf(list, 1));
+
+                var row = viewModel.SelectedExercises[1];
+
+                Assert.NotNull(RowSelection.Item(list));
+
+                viewModel.MoveUpCommand.Execute(row);
+
+                Assert.Equal(row, viewModel.SelectedExercises[0]);
+
+                var container = RowSelection.Container(list, row);
+
+                Assert.NotNull(container);
+                Assert.True(RowSelection.GetIsSelected(container));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>Пересборка состава снимает выделение вместе с прежними строками.</summary>
+    /// <remarks>
+    /// Выделение в данных пережило бы пересборку: строка осталась бы в составе, а подсветки на
+    /// экране уже нет — и горячие клавиши работали бы по невидимой строке.
+    /// </remarks>
+    [Fact]
+    public void СменаИсточникаСостава_ВыделениеСнимается()
+    {
+        StaRunner.Run(() =>
+        {
+            using var database = new TemporaryDatabase();
+            using var settings = new TemporarySettings();
+
+            var window = OpenWindow(database, settings);
+
+            try
+            {
+                var viewModel = (EditPlanViewModel)window.DataContext;
+                var list = (ItemsControl)window.FindName("SelectedList")!;
+
+                Click(RowOf(list, 0));
+
+                Assert.NotNull(RowSelection.Item(list));
+
+                // Источник с тем же упражнением: строка переживёт пересборку, и выделение без
+                // снятия осталось бы в данных без подсветки.
+                var source = new TrainingPlan { Name = "Другой" };
+                source.AddExercise(viewModel.AllExercises.Single(row => row.Name == "Приседание").Exercise);
+
+                viewModel.BasePlan = source;
+
+                Assert.Null(RowSelection.Item(list));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>Перемещённая строка не уезжает за край окна: полоса прокрутки следует за ней.</summary>
+    /// <remarks>
+    /// Выбор стрелками показывает выделенную строку всегда (<c>RowSelection.Move</c> зовёт
+    /// <c>BringIntoView</c>), и перестановка состава обязана вести себя так же: строка у верхнего
+    /// края окна, сдвинутая вверх, уходит за край — и полоса должна её вернуть.
+    /// </remarks>
+    [Fact]
+    public void ПеремещениеСтрокиЗаКрай_ПолосаПрокруткиСледует()
+    {
+        StaRunner.Run(() =>
+        {
+            using var database = new TemporaryDatabase();
+            using var settings = new TemporarySettings();
+
+            var window = OpenWindow(database, settings, compositionSize: 30);
+
+            try
+            {
+                var viewModel = (EditPlanViewModel)window.DataContext;
+                var list = (ItemsControl)window.FindName("SelectedList")!;
+                var scroll = (ScrollViewer)list.Parent!;
+
+                // Строка у верхнего края окна: сдвиг вверх уводит её за край.
+                const int Index = 20;
+
+                var row = viewModel.SelectedExercises[Index];
+
+                scroll.ScrollToVerticalOffset(ContentTopOf(list, scroll, Index));
+                window.UpdateLayout();
+
+                var before = scroll.VerticalOffset;
+
+                viewModel.MoveUpCommand.Execute(row);
+
+                // Просьба «показать» отрабатывает при раскладке — там же, где переставляются строки.
+                window.UpdateLayout();
+
+                Assert.True(
+                    scroll.VerticalOffset < before,
+                    $"Полоса не сдвинулась: было {before}, стало {scroll.VerticalOffset}.");
+
+                Assert.InRange(VisibleTopOf(list, scroll, Index - 1), 0, scroll.ViewportHeight);
+
+                Assert.True(
+                    scroll.VerticalOffset < before,
+                    $"Полоса не сдвинулась: было {before}, стало {scroll.VerticalOffset}.");
+
+                Assert.InRange(VisibleTopOf(list, scroll, Index - 1), 0, scroll.ViewportHeight);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
     /// <summary>Окно с наполненным справочником и составом.</summary>
     /// <remarks>
     /// Наполнение окна асинхронное, и оно пересобирает состав в конце: ждать только первого
     /// упражнения нельзя — окно переписало бы состав после того, как тест отметил упражнение.
     /// Поэтому диспетчеру отдаётся несколько порций работы подряд.
+    ///
+    /// <paramref name="compositionSize"/> — сколько упражнений в составе: длинный состав нужен там,
+    /// где важна прокрутка.
     /// </remarks>
-    private static EditPlanWindow OpenWindow(TemporaryDatabase database, TemporarySettings settings)
+    private static EditPlanWindow OpenWindow(
+        TemporaryDatabase database,
+        TemporarySettings settings,
+        int compositionSize = 1)
     {
         var squat = new Exercise { Name = "Приседание" };
         var bench = new Exercise { Name = "Жим" };
@@ -265,6 +415,14 @@ public sealed class EditPlanWindowTests
 
         var plan = new TrainingPlan { Name = "День" };
         plan.AddExercise(squat);
+
+        for (var number = 1; number < compositionSize; number++)
+        {
+            var extra = new Exercise { Name = $"Упражнение {number}" };
+            database.Repository.AddAsync(extra).GetAwaiter().GetResult();
+            plan.AddExercise(extra);
+        }
+
         database.PlanRepository.AddAsync(plan).GetAwaiter().GetResult();
 
         var viewModel = new EditPlanViewModel(
@@ -292,10 +450,26 @@ public sealed class EditPlanWindowTests
             window.Dispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));
         }
 
-        Assert.Equal(2, viewModel.AllExercises.Count);
-        Assert.Single(viewModel.SelectedExercises);
+        Assert.Equal(2 + compositionSize - 1, viewModel.AllExercises.Count);
+        Assert.Equal(compositionSize, viewModel.SelectedExercises.Count);
 
         return window;
+    }
+
+    /// <summary>Место строки в содержимом прокрутки: от начала содержимого, а не от видимой части.</summary>
+    private static double ContentTopOf(ItemsControl list, ScrollViewer scroll, int index)
+    {
+        var container = (FrameworkElement)list.ItemContainerGenerator.ContainerFromIndex(index)!;
+
+        return container.TransformToAncestor(scroll).Transform(new Point(0, 0)).Y + scroll.VerticalOffset;
+    }
+
+    /// <summary>Место строки на экране: положительное — строка ниже верхнего края окна.</summary>
+    private static double VisibleTopOf(ItemsControl list, ScrollViewer scroll, int index)
+    {
+        var container = (FrameworkElement)list.ItemContainerGenerator.ContainerFromIndex(index)!;
+
+        return container.TransformToAncestor(scroll).Transform(new Point(0, 0)).Y;
     }
 
     /// <summary>Палитра оформления из сборки приложения.</summary>
