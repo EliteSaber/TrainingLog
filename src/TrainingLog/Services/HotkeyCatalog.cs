@@ -30,7 +30,10 @@ public sealed record HotkeyAction(string Id, string Name, string? DefaultGesture
 }
 
 /// <summary>Группа каталога: назначения одного окна в порядке вкладки.</summary>
-public sealed record HotkeyGroup(string WindowName, IReadOnlyList<HotkeyAction> Actions);
+/// <param name="WindowName">Полное имя окна — заголовок его раздела в перечне.</param>
+/// <param name="ShortName">Короткое имя окна — подпись кнопки-перехода: восемь полных имён в один ряд не влезают.</param>
+/// <param name="Actions">Назначения окна в порядке вкладки.</param>
+public sealed record HotkeyGroup(string WindowName, string ShortName, IReadOnlyList<HotkeyAction> Actions);
 
 /// <summary>Каталог назначений: все кнопки всех окон, порядок групп = порядок вкладки.</summary>
 /// <remarks>
@@ -47,7 +50,7 @@ public static class HotkeyCatalog
 
     public static IReadOnlyList<HotkeyGroup> Groups { get; } =
     [
-        new HotkeyGroup("Главное окно «Журнал тренировок»",
+        new HotkeyGroup("Главное окно «Журнал тренировок»", "Журнал",
         [
             new HotkeyAction("Main.SettingsMenu", "Меню параметров", null, HotkeyKind.Window),
             new HotkeyAction("Main.OpenExercises", "Упражнения", null, HotkeyKind.Window),
@@ -61,7 +64,7 @@ public static class HotkeyCatalog
             new HotkeyAction("Main.ShowNote", "Показать примечание", null, HotkeyKind.Row),
         ]),
 
-        new HotkeyGroup("Окно дня",
+        new HotkeyGroup("Окно дня", "День",
         [
             new HotkeyAction("Day.Previous", "Предыдущее упражнение (‹)", null, HotkeyKind.Window),
             new HotkeyAction("Day.Next", "Следующее упражнение (›)", null, HotkeyKind.Window),
@@ -77,7 +80,7 @@ public static class HotkeyCatalog
                 HotkeyKind.Slot)),
         ]),
 
-        new HotkeyGroup("Упражнения",
+        new HotkeyGroup("Упражнения", "Упражнения",
         [
             new HotkeyAction("Exercises.Import", "Импорт", null, HotkeyKind.Window),
             new HotkeyAction("Exercises.Export", "Экспорт", null, HotkeyKind.Window),
@@ -87,20 +90,20 @@ public static class HotkeyCatalog
             new HotkeyAction("Exercises.Delete", "Удалить", null, HotkeyKind.Row),
         ]),
 
-        new HotkeyGroup("Правка упражнения",
+        new HotkeyGroup("Правка упражнения", "Правка упражнения",
         [
             new HotkeyAction("EditExercise.Accept", "Принять", null, HotkeyKind.Window),
             new HotkeyAction("EditExercise.Cancel", "Отменить", null, HotkeyKind.Window),
         ]),
 
-        new HotkeyGroup("Импорт упражнений",
+        new HotkeyGroup("Импорт упражнений", "Импорт",
         [
             new HotkeyAction("Import.PickFile", "Выбрать файл…", null, HotkeyKind.Window),
             new HotkeyAction("Import.Save", "Сохранить", null, HotkeyKind.Window),
             new HotkeyAction("Import.Cancel", "Отменить", null, HotkeyKind.Window),
         ]),
 
-        new HotkeyGroup("Планы",
+        new HotkeyGroup("Планы", "Планы",
         [
             new HotkeyAction("Plans.Add", "Добавить", null, HotkeyKind.Window),
             new HotkeyAction("Plans.ToggleSort", "Сортировка «Название»", null, HotkeyKind.Window),
@@ -108,7 +111,7 @@ public static class HotkeyCatalog
             new HotkeyAction("Plans.Delete", "Удалить", null, HotkeyKind.Row),
         ]),
 
-        new HotkeyGroup("Правка плана",
+        new HotkeyGroup("Правка плана", "Правка плана",
         [
             new HotkeyAction("EditPlan.ResetBase", "Сбросить «На основе»", null, HotkeyKind.Window),
             new HotkeyAction("EditPlan.Accept", "Принять", null, HotkeyKind.Window),
@@ -125,7 +128,7 @@ public static class HotkeyCatalog
             new HotkeyAction("EditPlan.BlockRight", "Блок справа: порядок в плане (→)", "Right", HotkeyKind.Window),
         ]),
 
-        new HotkeyGroup("Параметры",
+        new HotkeyGroup("Параметры", "Параметры",
         [
             new HotkeyAction("Settings.PickDirectory", "Обзор…", null, HotkeyKind.Window),
             new HotkeyAction("Settings.PickFile", "Выбрать файл…", null, HotkeyKind.Window),

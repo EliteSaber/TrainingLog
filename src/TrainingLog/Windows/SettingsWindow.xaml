@@ -32,6 +32,37 @@
             </ResourceDictionary.MergedDictionaries>
 
             <controls:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+            <!--
+              Свой экземпляр по той же причине: у конвертера состояния нет.
+            -->
+            <helpers:ScrollBarMarginConverter x:Key="ScrollBarMargin" />
+
+            <!--
+              Крестик очистки нарисован путём, а не глифом: на таком размере глиф мельче
+              линии, а иконки приложения рисуются путями.
+            -->
+            <PathGeometry x:Key="ClearGlyph" Figures="M 1,1 L 8,8 M 8,1 L 1,8" />
+
+            <!--
+              Нынешний вид кнопок-переходов: стеклянные кнопки, как были. Оставлен рядом с
+              новым TabButton, чтобы вернуть прежний вид можно было одним именем стиля, а не
+              переписыванием разметки.
+
+              Живёт в окне, а не в словаре темы: переходы к окнам есть только здесь, и общий
+              словарь не должен ради одного окна хранить его частный вид (ловушка 6).
+            -->
+            <Style x:Key="HotkeyChipGlass" TargetType="Button" BasedOn="{StaticResource GlassButtonSoft}">
+                <Setter Property="Margin" Value="0,0,0,4" />
+                <Setter Property="Padding" Value="4,2" />
+                <Setter Property="MinHeight" Value="28" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+                        <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -47,240 +78,334 @@
         <helpers:TitleBar Grid.Row="0"
                           Margin="-16,-16,-16,16" />
 
-        <TabControl Grid.Row="1">
+        <TabControl x:Name="SettingsTabs"
+                    Grid.Row="1">
 
             <TabItem Header="Общие">
-                <Grid Margin="0,12,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                <!--
+                  Скролл на случай, когда содержимое не помещается: окно уменьшили или шрифт
+                  увеличили. WPF окна не прокручивает сам, и лишнее просто уходило за край.
 
-                    <!--
-                      Поле устроено и настроено как на главном окне: та же ширина, те же отступы и
-                      центрирование, тот же фильтр цифр. Одно и то же число в двух окнах иначе читалось бы как
-                      два разных счётчика.
+                  Скролл только здесь, а не в шаблоне TabControl: у вкладки «Горячие клавиши»
+                  перечень занимает строку * и прокручивается сам, а внешний скролл меряет
+                  содержимое бесконечной высотой, и виртуализированный список построил бы все
+                  строки разом (ловушки 29 и 30).
 
-                      Подпись и поле в одну строку, две Auto-колонки. Не горизонтальная панель: она меряет
-                      содержимое бесконечной шириной, и перенос у подписи перестал бы работать (ловушка 35).
+                  Отрицательные отступы прижимают полосу к краю окна: полоса живёт внутри
+                  ScrollViewer, иначе её нечем прижать. Снят отступ корневой сетки (16) и
+                  отступ содержимого вкладки (10) — всего 26.
 
-                      MinWidth у поля — пол колонки, ниже которого она не сжимается: нехватку ширины забирает
-                      подпись и переносится по словам, а поле остаётся прежним. Без него нехватка делилась бы
-                      между ними поровну (ловушка 49) и поле обрезало бы цифру.
-                    -->
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                  Отступ не пропал, а переехал внутрь содержимого: рамка отодвинута от края на
+                  26 px, и пока полоса на экране, правый отступ снимается конвертером — иначе
+                  поля висели бы за 26 px от полосы. Как в главном окне.
+                -->
+                <ScrollViewer Margin="-26,0,-26,0"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Auto">
+                    <Border Margin="{Binding ComputedVerticalScrollBarVisibility,
+                                             RelativeSource={RelativeSource AncestorType=ScrollViewer},
+                                             Converter={StaticResource ScrollBarMargin},
+                                             ConverterParameter=26}"
+                            Padding="0,12,2,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-                        <!--
-                          Background="Transparent" обязателен: с null-фоном подпись ловит клик только по
-                          буквам, и клик по пробелу не передал бы фокус (ловушка 13).
-                        -->
-                        <TextBlock Grid.Column="0"
-                                   VerticalAlignment="Center"
-                                   Background="Transparent"
-                                   TextWrapping="Wrap"
-                                   Text="Количество отображаемых дней"
-                                   helpers:ClickToFocus.Target="{Binding ElementName=DaysCountBox}" />
+                            <!--
+                              Поле устроено и настроено как на главном окне: та же ширина, те же отступы и
+                              центрирование, тот же фильтр цифр. Одно и то же число в двух окнах иначе читалось бы как
+                              два разных счётчика.
 
-                        <TextBox x:Name="DaysCountBox"
-                                 Grid.Column="1"
-                                 Width="52"
-                                 MinWidth="52"
-                                 Margin="8,0,0,0"
-                                 VerticalAlignment="Center"
-                                 Padding="4,3"
-                                 HorizontalContentAlignment="Center"
-                                 VerticalContentAlignment="Center"
-                                 helpers:AllowedCharsInput.Allowed="Digits"
-                                 Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
-                    </Grid>
+                              Подпись и поле в одну строку, две Auto-колонки. Не горизонтальная панель: она меряет
+                              содержимое бесконечной шириной, и перенос у подписи перестал бы работать (ловушка 35).
 
-                    <!--
-                      Две строки адреса базы. Кнопка у директории открывает выбор папки, у наименования —
-                      выбор файла *.db: одного диалога «и папка, и файл» в стандартных окнах нет, а файл заодно
-                      подставляет директорию целиком — оба поля остаются согласованы.
-                      Обработчики живут в code-behind: диалоги — работа интерфейса, модели представления им не место.
+                              MinWidth у поля — пол колонки, ниже которого она не сжимается: нехватку ширины забирает
+                              подпись и переносится по словам, а поле остаётся прежним. Без него нехватка делилась бы
+                              между ними поровну (ловушка 49) и поле обрезало бы цифру.
+                            -->
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
 
-                      Средняя колонка `*`: путь длиннее подписи и кнопки, нехватку ширины забирает поле.
-                    -->
-                    <Grid Grid.Row="1" Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                                <!--
+                                  Background="Transparent" обязателен: с null-фоном подпись ловит клик только по
+                                  буквам, и клик по пробелу не передал бы фокус (ловушка 13).
+                                -->
+                                <TextBlock Grid.Column="0"
+                                           VerticalAlignment="Center"
+                                           Background="Transparent"
+                                           TextWrapping="Wrap"
+                                           Text="Количество отображаемых дней"
+                                           helpers:ClickToFocus.Target="{Binding ElementName=DaysCountBox}" />
 
-                        <TextBlock Grid.Column="0"
-                                   VerticalAlignment="Center"
-                                   Background="Transparent"
-                                   TextWrapping="Wrap"
-                                   Text="Директория БД"
-                                   helpers:ClickToFocus.Target="{Binding ElementName=DirectoryBox}" />
+                                <TextBox x:Name="DaysCountBox"
+                                         Grid.Column="1"
+                                         Width="52"
+                                         MinWidth="52"
+                                         Margin="8,0,0,0"
+                                         VerticalAlignment="Center"
+                                         Padding="4,3"
+                                         HorizontalContentAlignment="Center"
+                                         VerticalContentAlignment="Center"
+                                         helpers:AllowedCharsInput.Allowed="Digits"
+                                         Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
 
-                        <TextBox x:Name="DirectoryBox"
-                                 Grid.Column="1"
-                                 Margin="8,0,0,0"
-                                 VerticalAlignment="Center"
-                                 Padding="4,3"
-                                 helpers:OverflowTip.Enabled="True"
-                                 Text="{Binding DatabaseDirectory, UpdateSourceTrigger=PropertyChanged}" />
+                            <!--
+                              Две строки адреса базы. Кнопка у директории открывает выбор папки, у наименования —
+                              выбор файла *.db: одного диалога «и папка, и файл» в стандартных окнах нет, а файл заодно
+                              подставляет директорию целиком — оба поля остаются согласованы.
+                              Обработчики живут в code-behind: диалоги — работа интерфейса, модели представления им не место.
 
-                        <Button Grid.Column="2"
-                                Margin="8,0,0,0"
-                                VerticalAlignment="Center"
-                                Style="{StaticResource GlassButtonSoft}"
-                                Content="Обзор…"
-                                helpers:Hotkey.Id="Settings.PickDirectory"
-                                Click="OnPickDirectory" />
-                    </Grid>
+                              Средняя колонка `*`: путь длиннее подписи и кнопки, нехватку ширины забирает поле.
+                            -->
+                            <Grid Grid.Row="1" Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Row="2" Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           VerticalAlignment="Center"
+                                           Background="Transparent"
+                                           TextWrapping="Wrap"
+                                           Text="Директория БД"
+                                           helpers:ClickToFocus.Target="{Binding ElementName=DirectoryBox}" />
 
-                        <TextBlock Grid.Column="0"
-                                   VerticalAlignment="Center"
-                                   Background="Transparent"
-                                   TextWrapping="Wrap"
-                                   Text="Наименование БД"
-                                   helpers:ClickToFocus.Target="{Binding ElementName=NameBox}" />
+                                <TextBox x:Name="DirectoryBox"
+                                         Grid.Column="1"
+                                         Margin="8,0,0,0"
+                                         VerticalAlignment="Center"
+                                         Padding="4,3"
+                                         helpers:OverflowTip.Enabled="True"
+                                         Text="{Binding DatabaseDirectory, UpdateSourceTrigger=PropertyChanged}" />
 
-                        <TextBox x:Name="NameBox"
-                                 Grid.Column="1"
-                                 Margin="8,0,0,0"
-                                 VerticalAlignment="Center"
-                                 Padding="4,3"
-                                 helpers:OverflowTip.Enabled="True"
-                                 Text="{Binding DatabaseName, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Grid.Column="2"
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource GlassButtonSoft}"
+                                        Content="Обзор…"
+                                        helpers:Hotkey.Id="Settings.PickDirectory"
+                                        Click="OnPickDirectory" />
+                            </Grid>
 
-                        <Button Grid.Column="2"
-                                Margin="8,0,0,0"
-                                VerticalAlignment="Center"
-                                Style="{StaticResource GlassButtonSoft}"
-                                Content="Выбрать файл…"
-                                helpers:Hotkey.Id="Settings.PickFile"
-                                Click="OnPickDatabaseFile" />
-                    </Grid>
+                            <Grid Grid.Row="2" Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
 
-                    <!--
-                      Выбор шрифта: список всех системных семейств под строкой поиска. Живёт в
-                      колонке *, поле поиска сверху: подпись передаёт фокус именно поиску.
+                                <TextBlock Grid.Column="0"
+                                           VerticalAlignment="Center"
+                                           Background="Transparent"
+                                           TextWrapping="Wrap"
+                                           Text="Наименование БД"
+                                           helpers:ClickToFocus.Target="{Binding ElementName=NameBox}" />
 
-                      Выпадающий список виртуализирован — семейств сотни, и без
-                      VirtualizingStackPanel ComboBox строил бы их все разом при первом показе.
-                      CanContentScroll обязателен: попиксельная прокрутка виртуализации противоречит,
-                      ItemsPresenter строил бы весь ItemsSource.
-                    -->
-                    <Grid Grid.Row="3" Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
+                                <TextBox x:Name="NameBox"
+                                         Grid.Column="1"
+                                         Margin="8,0,0,0"
+                                         VerticalAlignment="Center"
+                                         Padding="4,3"
+                                         helpers:OverflowTip.Enabled="True"
+                                         Text="{Binding DatabaseName, UpdateSourceTrigger=PropertyChanged}" />
 
-                        <TextBlock Grid.Column="0"
-                                   VerticalAlignment="Center"
-                                   Background="Transparent"
-                                   TextWrapping="Wrap"
-                                   Text="Шрифт"
-                                   helpers:ClickToFocus.Target="{Binding ElementName=FontSearchBox}" />
+                                <Button Grid.Column="2"
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource GlassButtonSoft}"
+                                        Content="Выбрать файл…"
+                                        helpers:Hotkey.Id="Settings.PickFile"
+                                        Click="OnPickDatabaseFile" />
+                            </Grid>
 
-                        <StackPanel Grid.Column="1"
-                                    Margin="8,0,0,0">
-                            <TextBox x:Name="FontSearchBox"
-                                     Padding="4,3"
-                                     ToolTip="Поиск — по имени шрифта"
-                                     Text="{Binding FontSearch, UpdateSourceTrigger=PropertyChanged}" />
+                            <!--
+                              Разделитель перед блоком оформления: шрифт, размер и тема — другая тема
+                              настроек, а не продолжение адреса базы. Линия та же, что под вкладками
+                              окна, и идёт во всю ширину.
+                            -->
+                            <Border Grid.Row="3"
+                                    Height="1"
+                                    Margin="0,14,0,0"
+                                    Background="{DynamicResource LineSoft}"
+                                    SnapsToDevicePixels="True" />
 
-                            <ComboBox Margin="0,6,0,0"
-                                      VerticalAlignment="Center"
-                                      ScrollViewer.CanContentScroll="True"
-                                      MaxDropDownHeight="320"
-                                      VirtualizingPanel.IsVirtualizing="True"
-                                      ItemsSource="{Binding FilteredFonts}"
-                                      SelectedItem="{Binding SelectedFont}">
-                                <ComboBox.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <VirtualizingStackPanel />
-                                    </ItemsPanelTemplate>
-                                </ComboBox.ItemsPanel>
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Name}" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                        </StackPanel>
-                    </Grid>
+                            <!--
+                              Выбор шрифта: список всех системных семейств под строкой поиска, и он
+                              виден сразу — раньше он был спрятан в выпадающем списке, и между
+                              «напечатал в поиск» и «выбрал шрифт» приходилось ещё открывать окно.
 
-                    <!--
-                      Размер шрифта — пресетами, а не полем: годных значений шесть, и поле с
-                      фильтром цифр проверяло бы ввод, который ComboBox и так не берёт за
-                      пределы списка.
-                    -->
-                    <Grid Grid.Row="4" Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
+                              Список виртуализирован — семейств сотни, и без VirtualizingStackPanel
+                              он построил бы их все разом при первом показе; полоса прокрутки живёт
+                              внутри шаблона списка (ловушка 30).
+                            -->
+                            <Grid Grid.Row="4" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="0"
-                                   VerticalAlignment="Center"
-                                   Background="Transparent"
-                                   TextWrapping="Wrap"
-                                   Text="Размер шрифта"
-                                   helpers:ClickToFocus.Target="{Binding ElementName=ScaleBox}" />
+                                <TextBlock Grid.Column="0"
+                                           VerticalAlignment="Center"
+                                           Background="Transparent"
+                                           TextWrapping="Wrap"
+                                           Text="Шрифт"
+                                           helpers:ClickToFocus.Target="{Binding ElementName=FontSearchBox}" />
 
-                        <ComboBox x:Name="ScaleBox"
-                                  Grid.Column="1"
-                                  Margin="8,0,0,0"
-                                  Width="120"
-                                  HorizontalAlignment="Left"
-                                  VerticalAlignment="Center"
-                                  ItemsSource="{Binding ScaleOptions}"
-                                  SelectedItem="{Binding SelectedScale}" />
-                    </Grid>
+                                <Grid Grid.Column="1"
+                                      Margin="8,0,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                    <!--
-                      Тема оформления: выбор из трёх значений. Поле и подпись — как у остальных
-                      строк вкладки.
+                                    <!--
+                                      Правый отступ поля — место под крестик: текст под ним не заезжает,
+                                      а ширина поля при появлении крестика не меняется — крестик лежит
+                                      поверх поля, а не рядом с ним.
+                                    -->
+                                    <TextBox x:Name="FontSearchBox"
+                                             Grid.Row="0"
+                                             Padding="4,3,30,3"
+                                             ToolTip="Поиск — по имени шрифта"
+                                             Text="{Binding FontSearch, UpdateSourceTrigger=PropertyChanged}" />
 
-                      Показывается подпись, а в файл пишется значение: у пункта их два, и
-                      ComboBox берёт подпись через DisplayMemberPath.
-                    -->
-                    <Grid Grid.Row="5" Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
+                                    <!--
+                                      Плейсхолдер рисуется ПОВЕРХ поля: фон у TextBox непрозрачный,
+                                      и подложка под ним была бы не видна, поэтому блок объявлен после
+                                      TextBox — в Grid рисуется последним. IsHitTestVisible=False
+                                      обязателен: иначе надпись перехватывала бы нажатия и в поле
+                                      нельзя было бы ни поставить каретку, ни вставить из буфера.
+                                    -->
+                                    <TextBlock Grid.Row="0"
+                                               HorizontalAlignment="Left"
+                                               Margin="5,0,0,0"
+                                               VerticalAlignment="Center"
+                                               IsHitTestVisible="False"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Text="{Binding FontSearchPlaceholder}"
+                                               Visibility="{Binding HasFontSearchPlaceholder, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                        <TextBlock Grid.Column="0"
-                                   VerticalAlignment="Center"
-                                   Background="Transparent"
-                                   TextWrapping="Wrap"
-                                   Text="Тема"
-                                   helpers:ClickToFocus.Target="{Binding ElementName=ThemeBox}" />
+                                    <!--
+                                      Крестик внутри поля: он и есть часть поля, а не соседняя кнопка.
+                                      Показан, только когда поле не пустое.
+                                    -->
+                                    <Button x:Name="ClearFontSearchButton"
+                                            Grid.Row="0"
+                                            Width="18"
+                                            Height="18"
+                                            Margin="0,0,5,0"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource GlassButtonIconFlat}"
+                                            Command="{Binding ClearFontSearchCommand}"
+                                            Visibility="{Binding HasFontSearch, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                            ToolTip="Очистить поиск">
+                                        <Path Width="9"
+                                              Height="9"
+                                              Data="{StaticResource ClearGlyph}"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              StrokeThickness="1.3"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round" />
+                                    </Button>
 
-                        <ComboBox x:Name="ThemeBox"
-                                  Grid.Column="1"
-                                  Margin="8,0,0,0"
-                                  Width="160"
-                                  HorizontalAlignment="Left"
-                                  VerticalAlignment="Center"
-                                  ItemsSource="{Binding ThemeOptions}"
-                                  SelectedItem="{Binding SelectedTheme}"
-                                  DisplayMemberPath="Display" />
-                    </Grid>
-                </Grid>
+                                    <ListBox Grid.Row="1"
+                                             Margin="0,6,0,0"
+                                             Height="120"
+                                             ItemsSource="{Binding FilteredFonts}"
+                                             SelectedItem="{Binding SelectedFont}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Name}" />
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+
+                                    <TextBlock Grid.Row="1"
+                                               Margin="0,6,0,0"
+                                               Height="120"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               IsHitTestVisible="False"
+                                               Text="Шрифтов не найдено"
+                                               Visibility="{Binding IsFontListEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                </Grid>
+                            </Grid>
+
+                            <!--
+                              Размер шрифта — пресетами, а не полем: годных значений шесть, и поле с
+                              фильтром цифр проверяло бы ввод, который ComboBox и так не берёт за
+                              пределы списка.
+                            -->
+                            <Grid Grid.Row="5" Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           VerticalAlignment="Center"
+                                           Background="Transparent"
+                                           TextWrapping="Wrap"
+                                           Text="Размер шрифта"
+                                           helpers:ClickToFocus.Target="{Binding ElementName=ScaleBox}" />
+
+                                <ComboBox x:Name="ScaleBox"
+                                          Grid.Column="1"
+                                          Margin="8,0,0,0"
+                                          Width="120"
+                                          HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"
+                                          ItemsSource="{Binding ScaleOptions}"
+                                          SelectedItem="{Binding SelectedScale}" />
+                            </Grid>
+
+                            <!--
+                              Тема оформления: выбор из трёх значений. Поле и подпись — как у остальных
+                              строк вкладки.
+
+                              Показывается подпись, а в файл пишется значение: у пункта их два, и
+                              ComboBox берёт подпись через DisplayMemberPath.
+                            -->
+                            <Grid Grid.Row="6" Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           VerticalAlignment="Center"
+                                           Background="Transparent"
+                                           TextWrapping="Wrap"
+                                           Text="Тема"
+                                           helpers:ClickToFocus.Target="{Binding ElementName=ThemeBox}" />
+
+                                <ComboBox x:Name="ThemeBox"
+                                          Grid.Column="1"
+                                          Margin="8,0,0,0"
+                                          Width="160"
+                                          HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"
+                                          ItemsSource="{Binding ThemeOptions}"
+                                          SelectedItem="{Binding SelectedTheme}"
+                                          DisplayMemberPath="Display" />
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </ScrollViewer>
             </TabItem>
 
             <TabItem Header="Горячие клавиши">
@@ -292,15 +417,135 @@
                 <Grid Margin="0,12,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
+
+                    <!--
+                      Поиск по названию действия или окна. Поле — над перечнем, а не под ним:
+                      искать приходится именно в длинном списке, и подсказка под рукой нужна
+                      раньше, чем сам список.
+
+                      Галочка «только изменённые» — рядом с полем, а не отдельной строкой:
+                      это второй фильтр того же перечня, и он включается вместе с поиском.
+                    -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Background="Transparent"
+                                   Text="Поиск"
+                                   helpers:ClickToFocus.Target="{Binding ElementName=HotkeySearchBox}" />
+
+                        <Grid Grid.Column="1"
+                              Margin="8,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Grid Grid.Column="0">
+                                <!--
+                                  Правый отступ поля — место под крестик: текст под ним не заезжает,
+                                  а ширина поля при появлении крестика не меняется — крестик лежит
+                                  поверх поля, а не рядом с ним.
+                                -->
+                                <TextBox x:Name="HotkeySearchBox"
+                                         Padding="4,3,30,3"
+                                         VerticalContentAlignment="Center"
+                                         ToolTip="Поиск по названию действия или окна"
+                                         Text="{Binding HotkeySearch, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <!--
+                                  Крестик внутри поля: он и есть часть поля, а не соседняя кнопка.
+                                  Показан, только когда поле не пустое, и сделан из плоского стекла —
+                                  стеклянная пилюля рядом с белым полем была бы пятном.
+                                -->
+                                <Button x:Name="ClearSearchButton"
+                                        Width="18"
+                                        Height="18"
+                                        Margin="0,0,5,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource GlassButtonIconFlat}"
+                                        Command="{Binding ClearHotkeySearchCommand}"
+                                        Visibility="{Binding HasHotkeySearch, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        ToolTip="Очистить поиск">
+                                    <Path Width="9"
+                                          Height="9"
+                                          Data="{StaticResource ClearGlyph}"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.3"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round" />
+                                </Button>
+                            </Grid>
+
+                            <CheckBox Grid.Column="1"
+                                      Margin="8,0,0,0"
+                                      VerticalAlignment="Center"
+                                      Content="только изменённые"
+                                      IsChecked="{Binding HotkeyChangedOnly, Mode=TwoWay}"
+                                      ToolTip="Показывать только назначения, отличающиеся от умолчания" />
+                        </Grid>
+                    </Grid>
+
+                    <!--
+                      Кнопки-переходы по окнам: без них до нужной клавиши в перечне надо было бы
+                      долго скроллить, а назначения разбросаны по восьми разделам.
+
+                      Вид — TabButton из словаря кнопок: плоские сегменты, примыкающие друг к
+                      другу, выбранный уходит вглубь. Нынешний стеклянный вид сохранён рядом
+                      стилем HotkeyChipGlass — переключение это одно имя.
+
+                      Подписи короткие — восемь полных имён в один ряд не влезают, а полное имя
+                      окна остаётся заголовком его раздела в перечне. Рядов может быть
+                      несколько: число окон не фиксировано, но сегменты в ряду примыкают.
+
+                      Рамка под полосой — нижняя граница блока кнопок, отделяющая его от
+                      перечня, на который кнопки влияют. Линия идёт во всю ширину, как линия
+                      под вкладками «Общие | Горячие клавиши». Подложка снизу отодвигает
+                      сегменты от линии на 1 px: без неё линия сегментов и общая линия
+                      сливаются в одну полосу, и под блоком кнопок читается одна толстая.
+                    -->
+                    <Border Grid.Row="1"
+                            Margin="0,8,0,0"
+                            Padding="0,0,0,1"
+                            BorderBrush="{DynamicResource LineSoft}"
+                            BorderThickness="0,0,0,1"
+                            SnapsToDevicePixels="True">
+                        <ItemsControl x:Name="HotkeyChips"
+                                      ItemsSource="{Binding HotkeyChips}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource TabButton}"
+                                            Command="{Binding DataContext.SelectChipCommand,
+                                                                  RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            Content="{Binding Label}"
+                                            ToolTip="{Binding Tooltip}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
 
                     <!--
                       Конфликт — красной строкой и до исправления, а не подсказкой: «Сохранить»
                       с конфликтом молчит, и причину обязано быть видно, пока не исправят.
                     -->
-                    <TextBlock Grid.Row="0"
-                               Margin="0,0,0,8"
+                    <TextBlock Grid.Row="2"
+                               Margin="0,8,0,0"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource TextError}"
                                Visibility="{Binding HasHotkeyConflict, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -316,122 +561,139 @@
                       ScrollViewer + ItemsPresenter + CanContentScroll работает как у ListBox'а:
                       строится только видимое. Recycling переиспользует контейнеры при прокрутке,
                       попиксельная единица держит прокрутку плавной.
+
+                      Имя у ScrollViewer — для прокрутки к началу при смене окна и поиска: иначе
+                      перечень остался бы прокрученным на прежнем месте.
                     -->
-                    <ItemsControl Grid.Row="1"
-                                  ItemsSource="{Binding HotkeyListing}"
-                                  VirtualizingPanel.IsVirtualizing="True"
-                                  VirtualizingPanel.VirtualizationMode="Recycling"
-                                  VirtualizingPanel.ScrollUnit="Pixel">
+                    <Grid Grid.Row="3">
+                        <ItemsControl x:Name="HotkeyList"
+                                      ItemsSource="{Binding HotkeyListing}"
+                                      VirtualizingPanel.IsVirtualizing="True"
+                                      VirtualizingPanel.VirtualizationMode="Recycling"
+                                      VirtualizingPanel.ScrollUnit="Pixel">
 
-                        <ItemsControl.Template>
-                            <ControlTemplate TargetType="ItemsControl">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                              CanContentScroll="True"
-                                              helpers:ScrollBarGutter.Left="2">
-                                    <ItemsPresenter />
-                                </ScrollViewer>
-                            </ControlTemplate>
-                        </ItemsControl.Template>
+                            <ItemsControl.Template>
+                                <ControlTemplate TargetType="ItemsControl">
+                                    <ScrollViewer x:Name="HotkeyScroll"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  CanContentScroll="True"
+                                                  helpers:ScrollBarGutter.Left="2">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </ControlTemplate>
+                            </ItemsControl.Template>
 
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <VirtualizingStackPanel />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
 
-                        <ItemsControl.Resources>
+                            <ItemsControl.Resources>
 
-                            <!--
-                              Заголовок = то же название окна, что было у группы. Отступ сверху 10px
-                              подбирает прежнюю межгрупповую четверть: у самого первого заголовка
-                              появляется незаметный 10px над списком.
-                            -->
-                            <DataTemplate DataType="{x:Type vm:HotkeySectionViewModel}">
-                                <TextBlock Margin="0,10,0,4"
-                                           FontWeight="SemiBold"
-                                           Text="{Binding WindowName}" />
-                            </DataTemplate>
+                                <!--
+                                  Заголовок = то же название окна, что было у группы. Отступ сверху 10px
+                                  подбирает прежнюю межгрупповую четверть: у самого первого заголовка
+                                  появляется незаметный 10px над списком.
+                                -->
+                                <DataTemplate DataType="{x:Type vm:HotkeySectionViewModel}">
+                                    <TextBlock Margin="0,10,0,4"
+                                               FontWeight="SemiBold"
+                                               Text="{Binding WindowName}" />
+                                </DataTemplate>
 
-                            <!--
-                              Строка списка: Имя + TextBox захвата + «Убрать». Сами строки
-                              в grid-колонках, а не в панели: поле захвата честно правится
-                              колонкой Auto, и имя в колонке * переносится вместо того, чтобы
-                              сдвигать поле захвата с места (ловушка 35).
-                            -->
-                            <DataTemplate DataType="{x:Type vm:HotkeyRowViewModel}">
-                                <Grid Margin="0,0,0,4"
-                                      SnapsToDevicePixels="True">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                                <!--
+                                  Строка списка: Имя + TextBox захвата + «Убрать». Сами строки
+                                  в grid-колонках, а не в панели: поле захвата честно правится
+                                  колонкой Auto, и имя в колонке * переносится вместо того, чтобы
+                                  сдвигать поле захвата с места (ловушка 35).
+                                -->
+                                <DataTemplate DataType="{x:Type vm:HotkeyRowViewModel}">
+                                    <Grid Margin="0,0,0,4"
+                                          SnapsToDevicePixels="True">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <TextBlock Grid.Column="0"
-                                               Margin="0,0,8,0"
-                                               VerticalAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               Text="{Binding DisplayText}" />
+                                        <TextBlock Grid.Column="0"
+                                                   Margin="0,0,8,0"
+                                                   VerticalAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding DisplayText}" />
 
-                                    <!--
-                                      Поле захвата только для чтения: комбинацию вводит клавиатура,
-                                      а печатная правка «Ctrl+» руками — источник негодных значений.
-                                      Mode=OneWay обязателен: модель пишет в строку сама
-                                      промежуточный набор, а привязка по умолчанию двусторонняя.
-                                      Подсветка по признаку захвата строки: приглашение текстом
-                                      показывает назначение поля и само, подсветка страхует случай,
-                                      когда подсказку уже проглотил набор («Ctrl+»). Enter нигде не
-                                      подтверждает — комбинация подтверждается нажатой клавишей.
-                                    -->
-                                    <TextBox Grid.Column="1"
-                                             Width="120"
-                                             MinWidth="120"
-                                             Margin="0,0,6,0"
-                                             IsReadOnly="True"
-                                             IsReadOnlyCaretVisible="False"
-                                             Padding="4,3"
-                                             HorizontalContentAlignment="Center"
-                                             VerticalAlignment="Center"
-                                             Text="{Binding GestureText, Mode=OneWay}"
-                                             GotKeyboardFocus="OnCaptureGotFocus"
-                                             PreviewKeyDown="OnCaptureKeyDown"
-                                             PreviewLostKeyboardFocus="OnCaptureLostFocus"
-                                             ToolTip="Нажмите комбинацию; Esc — вернуть предыдущую">
-                                        <TextBox.Style>
-                                            <!--
-                                              BasedOn обязателен: локальный стиль вытесняет неявный
-                                              стиль TextBox из Controls.xaml, и без BasedOn поле осталось
-                                              бы с системным видом — в светлой теме это незаметно
-                                              (системное поле тоже белое), а в тёмной белое поле с
-                                              чёрным текстом читается как чужое, и надпись
-                                              «Комбинация…» на подложке захвата не видна.
-                                            -->
-                                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsCapturing}" Value="True">
-                                                        <Setter Property="BorderBrush" Value="{DynamicResource CaptureBorder}" />
-                                                        <Setter Property="Background" Value="{DynamicResource CaptureSurface}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBox.Style>
-                                    </TextBox>
+                                        <!--
+                                          Поле захвата только для чтения: комбинацию вводит клавиатура,
+                                          а печатная правка «Ctrl+» руками — источник негодных значений.
+                                          Mode=OneWay обязателен: модель пишет в строку сама
+                                          промежуточный набор, а привязка по умолчанию двусторонняя.
+                                          Подсветка по признаку захвата строки: приглашение текстом
+                                          показывает назначение поля и само, подсветка страхует случай,
+                                          когда подсказку уже проглотил набор («Ctrl+»). Enter нигде не
+                                          подтверждает — комбинация подтверждается нажатой клавишей.
+                                        -->
+                                        <TextBox Grid.Column="1"
+                                                 Width="120"
+                                                 MinWidth="120"
+                                                 Margin="0,0,6,0"
+                                                 IsReadOnly="True"
+                                                 IsReadOnlyCaretVisible="False"
+                                                 Padding="4,3"
+                                                 HorizontalContentAlignment="Center"
+                                                 VerticalAlignment="Center"
+                                                 Text="{Binding GestureText, Mode=OneWay}"
+                                                 GotKeyboardFocus="OnCaptureGotFocus"
+                                                 PreviewKeyDown="OnCaptureKeyDown"
+                                                 PreviewLostKeyboardFocus="OnCaptureLostFocus"
+                                                 ToolTip="Нажмите комбинацию; Esc — вернуть предыдущую">
+                                            <TextBox.Style>
+                                                <!--
+                                                  BasedOn обязателен: локальный стиль вытесняет неявный
+                                                  стиль TextBox из Controls.xaml, и без BasedOn поле осталось
+                                                  бы с системным видом — в светлой теме это незаметно
+                                                  (системное поле тоже белое), а в тёмной белое поле с
+                                                  чёрным текстом читается как чужое, и надпись
+                                                  «Комбинация…» на подложке захвата не видна.
+                                                -->
+                                                <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsCapturing}" Value="True">
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource CaptureBorder}" />
+                                                            <Setter Property="Background" Value="{DynamicResource CaptureSurface}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBox.Style>
+                                        </TextBox>
 
-                                    <!--
-                                      «Убрать» возвращает умолчание или пусто. Новая кнопка, не
-                                      IconButtonTemplate чужого окна: ресурсы окна живут в окне (ловушка 6).
-                                    -->
-                                    <Button Grid.Column="2"
-                                            VerticalAlignment="Center"
-                                            Style="{StaticResource GlassButtonIconSoft}"
-                                            Command="{Binding ClearCommand}"
-                                            Content="✕"
-                                            ToolTip="Убрать назначение (вернуть умолчание)" />
-                                </Grid>
-                            </DataTemplate>
+                                        <!--
+                                          «Убрать» возвращает умолчание или пусто. Новая кнопка, не
+                                          IconButtonTemplate чужого окна: ресурсы окна живут в окне (ловушка 6).
+                                        -->
+                                        <Button Grid.Column="2"
+                                                VerticalAlignment="Center"
+                                                Style="{StaticResource GlassButtonIconSoft}"
+                                                Command="{Binding ClearCommand}"
+                                                Content="✕"
+                                                ToolTip="Убрать назначение (вернуть умолчание)" />
+                                    </Grid>
+                                </DataTemplate>
 
-                        </ItemsControl.Resources>
-                    </ItemsControl>
+                            </ItemsControl.Resources>
+                        </ItemsControl>
+
+                        <!--
+                          Пустой перечень — это «ничего не найдено», а не пустое окно: без подписи
+                          пользователь не отличил бы его от сбоя вкладки.
+                        -->
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   IsHitTestVisible="False"
+                                   Text="Ничего не найдено"
+                                   Visibility="{Binding IsHotkeyListingEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </Grid>
                 </Grid>
             </TabItem>
         </TabControl>

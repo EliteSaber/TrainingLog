@@ -18,6 +18,13 @@
       Радиус живёт в helpers:ButtonChrome.CornerRadius (умолчание 4, мокап
       docs/addDayButtonStates.svg), шаблон читает его привязкой к TemplatedParent.
 
+      TabButton — не стекло: плоская кнопка-вкладка для вкладок и переходов. Живёт в этом же
+      словаре потому, что словарь хранит набор кнопок приложения, а не только стеклянные; она
+      ничего из перечисленных выше не заменяет, а дополняет их.
+
+      GlassButtonIconFlat — стекло без выпуклости: тот же материал, без объёма. Для кнопок,
+      которые принадлежат полю.
+
       Четыре состояния — обычное, наведённое, нажатая, недоступная: Shape-триггеры
       меняют градиенты, прозрачности слоёв, эффекты свечения/тени и «утапливают»
       кнопку вниз на 1px. Цвет состояния живёт в Foreground самой кнопки: текст
@@ -357,5 +364,174 @@
 
     <Style x:Key="AddDayButtonSoft" TargetType="Button" BasedOn="{StaticResource AddDayButton}">
         <Setter Property="helpers:ButtonChrome.CornerRadius" Value="2" />
+    </Style>
+
+    <!--
+      Кнопка-вкладка: для вкладок и переходов между разделами.
+
+      Не стекло: ни фаски, ни блика, ни тени, ни свечения — подложка плоская, и зазор между
+      соседними сегментами задаёт разделитель у правого края. Соседние сегменты примыкают
+      друг к другу, и линия между ними получается одна.
+
+      Выделение — по признаку IsSelected в данных, так же как у слотов окна дня: раз
+      переходов читается из данных, а не живёт в разметке. Выбранный сегмент уходит вглубь:
+      подложка темнее фона окна, сверху тень от края углубления, снизу акцентная линия
+      вместо обычной, а содержимое сдвинуто на пиксель вниз — так же, как у нажатой
+      стеклянной кнопки.
+
+      Стиль ключевой и ничего не заменяет: словарь хранит набор кнопок приложения, и
+      TabButton — ещё одна в нём, а не вместо стеклянных.
+
+      Шаблон сегмента написан здесь и второй раз — в неявном стиле TabItem
+      (Themes/Controls.xaml): одна ControlTemplate служит одному типу контрола, а у вкладки
+      и у кнопки разный источник содержимого — Header и Content. Вид у них общий.
+    -->
+    <Style x:Key="TabButton" TargetType="Button">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="{DynamicResource BodySize}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="MinHeight" Value="26" />        <!--
+          Зазор — сверху, а не снизу: нижняя граница блока сегментов должна примыкать
+          к общей линии полосы, а не отстоять от неё — иначе линия читается как граница
+          содержимого под кнопками, а не как нижняя граница самих кнопок. Сверху зазор
+          разводит ряды сегментов, и разводит их собственные линии.
+        -->
+        <Setter Property="Margin" Value="0,2,0,0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <!--
+                          Подложка сегмента. Прозрачная у обычного: сегменты стоят на фоне окна
+                          и читаются линиями, а не заливкой.
+                        -->
+                        <Border x:Name="Plate" Background="Transparent">
+                            <ContentPresenter x:Name="Content"
+                                              Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+
+                        <!--
+                          Верхняя кромка: у выбранного сегмента тень от края углубления.
+                          У обычного она прозрачна и места не занимает — толщина кромки
+                          одинакова при любом состоянии, и выделенный сегмент не «прыгает».
+                        -->
+                        <Rectangle x:Name="TopEdge"
+                                   Height="1"
+                                   VerticalAlignment="Top"
+                                   Fill="Transparent" />
+
+                        <!--
+                          Нижняя линия сегмента: у обычного — разделитель сегмента от
+                          содержимого под ним, у выбранного — акцентная метка выбора.
+                        -->
+                        <Rectangle x:Name="BottomLine"
+                                   Height="1"
+                                   VerticalAlignment="Bottom"
+                                   Fill="{DynamicResource LineSoft}" />
+
+                        <!--
+                          Разделитель соседей: у правого края сегмента, чтобы примыкающие
+                          сегменты давали одну линию между собой.
+                        -->
+                        <Rectangle Width="1"
+                                   HorizontalAlignment="Right"
+                                   Fill="{DynamicResource LineSoft}" />
+                    </Grid>
+
+                    <!--
+                      Состояния — в триггерах шаблона, а не стиля: триггер стиля умеет менять
+                      только сам элемент, а подложка, кромки и сдвиг содержимого живут внутри
+                      шаблона и по имени доступны только отсюда.
+
+                      Выделение — по признаку IsSelected в данных: раз переходов читается
+                      из данных, а не живёт в разметке. Привязка в триггере шаблона берёт
+                      DataContext применённого элемента — тот же, что и у кнопки.
+                    -->
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Plate" Property="Background" Value="{DynamicResource ControlHover}" />
+                        </Trigger>
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter TargetName="Plate" Property="Background" Value="{DynamicResource SurfaceAlt}" />
+                            <Setter TargetName="TopEdge" Property="Fill" Value="{DynamicResource LineStrong}" />
+                            <Setter TargetName="BottomLine" Property="Height" Value="2" />
+                            <Setter TargetName="BottomLine" Property="Fill" Value="{DynamicResource Accent}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AccentStrong}" />
+                            <!--
+                              Содержимое уходит вниз на пиксель: признак утопленности, какой и
+                              у нажатой стеклянной кнопки. Задаётся заменой трансформации целиком:
+                              обращаться к её элементам по имени из триггера нельзя — имена в
+                              области имён шаблона не всегда находятся.
+                            -->
+                            <Setter TargetName="Content" Property="RenderTransform">
+                                <Setter.Value>
+                                    <TranslateTransform Y="1" />
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+      Плоское стекло: кнопка-иконка из того же материала, что и все кнопки приложения, но
+      без выпуклости.
+
+      Материал тот же: заливка AddDayGlass и рамка AddDayBevel, при наведении — AddDayGlassHover
+      и AddDayBevelHover. Объёма нет: ни ореола-свечения, ни тени, ни внутреннего верхнего
+      блика, ни внутренней нижней тени, ни диагональной полосы — всё это создаёт выпуклость,
+      и без него кнопка остаётся стеклом, но плоским.
+
+      Для кнопок, которые принадлежат полю: кнопка внутри поля должна читаться частью
+      поля, и стеклянная пилюля рядом с белым полем была бы пятном.
+
+      Focusable=False — фокус остаётся в поле, откуда кнопку вызвали: каретка не теряется,
+      и после очистки можно печатать сразу.
+    -->
+    <Style x:Key="GlassButtonIconFlat" TargetType="Button">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="{DynamicResource BodySize}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="Background" Value="{DynamicResource AddDayGlass}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AddDayBevel}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Width" Value="20" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Glass"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="2"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Glass" Property="Background" Value="{DynamicResource AddDayGlassHover}" />
+                            <Setter TargetName="Glass" Property="BorderBrush" Value="{DynamicResource AddDayBevelHover}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 </ResourceDictionary>

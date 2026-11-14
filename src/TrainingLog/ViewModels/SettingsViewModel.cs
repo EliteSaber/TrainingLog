@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TrainingLog.Core.Settings;
@@ -68,7 +69,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         SavedTheme = theme;
 
         HotkeyGroups = BuildHotkeyGroups(settings.Hotkeys);
-        HotkeyListing = BuildHotkeyListing(HotkeyGroups);
+
+        // Кнопки-переходы строятся по группам, а выбранной сразу становится первая — «Все окна».
+        // Сеттер сам расставит признаки и пересоберёт перечень.
+        HotkeyChips = BuildHotkeyChips(HotkeyGroups);
+        SelectedChip = HotkeyChips[0];
 
         RecalculateHotkeyStatus();
     }
@@ -113,6 +118,32 @@ public sealed partial class SettingsViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(FilteredFonts))]
     private string _fontSearch = string.Empty;
 
+    /// <summary>Поле поиска шрифта не пусто: крестик очистки показан.</summary>
+    /// <remarks>
+    /// Факт один на двоих: и показ крестика, и его готовность читают его — как у поиска
+    /// горячих клавиш.
+    /// </remarks>
+    public bool HasFontSearch => !string.IsNullOrEmpty(FontSearch);
+
+    /// <summary>Подсказка в поле поиска шрифта: чем поле занято.</summary>
+    /// <remarks>
+    /// Без неё поле рядом с подписью «Шрифт» выглядит пустым белым прямоугольником, и что
+    /// в нём искать — догадываться.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFontSearchPlaceholder))]
+    private string _fontSearchPlaceholder = "Поиск по имени шрифта";
+
+    /// <summary>Поле поиска шрифта пусто: показать подсказку.</summary>
+    /// <remarks>
+    /// Отдельный признак от <see cref="HasFontSearch"/>: подсказка видна, когда поле пустое,
+    /// а крестик — когда поле непустое. Показывать их по одному признаку нельзя.
+    /// </remarks>
+    public bool HasFontSearchPlaceholder => FontSearchPlaceholder.Length > 0 && !HasFontSearch;
+
+    /// <summary>Список шрифтов пуст: показать «шрифтов не найдено».</summary>
+    public bool IsFontListEmpty => FilteredFonts.Count == 0;
+
     /// <summary>Список шрифтов под поиск.</summary>
     /// <remarks>
     /// Вычисляемым, а не обслуживаемой коллекцией: пересчёт сотен пунктов дёшев, а второй
@@ -121,11 +152,37 @@ public sealed partial class SettingsViewModel : ObservableObject
     public IReadOnlyList<FontCatalog.FontFamilyOption> FilteredFonts =>
         FontCatalog.Filter(FontOptions, FontSearch);
 
+    partial void OnFontSearchChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasFontSearch));
+        OnPropertyChanged(nameof(HasFontSearchPlaceholder));
+        OnPropertyChanged(nameof(IsFontListEmpty));
+
+        // Команда очистки уведомление свойства не слушает — её будить надо отдельно.
+        ClearFontSearchCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Очистка поиска шрифта: поле пусто, список снова полный.</summary>
+    [RelayCommand(CanExecute = nameof(CanClearFontSearch))]
+    private void ClearFontSearch()
+    {
+        // Проверка повторяется в теле команды: Execute предикат не спрашивает (ловушка 46).
+        if (!CanClearFontSearch())
+        {
+            return;
+        }
+
+        FontSearch = string.Empty;
+    }
+
+    /// <summary>Очищать есть что: пустое поле очищать незачем, и кнопка гаснет.</summary>
+    private bool CanClearFontSearch() => HasFontSearch;
+
     /// <summary>Выбранный пункт списка шрифтов.</summary>
     /// <remarks>
     /// Свойство написано вручную, а не <c>[ObservableProperty]</c>: список под поиск убирает
-    /// выбранный пункт, и ComboBox присылает null. Игнорирование null держит выбор в модели,
-    /// пока ComboBox на экране пуст, — очистка поиска возвращает пункт на место, и повторное
+    /// выбранный пункт, и список присылает null. Игнорирование null держит выбор в модели,
+    /// пока список на экране пуст, — очистка поиска возвращает пункт на место, и повторное
     /// выделение не теряет сохранённого значения.
     /// </remarks>
     public FontCatalog.FontFamilyOption SelectedFont
@@ -199,15 +256,53 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// </remarks>
     public IReadOnlyList<HotkeyGroupViewModel> HotkeyGroups { get; }
 
+    /// <summary>Кнопки-переходы по окнам: «Все окна» и по одной на каждое окно каталога.</summary>
+    /// <remarks>
+    /// Кнопки перечисляют окна, а не группы: пользователь знает окно, а группу видит только
+    /// заголовком. Порядок кнопок — порядок каталога.
+    /// </remarks>
+    public IReadOnlyList<HotkeyChipViewModel> HotkeyChips { get; }
+
+    /// <summary>Выбранная кнопка-переход: перечень показывает назначения этого окна.</summary>
+    [ObservableProperty]
+    private HotkeyChipViewModel? _selectedChip;
+
+    /// <summary>Окно, чьи назначения показывает перечень; null — показываются все окна.</summary>
+    public HotkeyGroupViewModel? SelectedHotkeyGroup => SelectedChip?.Group;
+
+    /// <summary>Поисковая строка перечня: по имени действия или имени окна.</summary>
+    /// <remarks>
+    /// Пустая строка означает, что показан весь перечень.
+    /// </remarks>
+    [ObservableProperty]
+    private string _hotkeySearch = string.Empty;
+
+    /// <summary>Показывать только те назначения, что отличаются от умолчания каталога.</summary>
+    [ObservableProperty]
+    private bool _hotkeyChangedOnly;
+
+    /// <summary>Поле поиска не пусто: крестик очистки показан.</summary>
+    /// <remarks>
+    /// Факт один на двоих: и показ крестика, и его готовность читают его. Отдельный признак
+    /// у команды разошёлся бы с полем при первом же изменении.
+    /// </remarks>
+    public bool HasHotkeySearch => !string.IsNullOrEmpty(HotkeySearch);
+
     /// <summary>Плоский список вкладки: за заголовком окна идут его строки — источник виртуализации.</summary>
     /// <remarks>
     /// Группа-в-группе не виртуализируется никогда: высота внутренней панели не ограничена,
     /// и она построила бы все ~60 строк разом — это была бы цена первого показа вкладки.
     /// Плоский перечень с разделителями-заголовками позволяет VirtualizingStackPanel строить
-    /// только видимые строки. Группы после конструктора не меняются, поэтому перечень строится
-    /// один раз и пересобирать его незачем.
+    /// только видимые строки.
+    ///
+    /// Коллекция обслуживаемая, а не вычисляемая: перечень пересобирается при смене поиска,
+    /// окна и галочки, и пересборка через <see cref="VisibleSync"/> не пересоздаёт контейнеры
+    /// уцелевших строк — иначе правка комбинации роняла бы фокус из поля захвата.
     /// </remarks>
-    public IReadOnlyList<object> HotkeyListing { get; }
+    public ObservableCollection<object> HotkeyListing { get; } = [];
+
+    /// <summary>Перечень пуст: показать «ничего не найдено».</summary>
+    public bool IsHotkeyListingEmpty => HotkeyListing.Count == 0;
 
     /// <summary>Объяснение конфликта назначений, а при пустом значении — конфликта нет.</summary>
     [ObservableProperty]
@@ -310,6 +405,77 @@ public sealed partial class SettingsViewModel : ObservableObject
         RecalculateHotkeyStatus();
 
         SaveCommand.NotifyCanExecuteChanged();
+
+        // Перечень трогаем только при включённом «только изменённые»: там состав перечня зависит
+        // от комбинации, а в обычном режиме правка ничего в перечне не меняет — а пересборка
+        // уничтожила бы контейнеры строк и унесла бы фокус из поля захвата.
+        if (HotkeyChangedOnly)
+        {
+            RebuildHotkeyListing();
+        }
+    }
+
+    /// <summary>Переход к окну: перечень показывает только его назначения.</summary>
+    [RelayCommand]
+    private void SelectChip(HotkeyChipViewModel chip) => SelectedChip = chip;
+
+    /// <summary>Пересобирает перечень под текущий поиск, окно и галочку.</summary>
+    /// <remarks>
+    /// Пересборка идёт через <see cref="VisibleSync"/>: коллекция приводится к целевому составу
+    /// без <c>Reset</c>, и контейнеры уцелевших строк переиспользуются. Полная пересборка
+    /// пересоздала бы контейнеры всех строк, и фокус из поля захвата улетел бы на каждой
+    /// правке комбинации.
+    /// </remarks>
+    private void RebuildHotkeyListing()
+    {
+        var target = HotkeyFilter.BuildListing(HotkeyGroups, HotkeySearch, HotkeyChangedOnly, SelectedHotkeyGroup);
+
+        VisibleSync.Sync(HotkeyListing, target);
+
+        OnPropertyChanged(nameof(IsHotkeyListingEmpty));
+    }
+
+    partial void OnHotkeySearchChanged(string value)
+    {        RebuildHotkeyListing();
+
+        OnPropertyChanged(nameof(HasHotkeySearch));
+
+        // Команда очистки уведомление свойства не слушает — её будить надо отдельно.
+        ClearHotkeySearchCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Очистка поиска: поле пусто, перечень снова полный.</summary>
+    /// <remarks>
+    /// Команда, а не присваивание в разметке: кнопка должна гаснуть на пустом поле, а серое
+    /// состояние WPF берёт из <c>CanExecute</c> привязанной команды.
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanClearHotkeySearch))]
+    private void ClearHotkeySearch()
+    {
+        // Проверка повторяется в теле команды: Execute предикат не спрашивает (ловушка 46).
+        if (!CanClearHotkeySearch())
+        {
+            return;
+        }
+
+        HotkeySearch = string.Empty;
+    }
+
+    /// <summary>Очищать есть что: пустое поле очищать незачем, и кнопка гаснет.</summary>
+    private bool CanClearHotkeySearch() => HasHotkeySearch;
+
+    partial void OnHotkeyChangedOnlyChanged(bool value) => RebuildHotkeyListing();
+
+    partial void OnSelectedChipChanged(HotkeyChipViewModel? value)
+    {
+        // Признак «выбрана» живёт на кнопке: разметка помечает ею кнопку, и держать второе
+        // состояние в модели рядом с выбранной кнопкой незачем — расходиться им нельзя.
+        foreach (var chip in HotkeyChips)
+        {
+            chip.IsSelected = ReferenceEquals(chip, value);
+        }
+
+        RebuildHotkeyListing();
     }
 
     /// <summary>Ищет первую пару строк с одинаковой комбинацией внутри окна и ставит сообщение о ней.</summary>
@@ -341,8 +507,11 @@ public sealed partial class SettingsViewModel : ObservableObject
                 {
                     if (occupied.TryGetValue(gesture, out var other))
                     {
+                        // Окно названо рядом с действием: конфликт считается по всем окнам, и при
+                        // включённом поиске или выбранном окне источник может быть не на экране —
+                        // без имени окна объяснение было бы половиной ответа.
                         HotkeyConflict =
-                            $"Комбинация «{gesture}» уже назначена действию «{other.Name}».";
+                            $"Комбинация «{gesture}» уже назначена действию «{other.Name}» в окне «{group.WindowName}».";
 
                         return;
                     }
@@ -398,24 +567,27 @@ public sealed partial class SettingsViewModel : ObservableObject
                         : action.DefaultGesture ?? string.Empty));
             }
 
-            groups.Add(new HotkeyGroupViewModel(catalogGroup.WindowName, rows));
+            groups.Add(new HotkeyGroupViewModel(catalogGroup.WindowName, catalogGroup.ShortName, rows));
         }
 
         return groups;
     }
 
-    /// <summary>Разворачивает группы в перечень вкладки: заголовок окна вперёд, за ним его строки.</summary>
-    private static List<object> BuildHotkeyListing(IReadOnlyList<HotkeyGroupViewModel> groups)
+    /// <summary>Кнопки-переходы: «Все окна» и по одной на каждое окно.</summary>
+    /// <remarks>
+    /// «Все окна» идёт первым и ссылается на null-группу: так «показать всё» — обычный
+    /// переход, а не отдельное состояние модели с отдельной командой.
+    /// </remarks>
+    private static List<HotkeyChipViewModel> BuildHotkeyChips(IReadOnlyList<HotkeyGroupViewModel> groups)
     {
-        List<object> listing = [];
+        List<HotkeyChipViewModel> chips = [new HotkeyChipViewModel("Все окна", null)];
 
         foreach (var group in groups)
         {
-            listing.Add(new HotkeySectionViewModel(group.WindowName));
-            listing.AddRange(group.Rows);
+            chips.Add(new HotkeyChipViewModel(group.ShortName, group));
         }
 
-        return listing;
+        return chips;
     }
 }
 
@@ -428,11 +600,58 @@ public sealed partial class SettingsViewModel : ObservableObject
 public sealed record ThemeOption(string Value, string Display);
 
 /// <summary>Группа вкладки горячих клавиш: назначения одного окна.</summary>
-public sealed class HotkeyGroupViewModel(string windowName, IReadOnlyList<HotkeyRowViewModel> rows)
+public sealed class HotkeyGroupViewModel(
+    string windowName,
+    string shortName,
+    IReadOnlyList<HotkeyRowViewModel> rows)
 {
     public string WindowName { get; } = windowName;
 
+    /// <summary>Короткое имя окна — подпись кнопки-перехода.</summary>
+    public string ShortName { get; } = shortName;
+
     public IReadOnlyList<HotkeyRowViewModel> Rows { get; } = rows;
+
+    /// <summary>Заголовок окна в плоском перечне.</summary>
+    /// <remarks>
+    /// Живёт в группе, а не строится на каждый пересбор перечня: пересборка идёт через
+    /// <see cref="VisibleSync"/>, и новый заголовок каждый раз считался бы ушедшим элементом —
+    /// контейнер заголовка пересоздавался бы направо.
+    /// </remarks>
+    public HotkeySectionViewModel Section { get; } = new(windowName);
+}
+
+/// <summary>Кнопка-переход к окну вкладки горячих клавиш.</summary>
+/// <remarks>
+/// Отдельный тип, а не строка: у кнопки есть признак «выбрана», и он должен уметь измениться
+/// сам — иначе разметка и модель держали бы одно и то же дважды.
+/// </remarks>
+public sealed partial class HotkeyChipViewModel : ObservableObject
+{
+    /// <param name="label">Подпись кнопки.</param>
+    /// <param name="group">Окно, к которому кнопка ведёт; null — «Все окна».</param>
+    public HotkeyChipViewModel(string label, HotkeyGroupViewModel? group)
+    {
+        Label = label;
+        Group = group;
+
+        // Подсказка называет окно полным именем: короткая подпись кнопки («Журнал») не говорит,
+        // что это именно «Главное окно «Журнал тренировок»».
+        Tooltip = group is null ? "Показать назначения всех окон" : group.WindowName;
+    }
+
+    /// <summary>Подпись кнопки: короткое имя окна или «Все окна».</summary>
+    public string Label { get; }
+
+    /// <summary>Подсказка кнопки: полное имя окна.</summary>
+    public string Tooltip { get; }
+
+    /// <summary>Окно, к которому ведёт кнопка; null — показываются все окна.</summary>
+    public HotkeyGroupViewModel? Group { get; }
+
+    /// <summary>Выбрана ли кнопка: её рамка рисуется акцентом.</summary>
+    [ObservableProperty]
+    private bool _isSelected;
 }
 
 /// <summary>Разделитель плоского списка вкладки: прежний заголовок группы, а строку класс не трогает.</summary>

@@ -442,6 +442,92 @@
         </Setter>
     </Style>
 
+    <!--
+      Список: белое поле с рамкой, как у полей ввода, и узкая полоса прокрутки приложения.
+
+      Списка в проекте раньше не было — окно параметров держало выпадающий список шрифтов.
+      Системный ListBox в тёмной теме выбивается, как выбивался системный DatePicker, и
+      свой шаблон здесь обязателен.
+
+      Полоса прокрутки внутри шаблона, а не над списком: иначе панель получает меру без
+      границ и строит весь список разом (ловушка 30), а семейств шрифтов сотни.
+      CanContentScroll обязателен: попиксельная прокрутка виртуализации противоречит,
+      ItemsPresenter строил бы весь ItemsSource.
+    -->
+    <Style TargetType="ListBox">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="Background" Value="{DynamicResource FieldBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource FieldBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="2" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+        <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+        <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <!--
+          Панель задана явно: у ListBox она приходит из системной темы, а свой стиль тему
+          заменяет, и без этого пункта список строился бы целиком.
+        -->
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel />
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="2"
+                            SnapsToDevicePixels="True">
+                        <ScrollViewer Focusable="False"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      CanContentScroll="{TemplateBinding ScrollViewer.CanContentScroll}">
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Пункт списка: подсветка наведения и выбранного — разные, выбранный виден и без мыши -->
+    <Style TargetType="ListBoxItem">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="Padding" Value="7,3" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Frame"
+                            Background="Transparent"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Frame" Property="Background" Value="{DynamicResource ControlHover}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Frame" Property="Background" Value="{DynamicResource RowHighlight}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Menu / ContextMenu: верхняя полоса прозрачна, само меню — белая карточка с рамкой -->
     <Style TargetType="Menu">
         <Setter Property="Background" Value="Transparent" />
@@ -696,7 +782,17 @@
         </Setter>
     </Style>
 
-    <!-- TabControl / TabItem: плоские вкладки — выделенная на белом, линия раздела под ними -->
+    <!--
+      TabControl / TabItem: вкладки — те же плоские сегменты, что и полоса переходов между
+      окнами в настройках (стиль TabButton в Themes/GlassButton.xaml).
+
+      Шаблон сегмента написан здесь второй раз: одна ControlTemplate служит одному типу
+      контрола, а у вкладки и у кнопки разный источник содержимого — Header и Content.
+
+      Полоса вкладок сдвинута влево на столько же, на сколько содержимое сдвинуто
+      отступом Padding, и отделена от общей линии содержимого зазором в пиксель: иначе
+      полоса торчит левее полей, а её линии сливаются с общей в одну толстую.
+    -->
     <Style TargetType="TabControl">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
         <Setter Property="Background" Value="Transparent" />
@@ -713,6 +809,7 @@
                         </Grid.RowDefinitions>
                         <TabPanel x:Name="HeaderPanel"
                                   Grid.Row="0"
+                                  Margin="10,0,0,1"
                                   IsItemsHost="True" />
                         <Border Grid.Row="1"
                                 BorderBrush="{DynamicResource LineSoft}"
@@ -731,26 +828,60 @@
 
     <Style TargetType="TabItem">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
-        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="MinHeight" Value="26" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TabItem">
-                    <Border x:Name="Frame"
-                            Background="Transparent"
-                            CornerRadius="2"
-                            Padding="{TemplateBinding Padding}"
-                            SnapsToDevicePixels="True">
-                        <ContentPresenter ContentSource="Header"
-                                          RecognizesAccessKey="True" />
-                    </Border>
+                    <Grid>
+                        <!--
+                          Подложка сегмента. Прозрачная у обычного: сегменты стоят на фоне окна
+                          и читаются линиями, а не заливкой.
+                        -->
+                        <Border x:Name="Plate" Background="Transparent">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              ContentSource="Header"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+
+                        <!--
+                          Верхняя кромка: у выбранного сегмента тень от края углубления.
+                          У обычного она прозрачна и места не занимает — толщина кромки
+                          одинакова при любом состоянии, и выделенный сегмент не «прыгает».
+                        -->
+                        <Rectangle x:Name="TopEdge"
+                                   Height="1"
+                                   VerticalAlignment="Top"
+                                   Fill="Transparent" />
+
+                        <!--
+                          Нижняя линия сегмента: у обычного — разделитель сегмента от
+                          содержимого под ним, у выбранного — акцентная метка выбора.
+                        -->
+                        <Rectangle x:Name="BottomLine"
+                                   Height="1"
+                                   VerticalAlignment="Bottom"
+                                   Fill="{DynamicResource LineSoft}" />
+
+                        <!--
+                          Разделитель соседей: у правого края сегмента, чтобы примыкающие
+                          сегменты давали одну линию между собой.
+                        -->
+                        <Rectangle Width="1"
+                                   HorizontalAlignment="Right"
+                                   Fill="{DynamicResource LineSoft}" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Frame" Property="Background" Value="{DynamicResource ControlHover}" />
+                            <Setter TargetName="Plate" Property="Background" Value="{DynamicResource ControlHover}" />
                         </Trigger>
-                        <!-- После наведения: у выделенной своя подложка, серое наведение не перекрывает -->
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Frame" Property="Background" Value="{DynamicResource FieldBackground}" />
+                            <Setter TargetName="Plate" Property="Background" Value="{DynamicResource SurfaceAlt}" />
+                            <Setter TargetName="TopEdge" Property="Fill" Value="{DynamicResource LineStrong}" />
+                            <Setter TargetName="BottomLine" Property="Height" Value="2" />
+                            <Setter TargetName="BottomLine" Property="Fill" Value="{DynamicResource Accent}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AccentStrong}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

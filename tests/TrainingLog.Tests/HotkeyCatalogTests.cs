@@ -38,6 +38,27 @@ public sealed class HotkeyCatalogTests
                 group.Actions.Select(action => action.Name).Distinct().Count()));
     }
 
+    /// <summary>Короткие имена окон — подписи кнопок-переходов: пустых быть не должно.</summary>
+    /// <remarks>
+    /// Подпись кнопки читается на вкладке клавиш, и пустая кнопка означала бы «переход в никуда».
+    /// </remarks>
+    [Fact]
+    public void КороткиеИмена_Непусты()
+    {
+        Assert.All(
+            HotkeyCatalog.Groups,
+            group => Assert.False(string.IsNullOrWhiteSpace(group.ShortName)));
+    }
+
+    /// <summary>Короткие имена не повторяются: иначе две кнопки звали бы одно и то же окно.</summary>
+    [Fact]
+    public void КороткиеИмена_НеПовторяются()
+    {
+        var names = HotkeyCatalog.Groups.Select(group => group.ShortName).ToList();
+
+        Assert.Equal(names.Count, names.Distinct().Count());
+    }
+
     /// <summary>Умолчания — «Сохранить» окна дня, стрелки журнала и клавиши окна плана.</summary>
     /// <remarks>
     /// Второе умолчание памятью держится плохо: у пользователя нет вкладки «какие клавиши из

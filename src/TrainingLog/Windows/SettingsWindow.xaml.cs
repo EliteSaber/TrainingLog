@@ -92,6 +92,29 @@ public partial class SettingsWindow : Window
         {
             AppTheme.Apply(_viewModel.SelectedTheme.Value);
         }
+
+        // Перечень пересобран — показывать его с начала: иначе после смены окна или ввода в
+        // поиск он остался бы прокрученным на прежнем месте, а прокрутка при этом не сбрасывается
+        // сама: WPF только подрезает её по высоте нового содержимого.
+        if (e.PropertyName is nameof(SettingsViewModel.SelectedChip)
+            or nameof(SettingsViewModel.HotkeySearch))
+        {
+            ScrollHotkeyListToTop();
+        }
+    }
+
+    /// <summary>Прокручивает перечень клавиш к началу.</summary>
+    /// <remarks>
+    /// ScrollViewer живёт в шаблоне перечня: над ItemsControl'ом он виртуализацию глушит
+    /// (ловушка 30), и достать его иначе нельзя — по имени в области имён шаблона.
+    /// Шаблон может быть ещё не применён (вкладку не открывали) — тогда и списка нет.
+    /// </remarks>
+    private void ScrollHotkeyListToTop()
+    {
+        if (HotkeyList.Template.FindName("HotkeyScroll", HotkeyList) is ScrollViewer viewer)
+        {
+            viewer.ScrollToHome();
+        }
     }
 
     /// <summary>Фокус попал в поле захвата: показать приглашение и запомнить значение для Esc.</summary>

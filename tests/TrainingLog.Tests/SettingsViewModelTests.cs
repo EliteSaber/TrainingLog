@@ -512,10 +512,259 @@ public sealed class SettingsViewModelTests
         Assert.Equal(listing.Count, position);
     }
 
+    /// <summary>
+    /// Поиск по названию действия находит его строку — и только её, а не всё окно.
+    /// </summary>
+    /// <remarks>
+    /// Имя действия ищется по подстроке без учёта регистра: пользователь пишет «сохранить»
+    /// строчными, а в перечне «Сохранить».
+    /// </remarks>
+    [Fact]
+    public void Поиск_ПоНазваниюДействия_ОставляетЕгоСтроки()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        viewModel.HotkeySearch = "сохранить";
+
+        var rows = ListingRows(viewModel);
+
+        Assert.Contains(rows, row => row.Id == "Day.Save");
+        Assert.Contains(rows, row => row.Id == "Day.SaveAndClose");
+        Assert.Contains(rows, row => row.Id == "Import.Save");
+        Assert.Contains(rows, row => row.Id == "Settings.Save");
+        Assert.DoesNotContain(rows, row => row.Id == "Exercises.Delete");
+    }
+
+    /// <summary>Поиск по названию окна оставляет все строки этого окна.</summary>
+    [Fact]
+    public void Поиск_ПоНазваниюОкна_ОставляетСтрокиЭтогоОкна()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        viewModel.HotkeySearch = "окно дня";
+
+        var rows = ListingRows(viewModel);
+        var dayRows = viewModel.HotkeyGroups.Single(group => group.WindowName == "Окно дня").Rows;
+
+        Assert.NotEmpty(rows);
+        Assert.All(rows, row => Assert.Contains(row, dayRows));
+    }
+
+    /// <summary>
+    /// Заголовок окна без совпадений пропадает: пустой раздел выглядит обломком структуры.
+    /// </summary>
+    [Fact]
+    public void Поиск_ЗаголовокГруппыБезСовпадений_Пропадает()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        viewModel.HotkeySearch = "Экспорт";
+
+        Assert.Equal(["Упражнения"], ListingSections(viewModel));
+        Assert.Equal("Exercises.Export", Assert.Single(ListingRows(viewModel)).Id);
+    }
+
+    /// <summary>Пустой перечень — это «ничего не найдено», а не пустое окно.</summary>
+    [Fact]
+    public void Поиск_БезСовпадений_ПереченьПуст()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        viewModel.HotkeySearch = "нетакого";
+
+        Assert.Empty(viewModel.HotkeyListing);
+        Assert.True(viewModel.IsHotkeyListingEmpty);
+    }
+
+    /// <summary>
+    /// Кнопка-переход оставляет только строки своего окна: до нужной клавиши не надо скроллить.
+    /// </summary>
+    [Fact]
+    public void КнопкаОкна_ОставляетТолькоЕгоСтроки()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var chip = viewModel.HotkeyChips.Single(candidate => candidate.Label == "Планы");
+
+        viewModel.SelectChipCommand.Execute(chip);
+
+        var rows = ListingRows(viewModel);
+        var plansRows = viewModel.HotkeyGroups.Single(group => group.WindowName == "Планы").Rows;
+
+        Assert.NotEmpty(rows);
+        Assert.All(rows, row => Assert.Contains(row, plansRows));
+        Assert.True(chip.IsSelected);
+    }
+
+    /// <summary>«Все окна» возвращает полный перечень: переход туда-обратно ничего не теряет.</summary>
+    [Fact]
+    public void КнопкаВсеОкна_ВозвращаетПолныйПеречень()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var full = viewModel.HotkeyListing.Count;
+
+        viewModel.SelectChipCommand.Execute(viewModel.HotkeyChips.Single(candidate => candidate.Label == "Планы"));
+        viewModel.SelectChipCommand.Execute(viewModel.HotkeyChips[0]);
+
+        Assert.Equal(full, viewModel.HotkeyListing.Count);
+        Assert.True(viewModel.HotkeyChips[0].IsSelected);
+    }
+
+    /// <summary>
+    /// «Только изменённые» оставляет строки, чья комбинация отличается от умолчания.
+    /// </summary>
+    /// <remarks>
+    /// Правка идёт через подтверждение захвата: только оно пересобирает перечень — промежуточный
+    /// набор не пересобирает, иначе список прыгал бы на каждом модификаторе.
+    /// </remarks>
+    [Fact]
+    public void ТолькоИзменённые_ОставляетОтличившиесяОтУмолчания()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        viewModel.HotkeyChangedOnly = true;
+
+        Assert.Empty(ListingRows(viewModel));
+
+        HotkeyRow(viewModel, "Exercises.Add").CommitCapture("Ctrl+F2");
+
+        Assert.Equal("Exercises.Add", Assert.Single(ListingRows(viewModel)).Id);
+
+        // «Убрать» возвращает умолчание — и строка уходит из перечня снова.
+        HotkeyRow(viewModel, "Exercises.Add").ClearCommand.Execute(null);
+
+        Assert.Empty(ListingRows(viewModel));
+    }
+
+    /// <summary>
+    /// Фильтр не влияет на запись: назначение, сделанное в суженном перечне, попадает в файл.
+    /// </summary>
+    /// <remarks>
+    /// В файл пишутся все назначения, а не только видимые: фильтр — это вид, и он не должен
+    /// молча выбрасывать то, что пользователь настроил в другом окне.
+    /// </remarks>
+    [Fact]
+    public void Фильтр_НеВлияетНаЗапись()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        HotkeyRow(viewModel, "Exercises.Add").CommitCapture("Ctrl+F2");
+
+        viewModel.HotkeySearch = "Планы";
+
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.Equal("Ctrl+F2", new AppSettingsStore(settings.FilePath).Load().Hotkeys["Exercises.Add"]);
+    }
+
+    /// <summary>
+    /// Конфликт называет окно: при суженном перечне источник может быть не на экране.
+    /// </summary>
+    [Fact]
+    public void Конфликт_НазываетОкно()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        HotkeyRow(viewModel, "Exercises.Add").CommitCapture("Ctrl+F2");
+        HotkeyRow(viewModel, "Exercises.ToggleSort").CommitCapture("Ctrl+F2");
+
+        Assert.Contains("Упражнения", viewModel.HotkeyConflict);
+    }
+
+    /// <summary>Крестик очищает поиск, и перечень снова полный.</summary>
+    [Fact]
+    public void ОчисткаПоиска_ВозвращаетПолныйПеречень()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var full = viewModel.HotkeyListing.Count;
+
+        viewModel.HotkeySearch = "Экспорт";
+
+        Assert.Single(ListingRows(viewModel));
+
+        viewModel.ClearHotkeySearchCommand.Execute(null);
+
+        Assert.Equal(string.Empty, viewModel.HotkeySearch);
+        Assert.Equal(full, viewModel.HotkeyListing.Count);
+    }
+
+    /// <summary>
+    /// На пустом поле крестик гаснет: очищать нечего.
+    /// </summary>
+    /// <remarks>
+    /// Серое состояние кнопки даёт привязка команды, и она спрашивает предикат — предикат
+    /// должен отражать поле, а не висеть всегда включённым.
+    /// </remarks>
+    [Fact]
+    public void ОчисткаПоиска_НаПустомПоле_Гасится()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.False(viewModel.HasHotkeySearch);
+        Assert.False(viewModel.ClearHotkeySearchCommand.CanExecute(null));
+
+        viewModel.HotkeySearch = "Экспорт";
+
+        Assert.True(viewModel.HasHotkeySearch);
+        Assert.True(viewModel.ClearHotkeySearchCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// Подсказка в поле поиска шрифта видна, пока поле пустое, и прячется после ввода.
+    /// </summary>
+    /// <remarks>
+    /// Без подсказки поле рядом с подписью «Шрифт» выглядит пустым белым прямоугольником,
+    /// и что в нём искать — приходится догадываться.
+    /// </remarks>
+    [Fact]
+    public void ПодсказкаПоискаШрифта_ВиднаНаПустомПоле()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.True(viewModel.HasFontSearchPlaceholder);
+
+        viewModel.FontSearch = "Segoe";
+
+        Assert.False(viewModel.HasFontSearchPlaceholder);
+    }
+
+    /// <summary>Крестик очистки поиска шрифта: появляется на непустом поле и чистит его.</summary>
+    [Fact]
+    public void ОчисткаПоискаШрифта_ЧиститПоле()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.False(viewModel.HasFontSearch);
+        Assert.False(viewModel.ClearFontSearchCommand.CanExecute(null));
+
+        viewModel.FontSearch = "Segoe";
+
+        Assert.True(viewModel.HasFontSearch);
+        Assert.True(viewModel.ClearFontSearchCommand.CanExecute(null));
+
+        viewModel.ClearFontSearchCommand.Execute(null);
+
+        Assert.Equal(string.Empty, viewModel.FontSearch);
+    }
+
     /// <summary>Тема открывается на сохранённой: пустое поле снесло бы настройку первым же сохранением.</summary>
     [Fact]
-    public void Тема_ОткрываетсяНаСохранённой()
-    {
+    public void Тема_ОткрываетсяНаСохранённой()    {
         using var settings = new TemporarySettings();
         settings.Store.Save(new AppSettings
         {
@@ -573,4 +822,12 @@ public sealed class SettingsViewModelTests
     /// <summary>Строка поиска по id: каталог у теста один на все группы.</summary>
     private static HotkeyRowViewModel HotkeyRow(SettingsViewModel viewModel, string id) =>
         viewModel.HotkeyGroups.SelectMany(group => group.Rows).Single(row => row.Id == id);
+
+    /// <summary>Строки перечня без заголовков: что видно пользователю как строки.</summary>
+    private static List<HotkeyRowViewModel> ListingRows(SettingsViewModel viewModel) =>
+        viewModel.HotkeyListing.OfType<HotkeyRowViewModel>().ToList();
+
+    /// <summary>Заголовки окон в перечне: без них не понять, чьи строки показаны.</summary>
+    private static List<string> ListingSections(SettingsViewModel viewModel) =>
+        viewModel.HotkeyListing.OfType<HotkeySectionViewModel>().Select(section => section.WindowName).ToList();
 }
