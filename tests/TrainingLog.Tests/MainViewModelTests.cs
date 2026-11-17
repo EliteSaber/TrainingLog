@@ -514,6 +514,19 @@ public sealed class MainViewModelTests : IDisposable
     public void Dates_Формат_МесяцСловом(string expected, int year, int month, int day) =>
         Assert.Equal(expected, Dates.Format(new DateOnly(year, month, day)));
 
+    /// <summary>
+    /// Сокращение дня недели берётся у текущей культуры — то же, что показывает строка журнала.
+    /// </summary>
+    [Fact]
+    public void Dates_СокращённыйДеньНедели_ПоКультуре()
+    {
+        var date = new DateOnly(2026, 11, 9);
+        var abbreviated = System.Globalization.CultureInfo.CurrentCulture
+            .DateTimeFormat.GetAbbreviatedDayName(date.DayOfWeek);
+
+        Assert.Equal(abbreviated, Dates.Weekday(date));
+    }
+
     private static TrainingSession Session(DateOnly date, string planName = "День") =>
         new() { Date = date, PlanName = planName };
 

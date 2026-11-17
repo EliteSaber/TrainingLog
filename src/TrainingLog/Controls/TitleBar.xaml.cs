@@ -39,6 +39,31 @@ public partial class TitleBar : UserControl
         }
     }
 
+    /// <summary>
+    /// Перетаскивание за текст заголовка и двойной клик по нему: разворот/восстановление.
+    /// </summary>
+    /// <remarks>
+    /// Подпись помечена <c>IsHitTestVisibleInChrome</c> ради подсказки, и хром больше не тянет
+    /// окно за этот участок полосы. Перетаскивание возвращается вручную — иначе за текстом
+    /// заголовка окно стояло бы на месте, хотя за пустой полосой двигалось.
+    /// </remarks>
+    private void OnTitleMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left)
+        {
+            return;
+        }
+
+        if (e.ClickCount == 2)
+        {
+            OnStateClick(sender, e);
+
+            return;
+        }
+
+        Window.GetWindow(this)?.DragMove();
+    }
+
     private void OnPinClick(object sender, RoutedEventArgs e)
     {
         var window = Window.GetWindow(this);

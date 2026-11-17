@@ -1426,7 +1426,8 @@ public async Task ПодтягиваниеПрошлогоДня_ВесаЗна�
     Assert.True(row.Sets.All(set => set.HasRepetitionPlaceholder));
 
     // Дата источника показывается рядом с «Не сохранено» — по ней видно, откуда значения.
-    Assert.Equal("(на основе 08 октября 2026)", viewModel.PulledFromDateText);
+    Assert.Equal($"(на основе 08 октября 2026 [{Dates.Weekday(new DateOnly(2026, 10, 8))}])",
+        viewModel.PulledFromDateText);
 }
 
 /// <summary>
@@ -1783,7 +1784,8 @@ public async Task Подтягивание_СменаДатыУбираетДа�
 
     await SettleAsync();
 
-    Assert.Equal("(на основе 08 октября 2026)", viewModel.PulledFromDateText);
+    Assert.Equal($"(на основе 08 октября 2026 [{Dates.Weekday(new DateOnly(2026, 10, 8))}])",
+        viewModel.PulledFromDateText);
 
     // Запись за новую дату есть, план тот же: сеттер SelectedPlan не срабатывает, и
     // подтягивание выходит сразу.

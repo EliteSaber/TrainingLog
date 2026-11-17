@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Shell;
 using System.Windows.Threading;
 using ShapePath = System.Windows.Shapes.Path;
 using TrainingLog.Controls;
@@ -55,6 +57,55 @@ public sealed class TitleBarTests
             finally
             {
                 window.Topmost = false;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Обрезанный заголовок даёт подсказку со всем текстом; помещающийся подсказки не даёт.
+    /// </summary>
+    [Fact]
+    public void Заголовок_ПриОбрезке_ПодсказкаСПолнымТекстом()
+    {
+        StaRunner.Run(() =>
+        {
+            const string title = "Редактирование упражнения — длинный заголовок окна";
+            var window = new Window
+            {
+                Title = title,
+                Width = 240,
+                Height = 120,
+                ShowActivated = false,
+                WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -32000,
+                Top = -32000,
+            };
+            var bar = new TitleBar();
+            window.Content = bar;
+
+            try
+            {
+                var text = (TextBlock)bar.FindName("TitleText")!;
+
+                // В зоне CaptionHeight хром съедает мышь без явного разрешения на элементе —
+                // без него подсказка есть, но наведение до неё не доходит.
+                Assert.True(WindowChrome.GetIsHitTestVisibleInChrome(text));
+                Assert.Equal(Brushes.Transparent, text.Background);
+
+                window.Show();
+                Pump(window);
+
+                var tip = Assert.IsType<ToolTip>(text.ToolTip);
+                var content = Assert.IsType<TextBlock>(tip.Content);
+                Assert.Equal(title, content.Text);
+
+                window.Width = 900;
+                Pump(window);
+                Assert.Null(text.ToolTip);
+            }
+            finally
+            {
+                window.Close();
             }
         });
     }

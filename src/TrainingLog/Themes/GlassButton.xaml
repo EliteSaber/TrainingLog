@@ -335,14 +335,15 @@
     </Style>
 
     <!--
-      Кнопка «Добавить день» журнала: габарит по компактному мокапу (тело 204×28
-      при Margin 6 шаблона — габарит 216×40), шрифт 15. Иконку «+» само содержимое
-      несёт: центр шаблона остаётся свободным, главное окно передаёт сетку
-      «иконка + надпись» напрямую.
+      Кнопка «Добавить день» журнала: минимальный габарит по компактному мокапу (тело
+      204×28 при Margin 6 шаблона — 216×40), шрифт 15. Это минимум, а не фиксированный
+      размер: при увеличенном кегле или другой гарнитуре кнопка растёт по содержимому,
+      иначе надпись обрезалась бы краями. Минимум высоты 40 приходит от GlassButton.
+      Иконку «+» несёт содержимое: центр шаблона остаётся свободным, главное окно
+      передаёт сетку «иконка + надпись» напрямую.
     -->
     <Style x:Key="AddDayButton" TargetType="Button" BasedOn="{StaticResource GlassButton}">
-        <Setter Property="Width" Value="216" />
-        <Setter Property="Height" Value="40" />
+        <Setter Property="MinWidth" Value="216" />
         <Setter Property="FontSize" Value="{DynamicResource LargeSize}" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />

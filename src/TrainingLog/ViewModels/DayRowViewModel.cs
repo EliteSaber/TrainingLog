@@ -66,17 +66,12 @@ public sealed class DayRowViewModel : INotifyPropertyChanged, ISelectableRow
 
     /// <summary>Дата с сокращённым днём недели: «08 октября 2026 (вс)».</summary>
     /// <remarks>
-    /// Формат даты общий с окном дня — <see cref="Dates"/>, иначе два места показывали бы дату
-    /// по-разному. Сокращение дня недели, наоборот, берётся у текущей культуры: подпись имеет смысл
+    /// И дата, и сокращение дня недели берутся из <see cref="Dates"/>: один формат на журнал,
+    /// окно дня и подпись источника. Сокращение по текущей культуре — подпись имеет смысл
     /// на языке пользователя.
-    ///
-    /// Через <see cref="DateTimeFormatInfo.GetAbbreviatedDayName(DayOfWeek)"/>, а не через
-    /// <c>DayOfWeek.ToString("ddd", …)</c>: у перечисления параметр культуры не учитывается, и такое
-    /// написание устарело — название дня всегда выходило бы английским.
     /// </remarks>
     public string DateText =>
-        $"{Dates.Format(Date)} "
-        + $"({CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(Date.DayOfWeek)})";
+        $"{Dates.Format(Date)} ({Dates.Weekday(Date)})";
 
     /// <summary>Название плана: копия названия на момент выполнения.</summary>
     public string PlanName { get; }

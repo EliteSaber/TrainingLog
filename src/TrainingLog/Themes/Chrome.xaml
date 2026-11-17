@@ -29,6 +29,23 @@
     </Style>
 
     <!--
+      Окно с высотой по содержимому (окно правки упражнения): хром тот же, но без захвата за
+      верхний и нижний края. При SizeToContent="Height" ручной тяж снизу добавлял бы под
+      содержимым пустоту и боролся бы с авторазмером. По ширине тянуть окно можно по-прежнему.
+    -->
+    <Style x:Key="AppWindowStyleContentHeight" TargetType="Window" BasedOn="{StaticResource AppWindowStyle}">
+        <Setter Property="shell:WindowChrome.WindowChrome">
+            <Setter.Value>
+                <shell:WindowChrome CaptionHeight="36"
+                                    ResizeBorderThickness="4,0,4,0"
+                                    GlassFrameThickness="0"
+                                    CornerRadius="6"
+                                    UseAeroCaptionButtons="False" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
       Кнопки полосы. Фон появляется только при наведении и нажатии — цвета палитры, никаких
       литеральных чисел: ControlHover уже подсвечивает строки, пункты меню и стрелки подсказки,
       тёмная тема переопределит значения сама. В шаблоне фон — TemplateBinding, а не триггеры

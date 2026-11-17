@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shell;
 using System.Windows.Threading;
 using TrainingLog.Controls;
 using TrainingLog.Core.Models;
@@ -38,6 +39,33 @@ public sealed class EditorWindowTests
             try
             {
                 AssertSeparate(window);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>Окно правки упражнения не тянется по высоте: зон захвата за верх и низ нет.</summary>
+    [Fact]
+    public void ОкноПравкиУпражнения_БезЗахватаПоВысоте()
+    {
+        StaRunner.Run(() =>
+        {
+            using var database = new TemporaryDatabase();
+            using var settings = new TemporarySettings();
+            var window = ExerciseWindow(database, settings, out _);
+
+            try
+            {
+                ShowAway(window);
+                var chrome = WindowChrome.GetWindowChrome(window);
+                Assert.NotNull(chrome);
+                Assert.Equal(0, chrome.ResizeBorderThickness.Top);
+                Assert.Equal(0, chrome.ResizeBorderThickness.Bottom);
+                Assert.Equal(4, chrome.ResizeBorderThickness.Left);
+                Assert.Equal(4, chrome.ResizeBorderThickness.Right);
             }
             finally
             {

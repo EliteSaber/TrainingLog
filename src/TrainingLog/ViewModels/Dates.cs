@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace TrainingLog.ViewModels;
 
 /// <summary>Дата в виде, в котором она показывается в приложении: «08 октября 2026».</summary>
@@ -7,8 +9,8 @@ namespace TrainingLog.ViewModels;
 /// здесь не нужен. Свой формат означает ещё и независимость от локали: <c>GetMonthName</c> на
 /// немецкой машине вернул бы «Oktober», а месяцы здесь свои.
 ///
-/// Одно место на оба применения — у строки журнала и у даты источника: два независимых формата
-/// разъехались бы.
+/// Одно место на все применения — у строки журнала, у даты источника в окне дня и у сокращения
+/// дня недели: независимые форматы разъехались бы.
 ///
 /// Имя класса не <c>DateText</c>: так называется свойство у строки журнала, и внутри своего же
 /// класса имя члена перебивает имя типа — вызов <c>DateText.Format</c> собрался бы в
@@ -47,4 +49,16 @@ public static class Dates
     /// <param name="date">Дата.</param>
     public static string Format(DateOnly date) =>
         $"{date.Day:00} {MonthNames[date.Month - 1]} {date.Year}";
+
+    /// <summary>Сокращённое название дня недели по текущей культуре: «чт».</summary>
+    /// <remarks>
+    /// Через <see cref="DateTimeFormatInfo.GetAbbreviatedDayName(DayOfWeek)"/>, а не через
+    /// <c>DayOfWeek.ToString("ddd", …)</c>: у перечисления параметр культуры не учитывается, и
+    /// такое написание устарело — название всегда выходило бы английским. Месяцы в
+    /// <see cref="Format"/> свои, а день недели — на языке пользователя: его сокращение
+    /// читается на любом языке.
+    /// </remarks>
+    /// <param name="date">Дата.</param>
+    public static string Weekday(DateOnly date) =>
+        CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(date.DayOfWeek);
 }

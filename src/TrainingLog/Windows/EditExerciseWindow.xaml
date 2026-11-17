@@ -12,7 +12,7 @@
         FontSize="{DynamicResource BodySize}"
         Background="{DynamicResource WindowBackground}"
         Foreground="{DynamicResource TextPrimary}"
-        Style="{DynamicResource AppWindowStyle}"
+        Style="{DynamicResource AppWindowStyleContentHeight}"
         Title="Редактирование упражнения"
         SizeToContent="Height"
         ShowInTaskbar="True"

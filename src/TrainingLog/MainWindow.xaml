@@ -676,10 +676,17 @@
                 Style="{StaticResource AddDayButtonSoft}"
                 Command="{Binding AddDayCommand}"
                 helpers:Hotkey.Id="Main.AddDay">
+            <!--
+              Колонки по содержимому, не '*' : при авто-ширине кнопки '*' мерялась бы по
+              доступному месту окна, и кнопка растянулась бы на всю ячейку. Иконка и надпись
+              задают ширину, а минимум 216 из стиля сохраняет габарит мокапа при 100 %.
+              Правый отступ надписи 42 (= 16 отступа иконки + 10 иконка + 16 зазор) балансирует
+              левую группу: с полями шаблона по 6 слева и справа надпись стоит по центру кнопки.
+            -->
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <Path Grid.Column="0"
@@ -694,6 +701,7 @@
                       StrokeEndLineCap="Square" />
 
                 <TextBlock Grid.Column="1"
+                           Margin="16,0,42,0"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            Text="Добавить день" />
