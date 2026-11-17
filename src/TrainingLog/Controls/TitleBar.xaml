@@ -5,9 +5,10 @@
              Focusable="False">
 
     <!--
-      Полоса заголовка вместо системной. Один контрол на все окна: логотип, название и три
-      кнопки. Название читается у окна (Title), поэтому привязки вида Title="{Binding Title}"
-      работают без изменений — у главного окна и окна дня их задаёт модель представления.
+      Полоса заголовка вместо системной. Один контрол на все окна: логотип, название и четыре
+      кнопки — закрепить, свернуть, развернуть, закрыть. Название читается у окна (Title), поэтому
+      привязки вида Title="{Binding Title}" работают без изменений — у главного окна и окна дня их
+      задаёт модель представления.
 
       Перетаскивание за полосу, двойной клик и захват за края делает WindowChrome (Themes/Chrome.xaml):
       контрол рисует только содержимое и кнопки. Кнопкам проставлено
@@ -80,6 +81,68 @@
 
         <StackPanel HorizontalAlignment="Right"
                     Orientation="Horizontal">
+            <!--
+              Закрепление: состояние берётся у окна (Topmost), а не из модели — флаг один на окно,
+              как и IsActive у остальных элементов полосы. Глиф повёрнут на 45°, когда окно
+              закреплено: «уже воткнут» читается как признак закрепления.
+            -->
+            <Button x:Name="PinButton"
+                    Click="OnPinClick"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+                        <!-- Подсказка только стилевым сеттером: локальное значение перекрыло бы триггер. -->
+                        <Setter Property="ToolTip" Value="Закрепить" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                <Setter Property="ToolTip" Value="Открепить" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+                <Grid>
+                    <Path x:Name="PinOutline"
+                          Width="14"
+                          Height="14"
+                          Stretch="Uniform"
+                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          Data="M16,9 V4 h1 c0.55,0 1,-0.45 1,-1 s-0.45,-1 -1,-1 H7 c-0.55,0 -1,0.45 -1,1 s0.45,1 1,1 h1 v5 c0,1.66 -1.34,3 -3,3 v2 h5.97 v7 l1,1 1,-1 v-7 H19 v-2 c-1.66,0 -3,-1.34 -3,-3 z">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+
+                    <Path x:Name="PinAngled"
+                          Width="14"
+                          Height="14"
+                          Stretch="Uniform"
+                          RenderTransformOrigin="0.5,0.5"
+                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          Data="M16,9 V4 h1 c0.55,0 1,-0.45 1,-1 s-0.45,-1 -1,-1 H7 c-0.55,0 -1,0.45 -1,1 s0.45,1 1,1 h1 v5 c0,1.66 -1.34,3 -3,3 v2 h5.97 v7 l1,1 1,-1 v-7 H19 v-2 c-1.66,0 -3,-1.34 -3,-3 z">
+                        <Path.RenderTransform>
+                            <RotateTransform Angle="45" />
+                        </Path.RenderTransform>
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+                </Grid>
+            </Button>
+
             <Button Click="OnMinimizeClick"
                     ToolTip="Свернуть"
                     Style="{StaticResource CaptionButton}"

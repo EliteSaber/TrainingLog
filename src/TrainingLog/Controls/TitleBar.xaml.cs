@@ -1,13 +1,14 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using TrainingLog.Services;
 
 namespace TrainingLog.Controls;
 
 /// <summary>
-/// Полоса заголовка вместо системной: логотип, название окна и кнопки свернуть, развернуть,
-/// закрыть. Перетаскивание и захват за края делает WindowChrome (Themes/Chrome.xaml), контрол
-/// отвечает только за содержимое.
+/// Полоса заголовка вместо системной: логотип, название окна и кнопки закрепить, свернуть,
+/// развернуть, закрыть. Перетаскивание и захват за края делает WindowChrome (Themes/Chrome.xaml),
+/// контрол отвечает только за содержимое.
 /// </summary>
 /// <remarks>
 /// Название читается у окна (Title), а не держится свойством контрола: привязки вида
@@ -25,6 +26,26 @@ public partial class TitleBar : UserControl
     public TitleBar()
     {
         InitializeComponent();
+
+        // Окна у контрола ещё нет: в конструкторе Window.GetWindow вернул бы null.
+        Loaded += OnLoaded;
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (Window.GetWindow(this) is { } window)
+        {
+            WindowPinner.Attach(window);
+        }
+    }
+
+    private void OnPinClick(object sender, RoutedEventArgs e)
+    {
+        var window = Window.GetWindow(this);
+        if (window is not null)
+        {
+            window.Topmost = !window.Topmost;
+        }
     }
 
     private void OnMinimizeClick(object sender, RoutedEventArgs e)
