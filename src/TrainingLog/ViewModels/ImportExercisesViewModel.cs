@@ -71,7 +71,7 @@ public sealed partial class ImportExercisesViewModel : ObservableObject
 
     public bool HasSummary => !string.IsNullOrEmpty(Summary);
 
-    /// <summary>Упражнения записаны. Окно выставляет <c>DialogResult</c> по нему.</summary>
+    /// <summary>Упражнения записаны. Окно сообщает о записи и закрывается по нему.</summary>
     public bool Accepted { get; private set; }
 
     [RelayCommand]
@@ -151,7 +151,7 @@ public sealed partial class ImportExercisesViewModel : ObservableObject
         Accepted = true;
 
         // Приватный сеттер не даёт сгенерировать уведомление автоматически, а окно ждёт его,
-        // чтобы выставить DialogResult.
+        // чтобы сообщить о записи и закрыться.
         OnPropertyChanged(nameof(Accepted));
     }
 

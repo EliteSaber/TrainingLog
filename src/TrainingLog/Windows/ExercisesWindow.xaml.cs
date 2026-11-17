@@ -21,6 +21,9 @@ public partial class ExercisesWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        // Размер окна — из каталога или из файла настроек: в разметке его нет.
+        WindowSizes.Apply(this);
+
         // Строки справочника работают через выделение: без него клавиши правки и удаления молчат.
         _binder = new HotkeyBinder(this, hotkeys)
             .Row("Exercises.Edit", ExerciseList, row =>
@@ -91,10 +94,19 @@ public partial class ExercisesWindow : Window
     /// </summary>
     private async void OnDeleteClick(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { CommandParameter: Exercise exercise })
+        if (sender is not Button { CommandParameter: Exercise exercise })
         {
-            ConfirmDelete(exercise);
+            return;
         }
+
+        // Страховка от устаревшей разметки: удалить упражнение, которое сейчас правится,
+        // нельзя — иначе «Принять» в окне правки не найдёт записи и молча ничего не сделает.
+        if (DataContext is ExercisesViewModel viewModel && ReferenceEquals(viewModel.EditedExercise, exercise))
+        {
+            return;
+        }
+
+        ConfirmDelete(exercise);
     }
 
     /// <summary>

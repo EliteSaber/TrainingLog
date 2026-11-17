@@ -14,12 +14,15 @@
         Foreground="{DynamicResource TextPrimary}"
         Style="{DynamicResource AppWindowStyle}"
         Title="Планы"
-        Width="520"
-        Height="560"
-        MinWidth="420"
-        MinHeight="360"
-        ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner">
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen">
+    <!--
+      Отдельное окно, а не окно-владелец журнала: владельца нет — иначе сворачивание журнала
+      прятало бы его вместе с собой, а показывать его надо и при свёрнутом журнале. Отсюда
+      ShowInTaskbar=True: свёрнутое окно без владельца и без кнопки на панели задач вернулось бы
+      только кликом по меню. CenterScreen, а не CenterOwner: владельца нет, родное место окна —
+      центр экрана. Как у окна дня.
+    -->
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -32,6 +35,9 @@
 
             <!-- Свой экземпляр по той же причине: у конвертера состояния нет. -->
             <helpers:ScrollBarMarginConverter x:Key="ScrollBarMargin" />
+
+            <!-- Кнопка «Удалить» гаснет у плана, который сейчас правится в отдельном окне. -->
+            <helpers:IsNotEditedConverter x:Key="IsNotEdited" />
         </ResourceDictionary>
     </Window.Resources>
 
@@ -252,7 +258,15 @@
                                                 Style="{StaticResource GlassButtonIconSoft}"
                                                 Click="OnDeleteClick"
                                                 CommandParameter="{Binding}"
-                                                Content="Удалить" />
+                                                Content="Удалить">
+                                            <Button.IsEnabled>
+                                                <MultiBinding Converter="{StaticResource IsNotEdited}">
+                                                    <Binding />
+                                                    <Binding Path="DataContext.EditedPlan"
+                                                             RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                                                </MultiBinding>
+                                            </Button.IsEnabled>
+                                        </Button>
                                     </StackPanel>
                                 </Grid>
                             </Border>

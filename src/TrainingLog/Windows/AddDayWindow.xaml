@@ -14,10 +14,6 @@
         Foreground="{DynamicResource TextPrimary}"
         Style="{DynamicResource AppWindowStyle}"
         Title="{Binding Title}"
-        Width="760"
-        Height="480"
-        MinWidth="620"
-        MinHeight="360"
         ShowInTaskbar="True"
         WindowStartupLocation="CenterScreen">
     <!--

@@ -11,11 +11,28 @@ using TrainingLog.ViewModels;
 
 namespace TrainingLog.Windows;
 
-/// <summary>Окно параметров: число дней, адрес базы и горячие клавиши.</summary>
+/// <summary>Окно параметров: число дней, адрес базы, горячие клавиши и размеры окон.</summary>
+/// <remarks>
+/// Окно немодальное и единственное: его можно открыть при любых других открытых окнах, а
+/// повторное «Параметры» выводит уже открытое окно вперёд. Отсюда два отличия от диалога:
+/// <c>DialogResult</c> на немодальном окне выставлять нельзя (присваивание кинет
+/// <see cref="InvalidOperationException"/>), и «Отменить» с Esc закрывают окно руками —
+/// <c>IsCancel</c> работает только в диалоге. Сохранение окно оповещает событием
+/// <see cref="Saved"/>, и его ждёт <see cref="Services.WindowService"/>.
+/// </remarks>
 public partial class SettingsWindow : Window
 {
     private readonly SettingsViewModel _viewModel;
     private readonly HotkeyService _hotkeys;
+
+    /// <summary>
+    /// Настройки записаны: главное окно перечитает файл, а размеры применятся к открытым окнам.
+    /// </summary>
+    /// <remarks>
+    /// Событие, а не результат диалога: окно немодальное, и спрашивать у него «приняли ли»
+    /// нечем — принять можно только записав файл.
+    /// </remarks>
+    public event Action? Saved;
 
     /// <param name="viewModel">Параметры приложения.</param>
     /// <param name="hotkeys">Сервис назначений: уведомляет живущие окна после записи файла.</param>
@@ -30,6 +47,14 @@ public partial class SettingsWindow : Window
         _viewModel = viewModel;
         _hotkeys = hotkeys;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        // Размеры окон применяются к открытым окнам сразу, как шрифт и тема: предпросмотр
+        // виден, и файл при этом не меняется.
+        _viewModel.WindowSizesChanged += OnWindowSizesChanged;
+
+        // Размер окна — из каталога или из файла настроек: в разметке его нет, иначе размер
+        // жил бы в двух местах.
+        WindowSizes.Apply(this);
 
         // Подписка в окне, а не в модели: событие приходит от поля ввода и живёт в Controls.
         // Отписка в Closed обязательна — иначе закрытое окно удерживалось бы подпиской.
@@ -53,10 +78,13 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
-    /// <c>DialogResult</c> выставляется по уведомлению: по одному значению
-    /// <see cref="SettingsViewModel.Accepted"/> вызывающий <c>ShowDialog</c> не узнал бы, что
-    /// настройка записана.
+    /// Запись настроек: применяем то, что записано, и закрываем окно.
     /// </summary>
+    /// <remarks>
+    /// Окно немодальное, и <c>DialogResult</c> выставлять нельзя: присваивание кинет
+    /// <see cref="InvalidOperationException"/>. Закрытие делает само окно, а вызывающий узнаёт
+    /// о записи по событию <see cref="Saved"/>.
+    /// </remarks>
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(SettingsViewModel.Accepted) && _viewModel.Accepted)
@@ -72,7 +100,14 @@ public partial class SettingsWindow : Window
             // Windows-диалоги привязки пересоздают при показе, поэтому здесь только живущие.
             _hotkeys.NotifyChanged();
 
-            DialogResult = true;
+            // Размеры — к уже открытым окнам: пользователь задал новые, и они обязаны
+            // подействовать сразу, а не с следующего открытия.
+            WindowSizes.Initialize(_viewModel.SavedWindowSizes);
+            WindowSizes.ApplyToOpenWindows(this);
+
+            Saved?.Invoke();
+
+            Close();
 
             return;
         }
@@ -101,6 +136,19 @@ public partial class SettingsWindow : Window
         {
             ScrollHotkeyListToTop();
         }
+    }
+
+    /// <summary>
+    /// Размер окна изменился: открытые окна подстраиваются сразу, как шрифт и тема.
+    /// </summary>
+    /// <remarks>
+    /// Само окно параметров исключено: оно изменило бы ширину под курсором, и поле, в котором
+    /// идёт правка, уехало бы вбок. Файл при этом не меняется — он пишется по «Сохранить».
+    /// </remarks>
+    private void OnWindowSizesChanged()
+    {
+        WindowSizes.Initialize(_viewModel.PreviewWindowSizes());
+        WindowSizes.ApplyToOpenWindows(this);
     }
 
     /// <summary>Прокручивает перечень клавиш к началу.</summary>
@@ -344,6 +392,29 @@ public partial class SettingsWindow : Window
         }
     }
 
+    /// <summary>Нажата кнопка «Отменить»: окно закрывается без записи.</summary>
+    private void OnCancelClick(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>Esc закрывает окно, как в диалоге закрывала кнопка <c>IsCancel</c>.</summary>
+    /// <remarks>
+    /// В немодальном окне WPF связку «Esc → Отменить» больше никто не держит: <c>IsCancel</c>
+    /// работает только в диалоге. Здесь обработка на окне, а не KeyBinding'ом, — команды
+    /// «закрыть у окна» в модели нет, и заводить её ради клавиши незачем.
+    ///
+    /// Поле захвата клавиши перехватывает Esc раньше окна (ловушка 41): захват отменяет
+    /// набор, а окно при этом остаётся открытым.
+    /// </remarks>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        if (e.Key == Key.Escape)
+        {
+            Close();
+            e.Handled = true;
+        }
+    }
+
     private void OnClosed(object? sender, EventArgs e)
     {
         // Выход без сохранения возвращает предпросмотр к срезу файла на открытие окна. По
@@ -352,9 +423,15 @@ public partial class SettingsWindow : Window
         {
             AppFonts.Apply(_viewModel.SavedFontName, _viewModel.SavedFontSizePercent);
             AppTheme.Apply(_viewModel.SavedTheme);
+
+            // Размеры — тем же порядком: окна, подстроенные предпросмотром, возвращаются к
+            // прежнему виду, а не остаются с размером, который не записан.
+            WindowSizes.Initialize(_viewModel.SavedWindowSizes);
+            WindowSizes.ApplyToOpenWindows();
         }
 
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _viewModel.WindowSizesChanged -= OnWindowSizesChanged;
         AllowedCharsInput.RemoveRejectedHandler(this, OnInputRejected);
         AllowedCharsInput.RemoveAcceptedHandler(this, OnInputAccepted);
     }

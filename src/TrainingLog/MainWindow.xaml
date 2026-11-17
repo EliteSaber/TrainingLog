@@ -14,11 +14,7 @@
         Background="{DynamicResource WindowBackground}"
         Foreground="{DynamicResource TextPrimary}"
         Style="{DynamicResource AppWindowStyle}"
-        Title="{Binding Title}"
-        Height="560"
-        Width="900"
-        MinWidth="640"
-        MinHeight="360">
+        Title="{Binding Title}">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>

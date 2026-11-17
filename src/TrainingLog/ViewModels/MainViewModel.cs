@@ -15,6 +15,16 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IWindowService _windowService;
     private readonly AppSettingsStore _settingsStore;
 
+    /// <summary>
+    /// Место базы на момент последней проверки.
+    /// </summary>
+    /// <remarks>
+    /// Хранится, а не читается перед открытием окна параметров: окно немодальное и может
+    /// простоять открытым сколько угодно, а сообщение о смене базы нужно только при самой
+    /// смене, а не при каждом открытии.
+    /// </remarks>
+    private string _databasePath = string.Empty;
+
     /// <param name="windowService">Список окон приложения.</param>
     /// <param name="sessionRepository">Журнал тренировок.</param>
     /// <param name="settingsStore">Файл настроек: сколько дней показывать.</param>
@@ -35,8 +45,15 @@ public sealed partial class MainViewModel : ObservableObject
         // после этого окно или осталось открытым: оно немодальное.
         _windowService.DaySaved += OnDaySaved;
 
+        // Настройки записаны открытым окном параметров — поле, список дней и место базы
+        // обновляются вместе. Окно немодальное, поэтому ответа «диалог закрылся» больше нет.
+        _windowService.SettingsSaved += OnSettingsSaved;
+
         // Из файла, а не из константы: настройка живёт рядом с программой.
-        DaysCount = settingsStore.Load().DaysCount;
+        var settings = settingsStore.Load();
+
+        DaysCount = settings.DaysCount;
+        _databasePath = settings.DatabasePath;
     }
 
     /// <summary>День записан открытым окном: журнал перечитывается.</summary>
@@ -46,17 +63,8 @@ public sealed partial class MainViewModel : ObservableObject
     /// </remarks>
     private Task OnDaySaved() => RefreshAsync();
 
-    [ObservableProperty]
-    private string _title = "Журнал тренировок";
-
-    [RelayCommand]
-    private void OpenExercises() => _windowService.OpenExercises();
-
-    [RelayCommand]
-    private void OpenPlans() => _windowService.OpenPlans();
-
     /// <summary>
-    /// Параметры из окна настроек: поле и показанные дни обновляются вместе.
+    /// Настройки записаны: поле и показанные дни обновляются вместе.
     /// </summary>
     /// <remarks>
     /// Файл перечитывается, а не значение берётся у окна: источник истины один — на диске.
@@ -70,28 +78,41 @@ public sealed partial class MainViewModel : ObservableObject
     /// перестраивается при старте, и прочитанное окном сегодня вложить в него нельзя. Сообщение
     /// на каждое открытие окна параметров мешало бы своим постоянством.
     /// </remarks>
-    [RelayCommand]
-    private async Task OpenSettingsAsync()
+    private async Task OnSettingsSaved()
     {
-        var addressBefore = _settingsStore.Load().DatabasePath;
-
-        if (!_windowService.ShowSettings())
-        {
-            return;
-        }
-
         var settings = _settingsStore.Load();
 
         DaysCount = settings.DaysCount;
 
-        if (settings.DatabasePath != addressBefore)
+        if (settings.DatabasePath != _databasePath)
         {
+            _databasePath = settings.DatabasePath;
+
             DatabaseAddressChanged?.Invoke(
                 "Место базы данных изменено. Подключение к новой базе произойдёт при следующем запуске.");
         }
 
         await RefreshAsync().ConfigureAwait(true);
     }
+
+    [ObservableProperty]
+    private string _title = "Журнал тренировок";
+
+    [RelayCommand]
+    private void OpenExercises() => _windowService.OpenExercises();
+
+    [RelayCommand]
+    private void OpenPlans() => _windowService.OpenPlans();
+
+    /// <summary>
+    /// Открывает окно параметров: немодальное и единственное.
+    /// </summary>
+    /// <remarks>
+    /// Команда ничего не ждёт: окно открывается и живёт рядом с журналом, а о записи настроек
+    /// главное окно узнаёт по событию <see cref="IWindowService.SettingsSaved"/>.
+    /// </remarks>
+    [RelayCommand]
+    private void OpenSettings() => _windowService.OpenSettings();
 
     /// <summary>
     /// Сколько дней показать. Применяется кнопкой «Применить», иначе список перечитывался бы на

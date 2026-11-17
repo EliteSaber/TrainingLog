@@ -34,6 +34,10 @@ public partial class App : Application
         // рисоваться уже в выбранной теме, а не в светлой.
         AppTheme.Apply(settings.Theme);
 
+        // Размеры окон — до показа окон же: первое окно должно открыться того размера, какой
+        // записан в настройках, а не нынешнего из каталога.
+        WindowSizes.Initialize(settings.WindowSizes);
+
         var mainWindow = _services.GetRequiredService<MainWindow>();
         MainWindow = mainWindow;
         mainWindow.Show();

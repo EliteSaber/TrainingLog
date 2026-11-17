@@ -42,6 +42,16 @@ public sealed partial class PlansViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDescending;
 
+    /// <summary>
+    /// План, который сейчас правится: его кнопка «Удалить» в списке неактивна.
+    /// </summary>
+    /// <remarks>
+    /// Значение приходит от сервиса окон: окно плана единственное и общее на добавление и
+    /// правку, поэтому объект правки знает только он.
+    /// </remarks>
+    [ObservableProperty]
+    private TrainingPlan? _editedPlan;
+
     /// <summary>Признак, что планы загружены и их нет ни одного.</summary>
     public bool IsEmpty => _all.Count == 0;
 
@@ -130,34 +140,40 @@ public sealed partial class PlansViewModel : ObservableObject
 
     /// <summary>
     /// Добавление открывает то же окно, что и правка: состав упражнений выбирается в нём,
-    /// и отдельного поля для наименования в списке нет.
+    /// и отдельного поля для наименования в списке нет. Окно отдельное и немодальное.
     /// </summary>
     [RelayCommand]
-    private async Task AddAsync()
+    private void Add()
     {
-        if (_windowService.ShowAddPlan())
-        {
-            await RefreshAsync().ConfigureAwait(true);
-        }
+        _windowService.OpenAddPlan(RefreshAsync, OnPlanClosed);
+
+        // Повторное открытие могло вывести уже открытое окно правки существующего плана.
+        EditedPlan = _windowService.EditedPlan;
     }
 
     /// <summary>
-    /// Открывает модальное окно правки. После сохранения список перечитывается: изменились
-    /// наименование и состав упражнений, а у плана это отдельные данные.
+    /// Открывает окно правки. Оно отдельное и немодальное: список планов остаётся рабочим.
     /// </summary>
+    /// <remarks>
+    /// После сохранения список перечитывается: изменились наименование и состав упражнений,
+    /// а у плана это отдельные данные. Перечитывает его окно — по нажатию «Принять» список
+    /// может и не обновиться, правка-то могла не состояться.
+    /// </remarks>
     [RelayCommand]
-    private async Task EditAsync(TrainingPlan? plan)
+    private void Edit(TrainingPlan? plan)
     {
         if (plan is null)
         {
             return;
         }
 
-        if (_windowService.ShowEditPlan(plan))
-        {
-            await RefreshAsync().ConfigureAwait(true);
-        }
+        _windowService.OpenEditPlan(plan, RefreshAsync, OnPlanClosed);
+
+        EditedPlan = _windowService.EditedPlan;
     }
+
+    /// <summary>Окно плана закрылось: блокировку удаления снимаем и без записи.</summary>
+    private void OnPlanClosed() => EditedPlan = null;
 
     [RelayCommand]
     private async Task DeleteAsync(TrainingPlan? plan)

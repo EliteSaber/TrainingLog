@@ -14,13 +14,20 @@
         Foreground="{DynamicResource TextPrimary}"
         Style="{DynamicResource AppWindowStyle}"
         Title="Параметры"
-        Width="520"
-        Height="560"
-        MinWidth="420"
-        MinHeight="420"
-        ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner">
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen">
     <!--
+      Отдельное окно, а не окно-владелец журнала: владельца нет — иначе сворачивание журнала
+      прятало бы его вместе с собой, а показывать его надо и при свёрнутом журнале. Отсюда
+      ShowInTaskbar=True: свёрнутое окно без владельца и без кнопки на панели задач вернулось бы
+      только кликом по меню. CenterScreen, а не CenterOwner: владельца нет, родное место окна —
+      центр экрана. Как у окна дня.
+    -->
+    <!--
+      Размер окна задаётся каталогом или файлом настроек, а не разметкой: в XAML его нет, иначе
+      размер жил бы в двух местах и разошёлся бы при первой правке любого из них. Окно само
+      берёт размер по своему типу (см. WindowSizes.Apply).
+
       SizeToContent заменён фиксированной высотой: список горячих клавиш длинный, и окно,
       растущее по содержимому, вылезло бы за экран. Содержимым в пределах окна правит прокрутка.
     -->
@@ -696,6 +703,124 @@
                     </Grid>
                 </Grid>
             </TabItem>
+
+            <TabItem Header="Окна">
+                <!--
+                  Размеры окон по умолчанию: по строке на каждое окно приложения. Число вводится
+                  в поле или меняется перетаскиванием: зажал левую кнопку и повёл мышь вправо —
+                  больше, влево — меньше.
+
+                  Прокрутка одна и общая для заголовков колонок и строк: полоса прокрутки сузила бы
+                  содержимое, и заголовки колонок разошлись бы с полями (они в одной сетке, но
+                  полоса живёт в шаблоне). Заголовки лежат внутри прокрутки рядом со строками, а
+                  не над ними: иначе при появлении полосы они остались бы на старой ширине.
+                -->
+                <ScrollViewer Margin="0,12,0,0"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!--
+                          Негодный размер — красной строкой до исправления, а не подсказкой:
+                          «Сохранить» с таким размером молчит, и причину обязано быть видно,
+                          пока не исправят.
+                        -->
+                        <TextBlock Grid.Row="0"
+                                   Margin="0,0,0,8"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextError}"
+                                   Visibility="{Binding HasSizeError, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                   Text="{Binding SizeError}" />
+
+                        <!--
+                          Заголовки колонок: без них «900» не отличить от «560», а ширину от
+                          высоты — тем более. Ширины колонок заданы числами, а не «Auto»: поля
+                          должны стоять под своими заголовками, иначе цифры съехали бы.
+                        -->
+                        <Grid Grid.Row="1" Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="88" />
+                                <ColumnDefinition Width="112" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="Окно" />
+
+                            <TextBlock Grid.Column="1"
+                                       HorizontalAlignment="Center"
+                                       Text="Ширина" />
+
+                            <TextBlock Grid.Column="2"
+                                       HorizontalAlignment="Center"
+                                       Text="Высота" />
+                        </Grid>
+
+                        <!--
+                          Строки размеров: окно, ширина и высота. Высота по содержимому показана
+                          подписью, а не полем: у окна правки упражнения высоту задать нельзя,
+                          WPF считает её сам по содержимому.
+                        -->
+                        <ItemsControl x:Name="WindowSizeList"
+                                      Grid.Row="2"
+                                      ItemsSource="{Binding WindowSizeRows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:WindowSizeRowViewModel}">
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="88" />
+                                            <ColumnDefinition Width="112" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                   VerticalAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding Title}" />
+
+                                        <!--
+                                          Поле ширины: цифры фильтром, значение меняется и вводом,
+                                          и перетаскиванием. DragValue не пишет в привязанное
+                                          свойство — значение меняет команда строки (ловушка 11).
+                                        -->
+                                        <TextBox Grid.Column="1"
+                                                 Margin="4,0,0,0"
+                                                 Padding="4,3"
+                                                 HorizontalContentAlignment="Center"
+                                                 VerticalContentAlignment="Center"
+                                                 helpers:AllowedCharsInput.Allowed="Digits"
+                                                 helpers:DragValue.Value="{Binding Width}"
+                                                 helpers:DragValue.Command="{Binding WidthCommand}"
+                                                 Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}" />
+
+                                        <TextBox Grid.Column="2"
+                                                 Margin="4,0,0,0"
+                                                 Padding="4,3"
+                                                 HorizontalContentAlignment="Center"
+                                                 VerticalContentAlignment="Center"
+                                                 Visibility="{Binding HasHeight, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                 helpers:AllowedCharsInput.Allowed="Digits"
+                                                 helpers:DragValue.Value="{Binding Height}"
+                                                 helpers:DragValue.Command="{Binding HeightCommand}"
+                                                 Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}" />
+
+                                        <TextBlock Grid.Column="2"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{DynamicResource TextSecondary}"
+                                                   Text="по содержимому"
+                                                   Visibility="{Binding IsContentHeight, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
 
         <!--
@@ -714,6 +839,9 @@
         <!--
           IsDefault один в окне: иначе Enter звал бы обе кнопки. Кнопки вне вкладок: сохраняется
           и число дней, и назначения сразу — два разных «Сохранить» разъехались бы.
+
+          IsCancel у «Отменить» убран: в немодальном окне он не работает, и кнопка закрывает
+          окно обработчиком, как это делает окно дня. Esc ловит окно (см. OnKeyDown).
         -->
         <StackPanel Grid.Row="3"
                     Margin="0,16,0,0"
@@ -729,7 +857,7 @@
                     Style="{StaticResource GlassButtonSoft}"
                     Content="Отменить"
                     helpers:Hotkey.Id="Settings.Cancel"
-                    IsCancel="True" />
+                    Click="OnCancelClick" />
         </StackPanel>
 
         <!--

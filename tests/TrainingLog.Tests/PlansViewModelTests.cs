@@ -134,6 +134,32 @@ public sealed class PlansViewModelTests
         Assert.Equal([second, first], visible);
     }
 
+    /// <summary>
+    /// Пока план правится, его нельзя удалить: после удаления «Принять» не нашёл бы запись и
+    /// молча ничего не сделал. Окно плана общее на добавление и правку, поэтому объект правки
+    /// знает сервис, а не список.
+    /// </summary>
+    [Fact]
+    public async Task EditCommand_ОткрытаПравка_ПланПомеченКакРедактируемый()
+    {
+        using var database = new TemporaryDatabase();
+        await database.PlanRepository.AddAsync(new Core.Models.TrainingPlan { Name = "Ноги" });
+
+        var windowService = new FakeWindowService();
+        var viewModel = new PlansViewModel(database.PlanRepository, windowService);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var shown = viewModel.Visible.Single();
+        viewModel.EditCommand.Execute(shown);
+
+        Assert.Same(shown, viewModel.EditedPlan);
+
+        // Окно закрылось без записи — кнопка «Удалить» снова активна.
+        windowService.RaisePlanClosed();
+
+        Assert.Null(viewModel.EditedPlan);
+    }
+
     private static List<NotifyCollectionChangedAction> Record(ObservableCollection<string> collection)
     {
         var actions = new List<NotifyCollectionChangedAction>();

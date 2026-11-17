@@ -24,37 +24,98 @@ public sealed class ExercisesViewModelTests
         Assert.False(viewModel.IsEmpty);
     }
 
+    /// <summary>
+    /// Импорт пишет в базу мимо модели окна, поэтому модель обязана перечитывать справочник
+    /// сама: иначе правка выглядела бы несработавшей. Перечитывание вызывает окно импорта —
+    /// когда оно сообщает, что упражнения записаны.
+    /// </summary>
     [Fact]
     public async Task ImportCommand_ПослеИмпорта_ПеречитываетСправочник()
     {
         using var database = new TemporaryDatabase();
-        var windowService = new FakeWindowService { ImportResult = true };
+        var windowService = new FakeWindowService();
         var viewModel = new ExercisesViewModel(database.Repository, windowService);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         // Так же, как пишет окно импорта: модель окна справочника об этой записи не знает.
         await database.Repository.AddAsync(new Exercise { Name = "Жим" });
 
-        await viewModel.ImportCommand.ExecuteAsync(null);
+        viewModel.ImportCommand.Execute(null);
 
         Assert.Equal(1, windowService.ImportCalls);
+
+        // Окно импорта сообщило, что упражнения записаны.
+        await windowService.RaiseImportSaved();
+
         Assert.Equal("Жим", Assert.Single(viewModel.Visible).Name);
     }
 
+    /// <summary>Окно импорта не сообщило о записи — справочник прежний.</summary>
     [Fact]
-    public async Task ImportCommand_ПриОтказе_СписокНеПеречитывается()
+    public async Task ImportCommand_БезЗаписи_СписокНеПеречитывается()
     {
         using var database = new TemporaryDatabase();
-        var windowService = new FakeWindowService { ImportResult = false };
+        var windowService = new FakeWindowService();
         var viewModel = new ExercisesViewModel(database.Repository, windowService);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         await database.Repository.AddAsync(new Exercise { Name = "Жим" });
 
-        await viewModel.ImportCommand.ExecuteAsync(null);
+        viewModel.ImportCommand.Execute(null);
 
         Assert.Equal(1, windowService.ImportCalls);
         Assert.Empty(viewModel.Visible);
+    }
+
+    /// <summary>
+    /// Пока упражнение правится, его нельзя удалить: после удаления «Принять» не нашёл бы запись
+    /// и молча ничего не сделал. Сервис знает, какое упражнение правится на самом деле.
+    /// </summary>
+    [Fact]
+    public async Task EditCommand_ОткрытаПравка_УпражнениеПомеченоКакРедактируемое()
+    {
+        using var database = new TemporaryDatabase();
+        await database.Repository.AddAsync(new Exercise { Name = "Жим" });
+
+        var windowService = new FakeWindowService();
+        var viewModel = new ExercisesViewModel(database.Repository, windowService);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var shown = viewModel.Visible.Single();
+        viewModel.EditCommand.Execute(shown);
+
+        Assert.Same(shown, viewModel.EditedExercise);
+
+        // Окно закрылось без записи — кнопка «Удалить» снова активна.
+        windowService.RaiseEditClosed();
+
+        Assert.Null(viewModel.EditedExercise);
+    }
+
+    /// <summary>
+    /// Правка упражнения меняет имя — и сортировка могла поменяться, поэтому видимый список
+    /// перестраивается. Перестраивает его окно правки, когда сообщает о записи.
+    /// </summary>
+    [Fact]
+    public async Task EditCommand_ПослеПравки_ПерестраиваетСписок()
+    {
+        using var database = new TemporaryDatabase();
+        var exercise = new Exercise { Name = "Жим" };
+        await database.Repository.AddAsync(exercise);
+
+        var windowService = new FakeWindowService();
+        var viewModel = new ExercisesViewModel(database.Repository, windowService);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        // Окно правки правит объект из видимого списка — так же, как это делает справочник.
+        var shown = viewModel.Visible.Single();
+        viewModel.EditCommand.Execute(shown);
+
+        shown.Name = "Жим лёжа";
+
+        await windowService.RaiseExerciseSaved();
+
+        Assert.Equal("Жим лёжа", Assert.Single(viewModel.Visible).Name);
     }
 
     /// <summary>

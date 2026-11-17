@@ -121,6 +121,79 @@ public sealed class AppSettingsStoreTests
         Assert.Empty(settings.Store.Load().Hotkeys);
     }
 
+    /// <summary>Секция размеров окон: круг «сохранили — прочитали» вместе с остальными полями.</summary>
+    /// <remarks>
+    /// Словарь сериализуется штатным System.Text.Json, но проверяется не сериализатор: та же
+    /// запись обязана вернуться из файла целиком, а не только из памяти хранилища.
+    /// </remarks>
+    [Fact]
+    public void Save_ПотоЧитаетсяСекцияРазмеровОкон()
+    {
+        using var settings = new TemporarySettings();
+
+        Assert.True(settings.Store.Save(new AppSettings
+        {
+            DaysCount = 7,
+            DatabaseDirectory = @"D:\журнал\базы",
+            DatabaseName = "спорт.db",
+            WindowSizes = new Dictionary<string, WindowSize>
+            {
+                ["Main"] = new WindowSize { Width = 1000, Height = 700 },
+                ["EditExercise"] = new WindowSize { Width = 400, Height = null },
+            },
+        }));
+
+        var loaded = settings.Store.Load();
+
+        Assert.Equal(1000, loaded.WindowSizes["Main"].Width);
+        Assert.Equal(700, loaded.WindowSizes["Main"].Height);
+        Assert.Equal(400, loaded.WindowSizes["EditExercise"].Width);
+        Assert.Null(loaded.WindowSizes["EditExercise"].Height);
+
+        // Отдельным хранилищем: секция лежит в файле, а не только в памяти.
+        var reread = new AppSettingsStore(settings.FilePath).Load();
+
+        Assert.Equal(1000, reread.WindowSizes["Main"].Width);
+        Assert.Equal(700, reread.WindowSizes["Main"].Height);
+    }
+
+    /// <summary>
+    /// Секции нет, она пустая или null — словарь пуст, а не null: «размеров нет» и «размеры
+    /// пустые» обязаны объясняться в одном месте.
+    /// </summary>
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""{"WindowSizes": {}}""")]
+    [InlineData("""{"WindowSizes": null}""")]
+    [InlineData("{ это не json")]
+    public void Load_СекцииРазмеровНет_ПустойСловарь(string content)
+    {
+        using var settings = new TemporarySettings();
+        settings.Write(content);
+
+        Assert.Empty(settings.Store.Load().WindowSizes);
+    }
+
+    /// <summary>
+    /// Негодный размер отбрасывается, годный остаётся: окно с шириной в два пикселя не открыть.
+    /// Файл при этом не переписывается — тот же договор, что у DaysCount.
+    /// </summary>
+    [Fact]
+    public void Load_НегодныйРазмерОтбрасывается_ГодныйОстаётся()
+    {
+        const string content = """
+            {"WindowSizes": {"Main": {"Width": 10, "Height": 560}, "Plans": {"Width": 520, "Height": 560}}}
+            """;
+
+        using var settings = new TemporarySettings();
+        settings.Write(content);
+
+        var loaded = settings.Store.Load();
+
+        Assert.False(loaded.WindowSizes.ContainsKey("Main"));
+        Assert.Equal(520, loaded.WindowSizes["Plans"].Width);
+    }
+
     /// <summary>
     /// Пустые и пробельные комбинации назначения не дают: записи отбрасываются, годные остаются.
     /// Файл не переписывается — тот же договор, что у DaysCount.

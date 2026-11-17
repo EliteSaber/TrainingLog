@@ -35,7 +35,7 @@ public sealed partial class EditExerciseViewModel : ObservableObject
     private string _name = string.Empty;
 
     /// <summary>
-    /// Признак, что изменения приняты и сохранены. Окно выставляет <c>DialogResult</c> по нему.
+    /// Признак, что изменения приняты и сохранены. Окно сообщает о записи и закрывается по нему.
     /// </summary>
     public bool Accepted { get; private set; }
 
@@ -79,7 +79,7 @@ public sealed partial class EditExerciseViewModel : ObservableObject
         Accepted = true;
 
         // Приватный сеттер не даёт сгенерировать уведомление автоматически, а окно ждёт его,
-        // чтобы выставить DialogResult: по одному только значению Accepted оно не узнает,
+        // чтобы сообщить о записи и закрыться: по одному только значению Accepted оно не узнает,
         // что правка сохранена.
         OnPropertyChanged(nameof(Accepted));
     }

@@ -74,4 +74,13 @@ public sealed class AppSettings
     /// System.Text.Json читает без конвертеров, и порядок строк в файле значения не имеет.
     /// </remarks>
     public Dictionary<string, string> Hotkeys { get; set; } = new();
+
+    /// <summary>Размеры окон по умолчанию: id окна к его размеру.</summary>
+    /// <remarks>
+    /// Секция пустая, пока размеры не заданы: отсутствие записи означает «размер окна такой,
+    /// какой он сейчас», а не «размер неизвестен». Каталог окон и правила пригодности живут
+    /// в слое WPF (у окон разные минимумы) и в <see cref="WindowSizeRules"/>; сам формат
+    /// файла — здесь.
+    /// </remarks>
+    public Dictionary<string, WindowSize> WindowSizes { get; set; } = new();
 }

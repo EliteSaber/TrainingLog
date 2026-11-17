@@ -14,11 +14,18 @@
         Foreground="{DynamicResource TextPrimary}"
         Style="{DynamicResource AppWindowStyle}"
         Title="Редактирование упражнения"
-        Width="380"
         SizeToContent="Height"
-        MinWidth="320"
-        ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner">
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen">
+    <!--
+      Отдельное окно, а не окно-владелец журнала: владельца нет — иначе сворачивание журнала
+      прятало бы его вместе с собой. Отсюда ShowInTaskbar=True: свёрнутое окно без владельца и
+      без кнопки на панели задач вернулось бы только кликом по справочнику. CenterScreen, а не
+      CenterOwner: владельца нет, родное место окна — центр экрана. Как у окна дня.
+
+      Немодальное: справочник остаётся рабочим, и вкладку «Окна» в «Параметрах» можно открыть
+      рядом с правкой.
+    -->
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -76,7 +83,7 @@
                     Style="{StaticResource GlassButtonSoft}"
                     Content="Отменить"
                     helpers:Hotkey.Id="EditExercise.Cancel"
-                    IsCancel="True" />
+                    Click="OnCancelClick" />
         </StackPanel>
 
         <!-- Рамка окна: элемент-обводка поверх содержимого, до самых краёв окна (как на главном). -->

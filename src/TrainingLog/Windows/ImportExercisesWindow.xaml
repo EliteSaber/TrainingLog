@@ -14,13 +14,9 @@
         Foreground="{DynamicResource TextPrimary}"
         Style="{DynamicResource AppWindowStyle}"
         Title="Импорт упражнений"
-        Width="560"
-        Height="520"
-        MinWidth="460"
-        MinHeight="360"
         AllowDrop="True"
-        ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen"
         DragOver="OnDragOver"
         Drop="OnDrop">
     <!--
@@ -28,6 +24,14 @@
 
       Файл можно перетащить в любое место окна, поэтому DragOver и Drop висят на самом Window, а не
       на рамке подсказки: зона приёма совпадает с окном и не требует прицеливания.
+
+      Отдельное окно, а не окно-владелец журнала: владельца нет — иначе сворачивание журнала
+      прятало бы его вместе с собой. Отсюда ShowInTaskbar=True: свёрнутое окно без владельца и
+      без кнопки на панели задач вернулось бы только кликом по справочнику. CenterScreen, а не
+      CenterOwner: владельца нет, родное место окна — центр экрана. Как у окна дня.
+
+      Немодальное: справочник остаётся рабочим, и вкладку «Окна» в «Параметрах» можно открыть
+      рядом с импортом. Диалог выбора файла — системный и модальный всегда.
     -->
     <Window.Resources>
         <ResourceDictionary>
@@ -179,7 +183,7 @@
                     Style="{StaticResource GlassButtonSoft}"
                     Content="Отменить"
                     helpers:Hotkey.Id="Import.Cancel"
-                    IsCancel="True" />
+                    Click="OnCancelClick" />
         </StackPanel>
 
         <!-- Рамка окна: элемент-обводка поверх содержимого, до самых краёв окна (как на главном). -->

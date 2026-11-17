@@ -129,7 +129,7 @@ public sealed partial class EditPlanViewModel : ObservableObject
     [ObservableProperty]
     private PlanBlock _activeBlock = PlanBlock.Exercises;
 
-    /// <summary>Изменения приняты и сохранены. Окно выставляет <c>DialogResult</c> по нему.</summary>
+    /// <summary>Изменения приняты и сохранены. Окно сообщает о записи и закрывается по нему.</summary>
     public bool Accepted { get; private set; }
 
     /// <summary>Подпись кнопки подтверждения: у добавления и правки она разная, а окно одно.</summary>
@@ -458,7 +458,7 @@ public sealed partial class EditPlanViewModel : ObservableObject
         Accepted = true;
 
         // Приватный сеттер не даёт сгенерировать уведомление автоматически, а окно ждёт его, чтобы
-        // выставить DialogResult.
+        // сообщить о записи и закрыться.
         OnPropertyChanged(nameof(Accepted));
     }
 

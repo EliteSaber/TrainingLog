@@ -819,6 +819,176 @@ public sealed class SettingsViewModelTests
         Assert.Contains(nameof(SettingsViewModel.SelectedTheme), notified);
     }
 
+    /// <summary>Строки размеров: по одной на каждое окно приложения.</summary>
+    [Fact]
+    public void Размеры_БезЗаписиВФайле_ИзКаталога()
+    {
+        using var settings = new TemporarySettings();
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.Equal(WindowSizeCatalog.Entries.Count, viewModel.WindowSizeRows.Count);
+
+        var main = viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.Main);
+        var entry = WindowSizeCatalog.Find(WindowSizeCatalog.Main)!;
+
+        Assert.Equal(entry.Width, main.Width);
+        Assert.Equal(entry.Height!.Value, main.Height);
+    }
+
+    /// <summary>Запись в файле главнее каталога: пользователь задал размер — он и показан.</summary>
+    [Fact]
+    public void Размеры_ИзФайла_Читаются()
+    {
+        using var settings = new TemporarySettings();
+        settings.Store.Save(new AppSettings
+        {
+            WindowSizes = new Dictionary<string, WindowSize>
+            {
+                [WindowSizeCatalog.Main] = new WindowSize { Width = 1000, Height = 700 },
+            },
+        });
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var main = viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.Main);
+
+        Assert.Equal(1000, main.Width);
+        Assert.Equal(700, main.Height);
+    }
+
+    /// <summary>Сохранение пишет размеры всех окон: секция читается целиком.</summary>
+    [Fact]
+    public void Save_ПишетРазмерыОконВФайл()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.Main).Width = 1000;
+
+        viewModel.SaveCommand.Execute(null);
+
+        var loaded = new AppSettingsStore(settings.FilePath).Load();
+
+        Assert.Equal(1000, loaded.WindowSizes[WindowSizeCatalog.Main].Width);
+        Assert.Equal(WindowSizeCatalog.Entries.Count, loaded.WindowSizes.Count);
+    }
+
+    /// <summary>
+    /// Ширина меньше минимума окна — объяснение и гаснущая «Сохранить»: размер, который WPF
+    /// всё равно не примет, записывать незачем.
+    /// </summary>
+    [Fact]
+    public void Размер_МеньшеМинимума_СохранитьГасится_ИОбъяснениеПоказано()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var main = viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.Main);
+
+        main.Width = 10;
+
+        Assert.True(viewModel.HasSizeError);
+        Assert.Contains("Журнал тренировок", viewModel.SizeError);
+        Assert.False(viewModel.SaveCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// Перетаскивание меняет число и вписывает его в границы окна: правило одно на оба способа
+    /// правки, иначе перетаскивание и ввод руками разошлись бы в том, что считается годным.
+    /// </summary>
+    [Fact]
+    public void Перетаскивание_ШиринаМеняется_ИВписываетсяВГраницы()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var main = viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.Main);
+        var start = main.Width;
+
+        main.WidthCommand.Execute(start + 100);
+
+        Assert.Equal(start + 100, main.Width);
+
+        main.WidthCommand.Execute(1);
+
+        Assert.Equal(main.MinimumWidth, main.Width);
+    }
+
+    /// <summary>У окна правки упражнения высоты нет: она следует за содержимым, и задать её нельзя.</summary>
+    [Fact]
+    public void Размеры_ОкноПравкиУпражнения_ВысотыПоСодержимому()
+    {
+        using var settings = new TemporarySettings();
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var row = viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.EditExercise);
+
+        Assert.False(row.HasHeight);
+        Assert.True(row.IsContentHeight);
+    }
+
+    /// <summary>
+    /// Правка размера поднимает событие: окно по нему применяет предпросмотр к открытым окнам.
+    /// </summary>
+    [Fact]
+    public void Размеры_Правка_ПоднимаетСобытие()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var raised = 0;
+        viewModel.WindowSizesChanged += () => raised++;
+
+        viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.Main).Width = 1000;
+
+        Assert.Equal(1, raised);
+    }
+
+    /// <summary>Предпросмотр берёт значение строки: годное значение применяется сразу.</summary>
+    [Fact]
+    public void PreviewWindowSizes_ГодноеЗначение_БерётсяИзСтроки()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.Main).Width = 1000;
+
+        Assert.Equal(1000, viewModel.PreviewWindowSizes()[WindowSizeCatalog.Main].Width);
+    }
+
+    /// <summary>
+    /// Негодное значение не применяется: прежнее, пока число не станет допустимым. Иначе окно
+    /// дёргалось бы на каждой цифре.
+    /// </summary>
+    [Fact]
+    public void PreviewWindowSizes_НегодноеЗначение_БерётсяПрежнее()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var entry = WindowSizeCatalog.Find(WindowSizeCatalog.Main)!;
+
+        viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.Main).Width = 10;
+
+        Assert.Equal(entry.Width, viewModel.PreviewWindowSizes()[WindowSizeCatalog.Main].Width);
+    }
+
+    /// <summary>Срез размеров заполнен при открытии окна: откату есть откуда взять.</summary>
+    [Fact]
+    public void SavedWindowSizes_ЗаполненПриОткрытии()
+    {
+        using var settings = new TemporarySettings();
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.Equal(WindowSizeCatalog.Entries.Count, viewModel.SavedWindowSizes.Count);
+        Assert.Equal(
+            WindowSizeCatalog.Find(WindowSizeCatalog.Main)!.Width,
+            viewModel.SavedWindowSizes[WindowSizeCatalog.Main].Width);
+    }
+
     /// <summary>Строка поиска по id: каталог у теста один на все группы.</summary>
     private static HotkeyRowViewModel HotkeyRow(SettingsViewModel viewModel, string id) =>
         viewModel.HotkeyGroups.SelectMany(group => group.Rows).Single(row => row.Id == id);

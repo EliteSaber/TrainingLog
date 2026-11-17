@@ -102,6 +102,13 @@ public sealed class AppSettingsStore
             .ToDictionary(pair => pair.Key, pair => pair.Value)
             ?? [];
 
+        // «WindowSizes»: тот же договор, что у «Hotkeys» — null вместо секции заменяется
+        // пустым словарём, а негодные размеры отбрасываются: окно с такой шириной не открыть.
+        settings.WindowSizes = settings.WindowSizes?
+            .Where(pair => pair.Value is not null && WindowSizeRules.IsValid(pair.Value.Width, pair.Value.Height))
+            .ToDictionary(pair => pair.Key, pair => pair.Value)
+            ?? [];
+
         if (IsMissing(settings.DatabaseDirectory) || IsMissing(settings.DatabaseName))
         {
             settings.DatabaseDirectory = IsMissing(settings.DatabaseDirectory)

@@ -7,15 +7,26 @@ namespace TrainingLog.Services;
 
 /// <summary>Список окон приложения.</summary>
 /// <remarks>
-/// Окна справочников идут через <see cref="SingleInstanceWindowHost{TWindow}"/>: повторное
-/// нажатие фокусирует открытое. Окна правки и окно параметров создаются заново на
-/// каждый вызов — внутри них то, что правят, и переиспользование экземпляра со старым
-/// содержимым выглядело бы как зависание.
+/// Окна справочников и окно параметров идут через <see cref="SingleInstanceWindowHost{TWindow}"/>:
+/// повторное нажатие фокусирует открытое. Окна правки тоже единственные — по одному на приложение,
+/// как окно дня: экземпляр держит сервис, потому что фабрикам нужны упражнение или план, а хост
+/// вызывает их без параметров.
+///
+/// Справочники и параметры — отдельные окна: владельца у них нет, своя кнопка на панели задач
+/// есть, и после сворачивания журнала до них можно переключиться. Так же устроено окно дня.
+/// Окна правки упражнения, плана и импорта — тоже отдельные и немодальные: модальный диалог
+/// блокирует всё приложение, включая «Параметры», и вкладку «Окна» во время правки было бы не
+/// открыть. Модальных окон у приложения не осталось — системные «MessageBox» и «Выбрать
+/// файл…» к ним не относятся.
 ///
 /// Окно дня единственный своего рода: немодальное, поэтому главное окно при открытом дне
 /// остаётся рабочим, и единственное, но без хоста — фабрике окна нужен день, а хост вызывает
-/// её без параметров. Повторное открытие и «Параметры» при активном дне не создают ничего,
-/// а выводят существующее окно на передний план с оповещением <see cref="WindowAttention"/>.
+/// её без параметров. Повторное открытие выводит существующее окно на передний план с
+/// оповещением <see cref="WindowAttention"/>.
+///
+/// Окно параметров немодальное и открывается при любых других открытых окнах: правило
+/// «при открытом окне дня параметры не открываются» отменено — параметры нужны и во время
+/// правки дня.
 /// </remarks>
 public sealed class WindowService(
     Func<ExercisesWindow> exercisesWindowFactory,
@@ -27,8 +38,17 @@ public sealed class WindowService(
     Func<DateOnly?, AddDayWindow> dayWindowFactory,
     Func<SettingsWindow> settingsWindowFactory) : IWindowService
 {
-    private readonly SingleInstanceWindowHost<ExercisesWindow> _exercises = new(exercisesWindowFactory);
-    private readonly SingleInstanceWindowHost<PlansWindow> _plans = new(plansWindowFactory);
+    private readonly SingleInstanceWindowHost<ExercisesWindow> _exercises = new(exercisesWindowFactory, owned: false);
+    private readonly SingleInstanceWindowHost<PlansWindow> _plans = new(plansWindowFactory, owned: false);
+
+    /// <summary>
+    /// Окно параметров: единственное и немодальное.
+    /// </summary>
+    /// <remarks>
+    /// Подписка на его «Сохранено» — при открытии: хост создаёт окно сам, и момент его
+    /// появления известен только хосту.
+    /// </remarks>
+    private readonly SingleInstanceWindowHost<SettingsWindow> _settings = new(settingsWindowFactory, owned: false);
 
     /// <summary>Открытое окно дня. <c>null</c> — окна дня нет.</summary>
     /// <remarks>
@@ -37,45 +57,274 @@ public sealed class WindowService(
     /// </remarks>
     private AddDayWindow? _dayWindow;
 
+    /// <summary>Открытые окна правки. <c>null</c> — такого окна нет.</summary>
+    /// <remarks>
+    /// По одному на приложение, как окно дня: второе окно правки того же упражнения или плана
+    /// смысла не имеет, а при повторном открытии существующее выводится вперёд.
+    /// </remarks>
+    private EditExerciseWindow? _exerciseWindow;
+    private ImportExercisesWindow? _importWindow;
+    private EditPlanWindow? _planWindow;
+
+    /// <summary>Текущие обратные вызовы окон правки: кто просит обновить список после записи.</summary>
+    /// <remarks>
+    /// Хранятся полями, а не в подписке на окно: при повторном открытии окно остаётся то же, а
+    /// вызывающий мог измениться — например, справочник закрыли и открыли заново, и старый
+    /// вызов указывал бы на мёртвую модель. После закрытия окна ссылки очищаются: сервис —
+    /// синглтон и не должен удерживать временную модель представления.
+    /// </remarks>
+    private Func<Task>? _exerciseSaved;
+    private Func<Task>? _importSaved;
+    private Func<Task>? _planSaved;
+
+    /// <summary>Обратные вызовы на закрытие окон правки: снять блокировку удаления в списках.</summary>
+    /// <remarks>
+    /// Окно может закрыться и без записи, когда <c>onSaved</c> не вызывается, — поэтому для
+    /// снятия блокировки нужен отдельный вызов. Как и <c>onSaved</c>, живёт вместе с окном.
+    /// </remarks>
+    private Action? _exerciseClosed;
+    private Action? _importClosed;
+    private Action? _planClosed;
+
+    /// <summary>Упражнение, которое реально правится: окно единственное, и правит оно один объект.</summary>
+    public Exercise? EditedExercise { get; private set; }
+
+    /// <summary>План, который реально правится; для добавления — ещё не сохранённый.</summary>
+    public TrainingPlan? EditedPlan { get; private set; }
+
     public event Func<Task>? DaySaved;
 
-    public void OpenExercises() => _exercises.Show(Application.Current?.MainWindow);
+    public event Func<Task>? SettingsSaved;
 
-    public void OpenPlans() => _plans.Show(Application.Current?.MainWindow);
+    public void OpenExercises() => _exercises.Show();
 
-    public bool ShowSettings()
+    public void OpenPlans() => _plans.Show();
+
+    /// <summary>
+    /// Открывает окно параметров: немодальное и единственное.
+    /// </summary>
+    /// <remarks>
+    /// Подписка на «Сохранено» снимается перед новой: окно могло быть уже открыто, и тогда
+    /// повторное открытие не создаёт нового, а подписка была бы второй на том же окне.
+    /// </remarks>
+    public void OpenSettings()
     {
-        // При открытом окне дня параметры не открываются: экран настроек поверх правящегося дня
-        // выглядел бы как его замена. Существующее окно выводится вперёд с оповещением.
-        if (_dayWindow is { IsVisible: true })
+        _settings.Show();
+
+        if (_settings.Current is { } window)
         {
-            ShowExistingDayWindow();
-
-            return false;
+            window.Saved -= OnSettingsSaved;
+            window.Saved += OnSettingsSaved;
         }
-
-        return ShowDialog(settingsWindowFactory(), Application.Current?.MainWindow);
     }
 
-    public bool ShowEditExercise(Exercise exercise)
+    /// <summary>
+    /// Открывает окно правки упражнения: отдельное, немодальное и единственное.
+    /// </summary>
+    /// <remarks>
+    /// Повторное открытие не создаёт второе окно и не переключает упражнение: существующее
+    /// выводится вперёд, как окно дня при попытке править другой день. Новый обратный вызов
+    /// подменяет прежний — список мог переоткрыться.
+    /// </remarks>
+    /// <param name="exercise">Упражнение, которое правится.</param>
+    /// <param name="onSaved">Что делать, когда упражнение записано.</param>
+    /// <param name="onClosed">Что делать, когда окно закрылось, в том числе без записи.</param>
+    public void OpenEditExercise(Exercise exercise, Func<Task>? onSaved = null, Action? onClosed = null)
     {
         ArgumentNullException.ThrowIfNull(exercise);
 
-        var window = editExerciseWindowFactory(exercise);
+        if (onSaved is not null)
+        {
+            _exerciseSaved = onSaved;
+        }
 
-        return ShowDialog(window, _exercises.Current ?? Application.Current?.MainWindow);
+        if (onClosed is not null)
+        {
+            _exerciseClosed = onClosed;
+        }
+
+        if (_exerciseWindow is { IsVisible: true })
+        {
+            ShowExisting(_exerciseWindow);
+
+            return;
+        }
+
+        EditedExercise = exercise;
+        var window = _exerciseWindow = editExerciseWindowFactory(exercise);
+        window.Saved += OnExerciseWindowSaved;
+        window.Closed += OnExercisesChildClosed;
+        window.Show();
+        BringToFrontAfterInput(window);
     }
 
-    public bool ShowImportExercises() =>
-        ShowDialog(importExercisesWindowFactory(), _exercises.Current ?? Application.Current?.MainWindow);
+    /// <summary>
+    /// Открывает окно импорта упражнений: отдельное, немодальное и единственное.
+    /// </summary>
+    /// <param name="onSaved">Что делать, когда упражнения записаны.</param>
+    /// <param name="onClosed">Что делать, когда окно закрылось, в том числе без записи.</param>
+    public void OpenImportExercises(Func<Task>? onSaved = null, Action? onClosed = null)
+    {
+        if (onSaved is not null)
+        {
+            _importSaved = onSaved;
+        }
 
-    public bool ShowAddPlan() => ShowDialog(addPlanWindowFactory(), PlansOwner);
+        if (onClosed is not null)
+        {
+            _importClosed = onClosed;
+        }
 
-    public bool ShowEditPlan(TrainingPlan plan)
+        if (_importWindow is { IsVisible: true })
+        {
+            ShowExisting(_importWindow);
+
+            return;
+        }
+
+        var window = _importWindow = importExercisesWindowFactory();
+        window.Saved += OnImportWindowSaved;
+        window.Closed += OnExercisesChildClosed;
+        window.Show();
+        BringToFrontAfterInput(window);
+    }
+
+    /// <summary>
+    /// Открывает окно добавления плана: отдельное, немодальное и единственное.
+    /// </summary>
+    /// <remarks>
+    /// Одно окно на добавление и правку плана: фабрики разные, экземпляр общий.
+    /// </remarks>
+    /// <param name="onSaved">Что делать, когда план записан.</param>
+    /// <param name="onClosed">Что делать, когда окно закрылось, в том числе без записи.</param>
+    public void OpenAddPlan(Func<Task>? onSaved = null, Action? onClosed = null)
+    {
+        if (onSaved is not null)
+        {
+            _planSaved = onSaved;
+        }
+
+        if (onClosed is not null)
+        {
+            _planClosed = onClosed;
+        }
+
+        if (_planWindow is { IsVisible: true })
+        {
+            ShowExisting(_planWindow);
+
+            return;
+        }
+
+        // Новый план ещё не в списке: ни одна строка не блокируется. Если окно правки уже
+        // открыто, его содержимое не меняется — EditedPlan остаётся тем планом, что правится.
+        var window = _planWindow = addPlanWindowFactory();
+        window.Saved += OnPlanWindowSaved;
+        window.Closed += OnPlansChildClosed;
+        window.Show();
+        BringToFrontAfterInput(window);
+    }
+
+    /// <summary>
+    /// Открывает окно правки плана: отдельное, немодальное и единственное.
+    /// </summary>
+    /// <remarks>
+    /// Повторное открытие не переключает план: выводится тот, что уже открыт.
+    /// </remarks>
+    /// <param name="plan">План, который правится.</param>
+    /// <param name="onSaved">Что делать, когда план записан.</param>
+    /// <param name="onClosed">Что делать, когда окно закрылось, в том числе без записи.</param>
+    public void OpenEditPlan(TrainingPlan plan, Func<Task>? onSaved = null, Action? onClosed = null)
     {
         ArgumentNullException.ThrowIfNull(plan);
 
-        return ShowDialog(editPlanWindowFactory(plan), PlansOwner);
+        if (onSaved is not null)
+        {
+            _planSaved = onSaved;
+        }
+
+        if (onClosed is not null)
+        {
+            _planClosed = onClosed;
+        }
+
+        if (_planWindow is { IsVisible: true })
+        {
+            ShowExisting(_planWindow);
+
+            return;
+        }
+
+        EditedPlan = plan;
+        var window = _planWindow = editPlanWindowFactory(plan);
+        window.Saved += OnPlanWindowSaved;
+        window.Closed += OnPlansChildClosed;
+        window.Show();
+        BringToFrontAfterInput(window);
+    }
+
+    /// <summary>Упражнение записано: вызываем текущий обратный вызов.</summary>
+    private void OnExerciseWindowSaved() => _ = _exerciseSaved?.Invoke();
+
+    /// <summary>Упражнения импортированы: вызываем текущий обратный вызов.</summary>
+    private void OnImportWindowSaved() => _ = _importSaved?.Invoke();
+
+    /// <summary>План записан: вызываем текущий обратный вызов.</summary>
+    private void OnPlanWindowSaved() => _ = _planSaved?.Invoke();
+
+    /// <summary>
+    /// Окно правки упражнения или импорта закрылось: активация возвращается справочнику.
+    /// </summary>
+    /// <remarks>
+    /// У окон без владельца возвращать активацию некому: фокус забрало бы приложение, которое
+    /// было активно до нас (ловушка 9). Отдаём её окну-родителю, а если его нет — журналу.
+    /// </remarks>
+    private void OnExercisesChildClosed(object? sender, EventArgs e)
+    {
+        if (sender is EditExerciseWindow exercise)
+        {
+            exercise.Closed -= OnExercisesChildClosed;
+            _exerciseWindow = null;
+            _exerciseSaved = null;
+            EditedExercise = null;
+            _exerciseClosed?.Invoke();
+            _exerciseClosed = null;
+        }
+        else if (sender is ImportExercisesWindow import)
+        {
+            import.Closed -= OnExercisesChildClosed;
+            _importWindow = null;
+            _importSaved = null;
+            _importClosed?.Invoke();
+            _importClosed = null;
+        }
+
+        if (ExercisesOwner is { IsVisible: true } owner)
+        {
+            owner.Activate();
+        }
+    }
+
+    /// <summary>Окно плана закрылось: активация возвращается списку планов.</summary>
+    /// <remarks>
+    /// Как и у окон справочника: у окна без владельца возвращать активацию некому (ловушка 9).
+    /// </remarks>
+    private void OnPlansChildClosed(object? sender, EventArgs e)
+    {
+        if (sender is EditPlanWindow plan)
+        {
+            plan.Closed -= OnPlansChildClosed;
+            _planWindow = null;
+            _planSaved = null;
+            EditedPlan = null;
+            _planClosed?.Invoke();
+            _planClosed = null;
+        }
+
+        if (PlansOwner is { IsVisible: true } owner)
+        {
+            owner.Activate();
+        }
     }
 
     /// <summary>Показывает окно добавления дня. <c>day</c> из <c>null</c> — сегодня.</summary>
@@ -84,7 +333,19 @@ public sealed class WindowService(
     /// <inheritdoc />
     public void ShowEditDay(DateOnly day) => ShowDay(day);
 
-    /// <summary>Дата правки — открыть существующую запись, <c>null</c> — добавить.</summary>
+    /// <summary>
+    /// Настройки записаны: сообщаем подписчикам, чтобы главное окно перечитало файл.
+    /// </summary>
+    /// <remarks>
+    /// Задача подписчика возвращается вызовом события, поэтому в тесте перечитывание можно
+    /// дождаться await'ом. В приложении подписчик один, и ждать его задачи сервису нечего: она
+    /// дополнится сама.
+    /// </remarks>
+    private void OnSettingsSaved() => SettingsSaved?.Invoke();
+
+    /// <summary>
+    /// Дата правки — открыть существующую запись, <c>null</c> — добавить.
+    /// </summary>
     /// <remarks>
     /// Окно одно на оба случая: за дату одна запись, и модель сама определяет по дате, какая это
     /// запись. И единственное на всё приложение: день пока правится, и параллельным окном его не
@@ -103,7 +364,7 @@ public sealed class WindowService(
     {
         if (_dayWindow is { IsVisible: true })
         {
-            ShowExistingDayWindow();
+            ShowExisting(_dayWindow);
 
             return;
         }
@@ -122,18 +383,23 @@ public sealed class WindowService(
         BringToFrontAfterInput(window);
     }
 
-    /// <summary>Уже открытое окно дня: восстановить из минимизации, мигнуть, вывести вперёд.</summary>
+    /// <summary>
+    /// Уже открытое окно: восстановить из минимизации, мигнуть, вывести вперёд.
+    /// </summary>
     /// <remarks>
+    /// Общий помощник для окна дня и трёх окон правки: у всех у них нет владельца, и порядок
+    /// один и тот же. Повторное открытие не меняет содержимое окна — какое было, такое и
+    /// остаётся, как у окна дня при попытке править другой день.
+    ///
     /// Порядок и оповещение = то самое поведение Windows при клике на заблокированное главное
     /// окно: восстановление окна, мигание и звук, затем вывод на передний план. Порядок задаёт
     /// <see cref="WindowAttention.BringToFront"/>, не <c>Activate()</c>: тот даёт фокус, но не
-    /// поднимает окно по z-порядку — owned-окнам это безразлично, окно дня за главным окном
-    /// было бы невидимо.
+    /// поднимает окно по z-порядку — owned-окнам это безразлично, а окно без владельца за главным
+    /// окном осталось бы невидимым.
     /// </remarks>
-    private void ShowExistingDayWindow()
+    /// <param name="window">Окно, которое уже открыто.</param>
+    private static void ShowExisting(Window window)
     {
-        var window = _dayWindow!;
-
         if (window.WindowState == WindowState.Minimized)
         {
             window.WindowState = WindowState.Normal;
@@ -198,25 +464,6 @@ public sealed class WindowService(
 
     private Window? PlansOwner => _plans.Current ?? Application.Current?.MainWindow;
 
-    /// <summary>
-    /// Показывает окно поверх владельца и возвращает результат.
-    /// </summary>
-    /// <remarks>
-    /// Владелец берётся у хоста, а не ищется перебором окон по IsActive: такой поиск вернёт
-    /// <c>null</c>, если в момент вызова ни одно окно ещё не считается активным. Без владельца
-    /// закрывать окно некому, и активацию забирает приложение, активное до нас.
-    ///
-    /// Активация владельца после закрытия вызывается явно: полагаться на поведение WPF по
-    /// умолчанию нельзя (ловушка 9).
-    /// </remarks>
-    private static bool ShowDialog(Window window, Window? owner)
-    {
-        window.Owner = owner;
-
-        var accepted = window.ShowDialog() == true;
-
-        owner?.Activate();
-
-        return accepted;
-    }
+    /// <summary>Окно справочника: ему возвращается активация после закрытия окон правки.</summary>
+    private Window? ExercisesOwner => _exercises.Current ?? Application.Current?.MainWindow;
 }

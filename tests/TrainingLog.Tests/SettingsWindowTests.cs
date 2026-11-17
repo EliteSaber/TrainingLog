@@ -4,7 +4,9 @@ using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using System.Windows.Threading;using TrainingLog.Services;
+using System.Windows.Threading;using TrainingLog.Controls;
+using TrainingLog.Core.Settings;
+using TrainingLog.Services;
 using TrainingLog.ViewModels;
 using TrainingLog.Windows;
 
@@ -115,6 +117,180 @@ public sealed class SettingsWindowTests
 
                 Assert.Single(rows);
                 Assert.Equal("Exercises.Export", rows[0].Id);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>
+    /// Вкладка размеров: строка на каждое окно приложения, по две колонки чисел.
+    /// </summary>
+    [Fact]
+    public void ВкладкаОкон_СтрокаНаКаждоеОкно()
+    {
+        StaRunner.Run(() =>
+        {
+            using var settings = new TemporarySettings();
+            var window = OpenWindow(settings, tab: 2);
+
+            try
+            {
+                var list = (ItemsControl)window.FindName("WindowSizeList")!;
+
+                Assert.Equal(WindowSizeCatalog.Entries.Count, list.Items.Count);
+
+                // Шаблон строки построен, и поле ширины связано с перетаскиванием: иначе
+                // перетаскивание молча не работало бы, а тест модели этого не заметил бы.
+                var container = list.ItemContainerGenerator.ContainerFromIndex(0)!;
+                var box = FindBox(container);
+
+                Assert.NotNull(box);
+                Assert.NotNull(DragValue.GetCommand(box!));
+                Assert.Equal(
+                    ((WindowSizeRowViewModel)list.Items[0]).Width,
+                    DragValue.GetValue(box!));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>
+    /// «Сохранить» закрывает окно: окно немодальное, и ответ «принято» ему возвращать нечем.
+    /// </summary>
+    [Fact]
+    public void Save_ЗакрываетОкно()
+    {
+        StaRunner.Run(() =>
+        {
+            using var settings = new TemporarySettings();
+            var window = OpenWindow(settings, tab: 0);
+
+            try
+            {
+                var viewModel = (SettingsViewModel)window.DataContext;
+
+                viewModel.SaveCommand.Execute(null);
+
+                Assert.False(window.IsVisible);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>
+    /// «Отменить» закрывает окно без записи: в немодальном окне <c>IsCancel</c> не работает,
+    /// и закрывает его обработчик кнопки.
+    /// </summary>
+    [Fact]
+    public void Отмена_ЗакрываетОкноБезЗаписи()
+    {
+        StaRunner.Run(() =>
+        {
+            using var settings = new TemporarySettings();
+            var window = OpenWindow(settings, tab: 0);
+
+            try
+            {
+                var button = ButtonByHotkeyId(window, "Settings.Cancel");
+
+                button.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                Assert.False(window.IsVisible);
+                Assert.Empty(settings.Store.Load().WindowSizes);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>
+    /// Правка размера применяется к окнам сразу: предпросмотр, как у шрифта и темы. Файл при
+    /// этом не меняется — он пишется по «Сохранить».
+    /// </summary>
+    [Fact]
+    public void ПравкаРазмера_ПрименяетсяСразу()
+    {
+        StaRunner.Run(() =>
+        {
+            using var settings = new TemporarySettings();
+            settings.Store.Save(new AppSettings
+            {
+                WindowSizes = new Dictionary<string, WindowSize>
+                {
+                    [WindowSizeCatalog.Main] = new WindowSize { Width = 1000, Height = 700 },
+                },
+            });
+
+            var window = OpenWindow(settings, tab: 2);
+
+            try
+            {
+                var viewModel = (SettingsViewModel)window.DataContext;
+
+                // Текущие размеры — общее состояние приложения, и тест задаёт его сам, чтобы
+                // не зависеть от порядка прогонов.
+                WindowSizes.Initialize(new Dictionary<string, WindowSize>
+                {
+                    [WindowSizeCatalog.Main] = new WindowSize { Width = 1000, Height = 700 },
+                });
+
+                viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.Main).Width = 1200;
+
+                Assert.Equal(1200, WindowSizes.Current[WindowSizeCatalog.Main].Width);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>
+    /// Выход без сохранения возвращает размеры как было: предпросмотр откатывается к срезу
+    /// файла, как шрифт и тема.
+    /// </summary>
+    [Fact]
+    public void Отмена_РазмерыВозвращаютсяКакБыло()
+    {
+        StaRunner.Run(() =>
+        {
+            using var settings = new TemporarySettings();
+            settings.Store.Save(new AppSettings
+            {
+                WindowSizes = new Dictionary<string, WindowSize>
+                {
+                    [WindowSizeCatalog.Main] = new WindowSize { Width = 1000, Height = 700 },
+                },
+            });
+
+            var window = OpenWindow(settings, tab: 2);
+
+            try
+            {
+                var viewModel = (SettingsViewModel)window.DataContext;
+
+                // Текущие размеры — общее состояние приложения, и тест задаёт его сам, чтобы
+                // не зависеть от порядка прогонов.
+                WindowSizes.Initialize(new Dictionary<string, WindowSize>
+                {
+                    [WindowSizeCatalog.Main] = new WindowSize { Width = 1000, Height = 700 },
+                });
+
+                viewModel.WindowSizeRows.Single(row => row.Id == WindowSizeCatalog.Main).Width = 1200;
+
+                window.Close();
+
+                Assert.Equal(1000, WindowSizes.Current[WindowSizeCatalog.Main].Width);
             }
             finally
             {
@@ -448,6 +624,54 @@ public sealed class SettingsWindowTests
         }
 
         throw new InvalidOperationException($"Кнопка под номером {index} не найдена.");
+    }
+
+    /// <summary>Поле ввода в поддереве: ищется первое, у строки размеров оно одно на колонку.</summary>
+    /// <param name="root">Корень поиска.</param>
+    private static TextBox? FindBox(DependencyObject root)
+    {
+        if (root is TextBox box)
+        {
+            return box;
+        }
+
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            if (FindBox(VisualTreeHelper.GetChild(root, index)) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Кнопка окна по её адресу назначения: id ищется по дереву окна.</summary>
+    /// <param name="window">Окно, в дереве которого ищется кнопка.</param>
+    /// <param name="hotkeyId">Адрес назначения из каталога.</param>
+    private static Button ButtonByHotkeyId(Window window, string hotkeyId) =>
+        FindButton(window, hotkeyId)
+            ?? throw new InvalidOperationException($"Кнопка «{hotkeyId}» в окне не найдена.");
+
+    /// <summary>Ищет кнопку по адресу назначения в визуальном дереве окна.</summary>
+    /// <param name="root">Корень поиска.</param>
+    /// <param name="hotkeyId">Адрес назначения из каталога.</param>
+    private static Button? FindButton(DependencyObject root, string hotkeyId)
+    {
+        if (root is FrameworkElement element && element is Button button && Hotkey.GetId(element) == hotkeyId)
+        {
+            return button;
+        }
+
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            if (FindButton(VisualTreeHelper.GetChild(root, index), hotkeyId) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Цвет токена палитры так, как его видит элемент.</summary>

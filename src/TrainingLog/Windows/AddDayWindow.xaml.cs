@@ -45,6 +45,9 @@ public partial class AddDayWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        // Размер окна — из каталога или из файла настроек: в разметке его нет.
+        WindowSizes.Apply(this);
+
         _viewModel = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 

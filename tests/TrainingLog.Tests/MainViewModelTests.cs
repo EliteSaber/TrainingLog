@@ -43,13 +43,11 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     /// <summary>
-    /// Параметры попадают в главное окно сразу: окно перечитывает файл, а не ждёт перезапуска, и
-    /// показанные дни перечитываются вместе с полем — иначе «Сохранить» применял бы настройку,
-    /// но её результата видно не было бы.
+    /// Настройки записаны окном параметров: поле и список обновились.
     /// </summary>
     /// <remarks>
-    /// Пять дней в журнале, показывается три, сохраняется два: проверяется количество строк, а
-    /// без перечитывания остались бы прежние три.
+    /// Окно параметров немодальное, и ответа у команды «Параметры» больше нет: главное окно
+    /// узнаёт о записи по событию. Проверяется ровно то, что перечитывание случается по файлу.
     /// </remarks>
     [Fact]
     public async Task OpenSettingsCommand_ПараметрыСохранены_ПолеИСписокОбновились()
@@ -60,26 +58,27 @@ public sealed class MainViewModelTests : IDisposable
             await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
         }
 
-        var windowService = new FakeWindowService
-        {
-            SettingsResult = true,
-            OnSettings = () => _settings.Store.Save(new AppSettings { DaysCount = 2 }),
-        };
+        var windowService = new FakeWindowService();
 
         var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         Assert.Equal(3, viewModel.Days.Count);
 
-        await viewModel.OpenSettingsCommand.ExecuteAsync(null);
+        viewModel.OpenSettingsCommand.Execute(null);
 
         Assert.Equal(1, windowService.SettingsCalls);
+
+        _settings.Store.Save(new AppSettings { DaysCount = 2 });
+
+        await windowService.RaiseSettingsSaved();
+
         Assert.Equal(2, viewModel.DaysCount);
         Assert.Equal(2, viewModel.Days.Count);
         Assert.Equal(["День 5", "День 4"], viewModel.Days.Select(day => day.PlanName));
     }
 
-    /// <summary>Отмена не трогает ни поля, ни списка: окно не записало файл.</summary>
+    /// <summary>Пока окно параметров не записало файл, поле и список не меняются.</summary>
     [Fact]
     public async Task OpenSettingsCommand_Отменено_ПолеИСписокНеМеняются()
     {
@@ -89,11 +88,11 @@ public sealed class MainViewModelTests : IDisposable
             await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
         }
 
-        var windowService = new FakeWindowService { SettingsResult = false };
+        var windowService = new FakeWindowService();
         var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
-        await viewModel.OpenSettingsCommand.ExecuteAsync(null);
+        viewModel.OpenSettingsCommand.Execute(null);
 
         Assert.Equal(1, windowService.SettingsCalls);
         Assert.Equal(AppSettings.DefaultDaysCount, viewModel.DaysCount);
@@ -109,18 +108,16 @@ public sealed class MainViewModelTests : IDisposable
     {
         using var database = new TemporaryDatabase();
 
-        var windowService = new FakeWindowService
-        {
-            SettingsResult = true,
-            OnSettings = () => _settings.Store.Save(new AppSettings { DatabaseDirectory = @"D:\базы" }),
-        };
+        var windowService = new FakeWindowService();
 
         var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
 
         var messages = new List<string>();
         viewModel.DatabaseAddressChanged += message => messages.Add(message);
 
-        await viewModel.OpenSettingsCommand.ExecuteAsync(null);
+        _settings.Store.Save(new AppSettings { DatabaseDirectory = @"D:\базы" });
+
+        await windowService.RaiseSettingsSaved();
 
         var message = Assert.Single(messages);
 
@@ -133,18 +130,16 @@ public sealed class MainViewModelTests : IDisposable
     {
         using var database = new TemporaryDatabase();
 
-        var windowService = new FakeWindowService
-        {
-            SettingsResult = true,
-            OnSettings = () => _settings.Store.Save(new AppSettings { DaysCount = 7 }),
-        };
+        var windowService = new FakeWindowService();
 
         var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
 
         var raised = false;
         viewModel.DatabaseAddressChanged += _ => raised = true;
 
-        await viewModel.OpenSettingsCommand.ExecuteAsync(null);
+        _settings.Store.Save(new AppSettings { DaysCount = 7 });
+
+        await windowService.RaiseSettingsSaved();
 
         Assert.False(raised);
     }
@@ -155,18 +150,14 @@ public sealed class MainViewModelTests : IDisposable
     {
         using var database = new TemporaryDatabase();
 
-        var windowService = new FakeWindowService
-        {
-            SettingsResult = false,
-            OnSettings = () => _settings.Store.Save(new AppSettings { DatabaseDirectory = @"D:\базы" }),
-        };
+        var windowService = new FakeWindowService();
 
         var viewModel = new MainViewModel(windowService, database.SessionRepository, _settings.Store);
 
         var raised = false;
         viewModel.DatabaseAddressChanged += _ => raised = true;
 
-        await viewModel.OpenSettingsCommand.ExecuteAsync(null);
+        viewModel.OpenSettingsCommand.Execute(null);
 
         Assert.False(raised);
     }

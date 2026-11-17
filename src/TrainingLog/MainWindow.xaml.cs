@@ -52,6 +52,9 @@ public partial class MainWindow : Window
 
         InitializeComponent();
 
+        // Размер окна — из каталога или из файла настроек: в разметке его нет.
+        WindowSizes.Apply(this);
+
         DataContext = viewModel;
 
         _viewModel = viewModel;

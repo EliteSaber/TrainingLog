@@ -22,6 +22,9 @@ public partial class PlansWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        // Размер окна — из каталога или из файла настроек: в разметке его нет.
+        WindowSizes.Apply(this);
+
         _exerciseRepository = exerciseRepository;
 
         // Строки планов работают через выделение: без него клавиши правки и удаления молчат.
@@ -120,9 +123,18 @@ public partial class PlansWindow : Window
     /// </summary>
     private async void OnDeleteClick(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { CommandParameter: TrainingPlan plan })
+        if (sender is not Button { CommandParameter: TrainingPlan plan })
         {
-            ConfirmDelete(plan);
+            return;
         }
+
+        // Страховка от устаревшей разметки: удалить план, который сейчас правится, нельзя —
+        // иначе «Принять» в окне правки не найдёт записи и молча ничего не сделает.
+        if (DataContext is PlansViewModel viewModel && ReferenceEquals(viewModel.EditedPlan, plan))
+        {
+            return;
+        }
+
+        ConfirmDelete(plan);
     }
 }

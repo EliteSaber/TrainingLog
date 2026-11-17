@@ -49,6 +49,16 @@ public sealed partial class ExercisesViewModel : ObservableObject
     /// <summary>Сколько упражнений в справочнике: нужно для текста сообщения о выгрузке.</summary>
     public int Count => _all.Count;
 
+    /// <summary>
+    /// Упражнение, которое сейчас правится: его кнопка «Удалить» в списке неактивна.
+    /// </summary>
+    /// <remarks>
+    /// Значение приходит от сервиса окон: окно правки единственное, и при повторном открытии
+    /// правится тот объект, который уже открыт, а не последний нажатый в списке.
+    /// </remarks>
+    [ObservableProperty]
+    private Exercise? _editedExercise;
+
     /// <summary>Выгружать нечего, пока справочник пуст.</summary>
     public bool CanExport => _all.Count > 0;
 
@@ -113,29 +123,25 @@ public sealed partial class ExercisesViewModel : ObservableObject
     private void ToggleSort() => IsDescending = !IsDescending;
 
     /// <summary>
-    /// Открывает окно импорта и перечитывает справочник, если упражнения записаны.
+    /// Открывает окно импорта. Оно отдельное и немодальное: справочник остаётся рабочим.
     /// </summary>
     /// <remarks>
     /// Перечитывание обязательно: окно импорта пишет в базу мимо этой модели, и её собственные
     /// объекты после замены справочника устарели — без перечитывания список остался бы прежним,
-    /// и правка выглядела бы несработавшей.
+    /// и импорт выглядел бы несработавшим.
     /// </remarks>
     [RelayCommand]
-    private async Task ImportAsync()
-    {
-        if (!_windowService.ShowImportExercises())
-        {
-            return;
-        }
-
-        await LoadAsync().ConfigureAwait(true);
-    }
+    private void Import() => _windowService.OpenImportExercises(LoadAsync);
 
     /// <summary>
-    /// Открывает модальное окно правки. Объект <paramref name="exercise"/> общий с моделью
-    /// представления окна справочника: репозиторий записывает новое название прямо в него,
-    /// поэтому после успешной правки достаточно перестроить видимый список.
+    /// Открывает окно правки. Оно отдельное и немодальное: справочник остаётся рабочим.
     /// </summary>
+    /// <remarks>
+    /// Объект <paramref name="exercise"/> общий с моделью представления окна справочника:
+    /// репозиторий записывает новое название прямо в него, поэтому после успешной правки
+    /// достаточно перестроить видимый список. Перестроение вызывает окно: правка может и не
+    /// состояться, и перечитывать список без нужды незачем.
+    /// </remarks>
     [RelayCommand]
     private void Edit(Exercise? exercise)
     {
@@ -144,10 +150,26 @@ public sealed partial class ExercisesViewModel : ObservableObject
             return;
         }
 
-        if (_windowService.ShowEditExercise(exercise))
-        {
-            RebuildVisible();
-        }
+        _windowService.OpenEditExercise(exercise, Reload, OnEditClosed);
+
+        // Сервис знает, какое упражнение правится на самом деле: повторное открытие могло
+        // вывести уже открытое окно с другим упражнением.
+        EditedExercise = _windowService.EditedExercise;
+    }
+
+    /// <summary>Окно правки закрылось: блокировку удаления снимаем и без записи.</summary>
+    private void OnEditClosed() => EditedExercise = null;
+
+    /// <summary>Список перестраивается после правки упражнения.</summary>
+    /// <remarks>
+    /// Имя упражнения изменилось — и сортировка могла поменяться, поэтому видимый список
+    /// пересобирается заново. Задача обратного вызова уже исполнена, и возвращать нечего.
+    /// </remarks>
+    private Task Reload()
+    {
+        RebuildVisible();
+
+        return Task.CompletedTask;
     }
 
     [RelayCommand]

@@ -14,11 +14,21 @@ namespace TrainingLog.Windows;
 /// Окно добавления и правки плана. Одно на оба случая: различаются только набор планов
 /// для проверки дубля и команда сохранения.
 /// </summary>
+/// <remarks>
+/// Окно отдельное и немодальное: список планов остаётся рабочим, и вкладку «Окна» в
+/// «Параметрах» можно открыть рядом с правкой. Отсюда отличия от диалога: <c>DialogResult</c>
+/// выставлять нельзя (присваивание кинет <see cref="InvalidOperationException"/>), «Отменить»
+/// закрывает окно обработчиком, а Esc ловит окно — <c>IsCancel</c> работает только в диалоге.
+/// О записи окно сообщает событием <see cref="Saved"/>.
+/// </remarks>
 public partial class EditPlanWindow : Window
 {
     private readonly EditPlanViewModel _viewModel;
     private readonly HotkeyBinder _binder;
     private readonly HotkeyService _hotkeys;
+
+    /// <summary>План записан: списку планов пора перечитать планы.</summary>
+    public event Action? Saved;
 
     /// <summary>Шаги выделения строк: id назначения к сдвигу строк.</summary>
     /// <remarks>
@@ -41,6 +51,9 @@ public partial class EditPlanWindow : Window
 
         InitializeComponent();
         DataContext = viewModel;
+
+        // Размер окна — из каталога или из файла настроек: в разметке его нет.
+        WindowSizes.Apply(this);
 
         _viewModel = viewModel;
         _hotkeys = hotkeys;
@@ -333,16 +346,40 @@ public partial class EditPlanWindow : Window
     }
 
     /// <summary>
-    /// Кнопка подтверждения привязана к команде, поэтому WPF сама снимает активность кнопки,
-    /// когда правки нет. А вот результат сохранения известен только здесь: по одному значению
-    /// <see cref="EditPlanViewModel.Accepted"/> вызывающий <c>ShowDialog</c> поймёт, что план
-    /// сохранён. Поэтому <see cref="DialogResult"/> выставляется по уведомлению.
+    /// План записан: сообщаем списку планов и закрываем окно.
     /// </summary>
+    /// <remarks>
+    /// Окно немодальное, и <c>DialogResult</c> выставлять нельзя: присваивание кинет
+    /// <see cref="InvalidOperationException"/>. Закрытие делает само окно, а вызывающий узнаёт
+    /// о записи по событию <see cref="Saved"/>.
+    /// </remarks>
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(EditPlanViewModel.Accepted) && _viewModel.Accepted)
         {
-            DialogResult = true;
+            Saved?.Invoke();
+
+            Close();
+        }
+    }
+
+    /// <summary>Нажата кнопка «Отменить»: окно закрывается без записи.</summary>
+    private void OnCancelClick(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>Esc закрывает окно, как в диалоге закрывала кнопка <c>IsCancel</c>.</summary>
+    /// <remarks>
+    /// В немодальном окне WPF связку «Esc → Отменить» больше никто не держит: <c>IsCancel</c>
+    /// работает только в диалоге. Здесь обработка на окне, а не KeyBinding'ом, — команды
+    /// «закрыть у окна» в модели нет, и заводить её ради клавиши незачем.
+    /// </remarks>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        if (e.Key == Key.Escape)
+        {
+            Close();
+            e.Handled = true;
         }
     }
 

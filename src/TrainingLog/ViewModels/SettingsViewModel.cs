@@ -76,6 +76,16 @@ public sealed partial class SettingsViewModel : ObservableObject
         SelectedChip = HotkeyChips[0];
 
         RecalculateHotkeyStatus();
+
+        // Размеры окон: по строке на каждое окно приложения. Значение — из файла, а если его
+        // там нет, то нынешний размер окна из каталога.
+        WindowSizeRows = BuildWindowSizeRows(settings.WindowSizes);
+
+        // Срез размеров на момент открытия окна: выход без сохранения возвращает окна к нему,
+        // как шрифт и тему возвращает к своему срезу.
+        SavedWindowSizes = WindowSizesFromRows();
+
+        RecalculateSizeStatus();
     }
 
     /// <summary>Сколько дней показывать.</summary>
@@ -312,7 +322,49 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Есть ли конфликт назначений: он гасит «Сохранить».</summary>
     public bool HasHotkeyConflict => !string.IsNullOrEmpty(HotkeyConflict);
 
-    /// <summary>Настройки записаны. Окно выставляет <c>DialogResult</c> по нему.</summary>
+    /// <summary>
+    /// Строки размеров окон: по одной на каждое окно приложения.
+    /// </summary>
+    /// <remarks>
+    /// Порядок строк — порядок каталога, а не порядок файла: файл читают руками, и записи в
+    /// нём может не быть вовсе, а список размеров должен быть всегда один и тот же.
+    /// </remarks>
+    public IReadOnlyList<WindowSizeRowViewModel> WindowSizeRows { get; }
+
+    /// <summary>
+    /// Объяснение негодного размера, а при пустом значении — размеры годные.
+    /// </summary>
+    /// <remarks>
+    /// Живёт до исправления, а не пять секунд в подсказке: «Сохранить» с негодным размером
+    /// не пишет, и причину обязано быть видно, пока не исправят.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSizeError))]
+    private string _sizeError = string.Empty;
+
+    /// <summary>Показывать ли объяснение негодного размера.</summary>
+    public bool HasSizeError => !string.IsNullOrEmpty(SizeError);
+
+    /// <summary>
+    /// Размеры, записанные в файл, а до записи — срез файла на момент открытия окна.
+    /// </summary>
+    /// <remarks>
+    /// Отдаются окну: по ним окно применяет размеры к открытым окнам и откатывает предпросмотр
+    /// при выходе без сохранения. Читающим свойством, а не полем-значением окна: что было
+    /// сохранено, знает модель, окно знает лишь, когда откатывать.
+    /// </remarks>
+    public IReadOnlyDictionary<string, WindowSize> SavedWindowSizes { get; private set; }
+
+    /// <summary>
+    /// Размер окна изменился: пора применить их к открытым окнам.
+    /// </summary>
+    /// <remarks>
+    /// Событие, а не свойство со значением: применять размеры — работа интерфейса, и окно
+    /// делает её само, как шрифт и тему.
+    /// </remarks>
+    public event Action? WindowSizesChanged;
+
+    /// <summary>Настройки записаны. Окно закрывается по нему.</summary>
     public bool Accepted { get; private set; }
 
     /// <summary>Объяснение отказа записи, а при пустом значении — ничего.</summary>
@@ -331,10 +383,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         DaysCountRules.IsValid(DaysCount)
         && !string.IsNullOrWhiteSpace(DatabaseDirectory)
         && !string.IsNullOrWhiteSpace(DatabaseName)
-        && !HasHotkeyConflict;
+        && !HasHotkeyConflict
+        && !HasSizeError;
 
     /// <summary>
-    /// Записывает количество дней, адрес базы и горячие клавиши в файл настроек.
+    /// Записывает количество дней, адрес базы, горячие клавиши и размеры окон в файл настроек.
     /// </summary>
     /// <remarks>
     /// Проверка значений повторяется в теле команды, а не только в предикате: предикат гасит
@@ -346,11 +399,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     private void Save()
     {
         RecalculateHotkeyStatus();
+        RecalculateSizeStatus();
 
         if (!CanSave())
         {
             return;
         }
+
+        var sizes = WindowSizesFromRows();
 
         if (!_store.Save(new AppSettings
             {
@@ -362,6 +418,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 FontSizePercent = SelectedScale,
                 Theme = SelectedTheme.Value,
                 Hotkeys = AssignedHotkeys(),
+                WindowSizes = sizes,
             }))
         {
             Status = "Не удалось записать файл настроек. Программа стоит в папке без права записи?";
@@ -370,10 +427,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
 
         Status = string.Empty;
+        SavedWindowSizes = sizes;
         Accepted = true;
 
         // Приватный сеттер не даёт сгенерировать уведомление автоматически, а окно ждёт его,
-        // чтобы выставить DialogResult.
+        // чтобы закрыться.
         OnPropertyChanged(nameof(Accepted));
     }
 
@@ -413,6 +471,52 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             RebuildHotkeyListing();
         }
+    }
+
+    /// <summary>
+    /// Строка размеров изменилась: пересчитать объяснение и состояние «Сохранить».
+    /// </summary>
+    /// <remarks>
+    /// Правка приходит методами строки, а не через поля модели, поэтому уведомление
+    /// команды здесь — так же, как у строк горячих клавиш.
+    /// </remarks>
+    internal void OnWindowSizeChanged()
+    {
+        RecalculateSizeStatus();
+
+        SaveCommand.NotifyCanExecuteChanged();
+
+        // Предпросмотр: открытые окна подстраиваются сразу, как шрифт и тема. Файл при этом
+        // не меняется — он пишется по «Сохранить».
+        WindowSizesChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Размеры для предпросмотра: у строки с годным значением — её значение, у негодной —
+    /// прежнее.
+    /// </summary>
+    /// <remarks>
+    /// Негодное значение не применяется: печатая «1000», окно дёргается один раз в конце, а не
+    /// на каждой цифре. Прежнее значение берётся из среза файла — того, что действовало до
+    /// правки.
+    /// </remarks>
+    public IReadOnlyDictionary<string, WindowSize> PreviewWindowSizes()
+    {
+        Dictionary<string, WindowSize> sizes = [];
+
+        foreach (var row in WindowSizeRows)
+        {
+            var edited = new WindowSize { Width = row.Width, Height = row.HasHeight ? row.Height : null };
+
+            if (!SavedWindowSizes.TryGetValue(row.Id, out var saved))
+            {
+                saved = edited;
+            }
+
+            sizes[row.Id] = row.Problem is null ? edited : saved;
+        }
+
+        return sizes;
     }
 
     /// <summary>Переход к окну: перечень показывает только его назначения.</summary>
@@ -523,6 +627,51 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         HotkeyConflict = string.Empty;
     }
+
+    /// <summary>
+    /// Ищет первую строку размеров с негодным значением и ставит сообщение о ней.
+    /// </summary>
+    /// <remarks>
+    /// Первая, а не все: сообщение одно, и перечисление всех негодных строк забило бы
+    /// подпись. Размеры проверяются и при вводе вручную, и после перетаскивания — правило
+    /// одно, иначе способы правки расходились бы в том, что считается годным.
+    /// </remarks>
+    private void RecalculateSizeStatus()
+    {
+        foreach (var row in WindowSizeRows)
+        {
+            if (row.Problem is { } problem)
+            {
+                SizeError = problem;
+
+                return;
+            }
+        }
+
+        SizeError = string.Empty;
+    }
+
+    /// <summary>Строки размеров окон: по одной на каждое окно каталога.</summary>
+    /// <remarks>
+    /// Размер берётся из файла, а если его там нет — из каталога: файл настроек может быть
+    /// дописан руками, и отсутствующая запись означает «нынешний размер окна», а не
+    /// «размер неизвестен».
+    /// </remarks>
+    /// <param name="saved">Размеры из файла настроек.</param>
+    private List<WindowSizeRowViewModel> BuildWindowSizeRows(IReadOnlyDictionary<string, WindowSize> saved) =>
+        [.. WindowSizeCatalog.Entries.Select(entry =>
+            new WindowSizeRowViewModel(this, entry, WindowSizeCatalog.Resolve(entry, saved)))];
+
+    /// <summary>Размеры строк вкладки: словарь для секции файла.</summary>
+    /// <remarks>
+    /// В файл пишутся все окна, а не только изменённые: секция читается целиком, и пустая
+    /// она быть не может — иначе «нет записи» и «размер такой-то» совпали бы в одном
+    /// состоянии, и второе не отличить от первого.
+    /// </remarks>
+    private Dictionary<string, WindowSize> WindowSizesFromRows() =>
+        WindowSizeRows.ToDictionary(
+            row => row.Id,
+            row => new WindowSize { Width = row.Width, Height = row.HasHeight ? row.Height : null });
 
     /// <summary>Все установленные семейства; без каталога (тесты) — только гарнитура по умолчанию.</summary>
     private static List<FontCatalog.FontFamilyOption> BuildFontOptions(FontCatalog? fonts) =>
