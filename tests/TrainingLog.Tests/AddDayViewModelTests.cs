@@ -1000,6 +1000,30 @@ public async Task СменаДатыНаДатуСЗаписью_Подтяги�
         }
     }
 
+    /// <summary>
+    /// Подпись дня недели в поле даты меняется вместе с датой и не хранит своего значения.
+    /// </summary>
+    [Fact]
+    public async Task Дата_ПодписьДняНедели()
+    {
+        using var database = new TemporaryDatabase();
+        var viewModel = await CreateInitializedAsync(database);
+
+        var notifications = TrackNotifications(viewModel);
+        var monday = new DateOnly(2026, 11, 9);
+        await LoadDayAsync(viewModel, monday);
+        Assert.Equal($"[{Dates.Weekday(monday)}]", viewModel.DateWeekdayText);
+        Assert.Contains(nameof(AddDayViewModel.DateWeekdayText), notifications);
+
+        var thursday = new DateOnly(2026, 10, 8);
+        await LoadDayAsync(viewModel, thursday);
+        Assert.Equal($"[{Dates.Weekday(thursday)}]", viewModel.DateWeekdayText);
+        Assert.NotEqual($"[{Dates.Weekday(monday)}]", viewModel.DateWeekdayText);
+
+        viewModel.Date = null;
+        Assert.Equal(string.Empty, viewModel.DateWeekdayText);
+    }
+
     private static List<string?> TrackNotifications(AddDayViewModel viewModel)
     {
         var notifications = new List<string?>();

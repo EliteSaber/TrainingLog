@@ -73,6 +73,7 @@
             <DatePicker Grid.Column="1"
                         Margin="8,0,0,0"
                         VerticalAlignment="Center"
+                        helpers:DatePickerSuffix.Text="{Binding DateWeekdayText}"
                         SelectedDate="{Binding Date}" />
 
             <TextBlock Grid.Column="2"
@@ -80,7 +81,9 @@
                        VerticalAlignment="Center"
                        Text="План" />
 
+            <!-- 24 — высота кнопки календаря в шаблоне DatePicker: она задаёт высоту поля даты. -->
             <ComboBox Grid.Column="3"
+                      MinHeight="24"
                       VerticalAlignment="Center"
                       DisplayMemberPath="Name"
                       ItemsSource="{Binding Plans}"

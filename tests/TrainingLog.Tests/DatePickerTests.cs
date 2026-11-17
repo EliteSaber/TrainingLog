@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using TrainingLog.Controls;
 using TrainingLog.Services;
 
 namespace TrainingLog.Tests;
@@ -62,6 +63,76 @@ public sealed class DatePickerTests
             // Текст даты — наш TextPrimary, а не системный чёрный: в тёмной теме чёрным по
             // тёмному полю читаться не будет.
             Assert.Equal(foreground.Color, ((SolidColorBrush)text.Foreground).Color);
+        });
+    }
+
+    /// <summary>
+    /// Подпись дня недели внутри поля: текст приходит из attached-свойства и не ловит мышь.
+    /// </summary>
+    [Fact]
+    public void Шаблон_ПодписьДняНедели_ПоказываетсяИНеРедактируется()
+    {
+        StaRunner.Run(() =>
+        {
+            var picker = CreatePicker(new DateTime(2026, 11, 12));
+            DatePickerSuffix.SetText(picker, "[чт]");
+
+            picker.ApplyTemplate();
+            var suffix = picker.Template.FindName("WeekdaySuffix", picker) as TextBlock;
+
+            Assert.NotNull(suffix);
+            Assert.Equal("[чт]", suffix.Text);
+            Assert.False(suffix.IsHitTestVisible);
+        });
+    }
+
+    /// <summary>
+    /// Подпись красится как дата в обеих темах: унаследованный от DatePicker календарный цвет
+    /// в тёмной теме слился бы с фоном поля.
+    /// </summary>
+    [Theory]
+    [InlineData("Themes/Palette.Light.xaml")]
+    [InlineData("Themes/Palette.Dark.xaml")]
+    public void Подпись_ЦветКакУДаты_ВОбеихТемах(string palette)
+    {
+        StaRunner.Run(() =>
+        {
+            var picker = CreatePicker(new DateTime(2026, 11, 12));
+            picker.Resources.MergedDictionaries.Add(Load(palette));
+            DatePickerSuffix.SetText(picker, "[чт]");
+
+            picker.ApplyTemplate();
+            var suffix = picker.Template.FindName("WeekdaySuffix", picker) as TextBlock;
+            Assert.NotNull(suffix);
+
+            var expected = (SolidColorBrush)picker.Resources["TextPrimary"];
+            Assert.Equal(expected.Color, ((SolidColorBrush)suffix.Foreground).Color);
+        });
+    }
+
+    /// <summary>
+    /// Подпись рисуется поверх поля, не отнимая у него ширину: тексту остаётся вся колонка
+    /// между краем DatePicker и кнопкой календаря.
+    /// </summary>
+    [Fact]
+    public void Шаблон_ПодписьНеСужаетПоле()
+    {
+        StaRunner.Run(() =>
+        {
+            var picker = CreatePicker(new DateTime(2026, 11, 12));
+            DatePickerSuffix.SetText(picker, "[чт]");
+
+            var size = new Size(220, 40);
+            picker.Measure(size);
+            picker.Arrange(new Rect(size));
+            picker.UpdateLayout();
+
+            var text = picker.Template.FindName("PART_TextBox", picker) as TextBox;
+            var button = picker.Template.FindName("PART_Button", picker) as Button;
+            Assert.NotNull(text);
+            Assert.NotNull(button);
+
+            Assert.Equal(size.Width - button.ActualWidth - 4, text.ActualWidth, 1);
         });
     }
 

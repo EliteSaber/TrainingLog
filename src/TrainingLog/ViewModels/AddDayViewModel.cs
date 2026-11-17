@@ -145,7 +145,19 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// по умолчанию живёт в конструкторе, а не в инициализаторе поля.
     /// </remarks>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DateWeekdayText))]
     private DateTime? _date;
+
+    /// <summary>
+    /// Сокращение дня недели даты в квадратных скобках: «[пн]». Только для показа в поле даты.
+    /// </summary>
+    /// <remarks>
+    /// Источник — <see cref="Dates.Weekday"/>, тот же, что у строки журнала и даты источника:
+    /// подпись не редактируется и меняется только вместе с датой. При пустой дате подписи нет —
+    /// пустые скобки в поле выглядели бы как пропущенный день.
+    /// </remarks>
+    public string DateWeekdayText =>
+        Date is { } date ? $"[{Dates.Weekday(DateOnly.FromDateTime(date))}]" : string.Empty;
 
     /// <summary>Выбранный план.</summary>
     [ObservableProperty]

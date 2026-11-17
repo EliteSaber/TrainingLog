@@ -143,7 +143,8 @@
 
       Части шаблона — те, что ждёт сам DatePicker (PART_Root, PART_TextBox, PART_Button,
       PART_Popup): переименуешь — и он перестанет находить поле и кнопку. В частности, кнопка
-      должна быть Button, а не ToggleButton: DatePicker подписывается на её Click.
+      должна быть Button, а не ToggleButton: DatePicker подписывается на её Click. Справа от
+      текста внутри поля лежит подпись DatePickerSuffix.Text — только для показа, не для ввода.
 
       Foreground задан отдельным токеном: DatePicker привязывает к нему Foreground календаря,
       а подложка календаря всегда светлая — в тёмной теме обычный TextPrimary дал бы светлый
@@ -170,10 +171,29 @@
                           {x:Type TextBox} — ссылка на неявный стиль по его ключу-типу; он объявлен
                           в этом же словаре, поэтому и виден.
                         -->
+                        <!--
+                          Подпись дня недели рисуется поверх текстовой части поля, перед кнопкой
+                          календаря, в той же ячейке корневой сетки — вложенный контейнер менял
+                          желаемый размер DatePicker. Поле сохраняет родные отступы 5,2, справа
+                          добавлен резерв 48, иначе длинная дата зашла бы под подпись. Цвет подписи
+                          задан явно: DatePicker.Foreground — это TextOnLightSurface для календаря,
+                          и в тёмной теме он слился бы с фоном поля, поэтому подпись красится в
+                          TextPrimary, как и сама дата.
+                        -->
                         <primitives:DatePickerTextBox x:Name="PART_TextBox"
                                                        Grid.Column="0"
                                                        VerticalAlignment="Center"
+                                                       Padding="5,2,48,2"
                                                        Style="{StaticResource {x:Type TextBox}}" />
+
+                        <TextBlock x:Name="WeekdaySuffix"
+                                   Grid.Column="0"
+                                   Margin="0,0,4,0"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   IsHitTestVisible="False"
+                                   Text="{Binding Path=(helpers:DatePickerSuffix.Text), RelativeSource={RelativeSource TemplatedParent}}" />
 
                         <Button x:Name="PART_Button"
                                 Grid.Column="1"
