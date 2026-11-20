@@ -13,8 +13,16 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
     public async Task<IReadOnlyList<TrainingSession>> GetAsync(
         DateOnly? fromInclusive = null,
         DateOnly? toInclusive = null,
+        int? count = null,
         CancellationToken cancellationToken = default)
     {
+        // Отрицательный лимит в SQLite значил бы «без лимита», а ноль — пустую выборку.
+        // Решение принимается здесь, до базы: значение приходит из поля окна.
+        if (count is <= 0)
+        {
+            return [];
+        }
+
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
         // Порядок выполнения и порядок подходов задаются при записи, а при выборке только
@@ -31,34 +39,26 @@ public sealed class TrainingSessionRepository(IDbContextFactory<TrainingLogDbCon
             query = query.Where(session => session.Date <= to);
         }
 
-        return await query
-            .OrderByDescending(session => session.Date)
-            .AsSplitQuery()
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
+        // Take строго после сортировки: лимит означает «последние N внутри периода», а не
+        // «первые N, попавшие в фильтр». Раздельный запрос убирает дублирование колонок
+        // упражнений по подходам; дата уникальна, поэтому порядок однозначен и для Take.
+        IQueryable<TrainingSession> ordered = query.OrderByDescending(session => session.Date);
 
-    public async Task<IReadOnlyList<TrainingSession>> GetLatestAsync(
-        int count,
-        CancellationToken cancellationToken = default)
-    {
-        if (count <= 0)
+        if (count is { } limit)
         {
-            return [];
+            ordered = ordered.Take(limit);
         }
 
-        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-
-        // Take до Include: база отдаёт только показанные дни, а не весь журнал. Раздельный запрос
-        // убирает дублирование колонок упражнений по подходам; дата уникальна, поэтому порядок
-        // однозначен и для Skip/Take.
-        return await Readable(context.TrainingSessions.AsNoTracking())
-            .OrderByDescending(session => session.Date)
-            .Take(count)
+        return await ordered
             .AsSplitQuery()
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
+
+    public Task<IReadOnlyList<TrainingSession>> GetLatestAsync(
+        int count,
+        CancellationToken cancellationToken = default) =>
+        GetAsync(count: count, cancellationToken: cancellationToken);
 
     public async Task<TrainingSession?> GetByDateAsync(
         DateOnly targetDate,

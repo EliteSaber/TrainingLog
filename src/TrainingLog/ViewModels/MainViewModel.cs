@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TrainingLog.Core.Models;
@@ -8,7 +9,7 @@ using TrainingLog.Services;
 
 namespace TrainingLog.ViewModels;
 
-/// <summary>Главное окно: сколько дней показывать, сами дни и добавление нового дня.</summary>
+/// <summary>Главное окно: какие дни показывать, сами дни и добавление нового дня.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly ITrainingSessionRepository _sessionRepository;
@@ -24,6 +25,22 @@ public sealed partial class MainViewModel : ObservableObject
     /// смене, а не при каждом открытии.
     /// </remarks>
     private string _databasePath = string.Empty;
+
+    /// <summary>Сколько чтений журнала сейчас в пути. Счётчик, а не флаг: источников несколько.</summary>
+    /// <remarks>
+    /// Перечитывание запускают «Применить», старт окна, сохранение настроек и запись дня из
+    /// открытого окна. Флаг сбрасывался бы первым же ответом, пока второй ещё в пути.
+    /// </remarks>
+    private int _loadingCount;
+
+    /// <summary>Номер последнего запрошенного чтения журнала.</summary>
+    /// <remarks>
+    /// Пока чтение шло на UI-потоке, два перечитывания не могли пересечься. Теперь запросы идут
+    /// в фоне, и ответ более раннего мог бы прийти позже — тогда журнал показал бы данные до
+    /// сохранения дня. Поэтому устаревший ответ отбрасывается: список обновляет только последний
+    /// запрос, а более ранние не трогают ни строки, ни сводку.
+    /// </remarks>
+    private int _refreshVersion;
 
     /// <param name="windowService">Список окон приложения.</param>
     /// <param name="sessionRepository">Журнал тренировок.</param>
@@ -53,6 +70,8 @@ public sealed partial class MainViewModel : ObservableObject
         var settings = settingsStore.Load();
 
         DaysCount = settings.DaysCount;
+        _appliedDaysCount = settings.DaysCount;
+        IsFiltersExpanded = !settings.CollapseFiltersOnStartup;
         _databasePath = settings.DatabasePath;
     }
 
@@ -132,6 +151,113 @@ public sealed partial class MainViewModel : ObservableObject
     /// </remarks>
     public HintState Hint { get; } = new();
 
+    /// <summary>Нижняя граница показа; <c>null</c> — без ограничения снизу.</summary>
+    /// <remarks>
+    /// <see cref="DateTime"/> ради DatePicker: в запрос уходит DateOnly. Фильтры — состояние
+    /// показа, а не настройка, и в файл параметров не пишутся.
+    /// </remarks>
+    [ObservableProperty]
+    private DateTime? _dateFrom;
+
+    /// <summary>Верхняя граница показа; <c>null</c> — без ограничения сверху.</summary>
+    [ObservableProperty]
+    private DateTime? _dateTo;
+
+    /// <summary>
+    /// Показывать все записи в выбранном периоде, не ограничивая их числом.
+    /// </summary>
+    /// <remarks>
+    /// Галочка снимает только ограничение по количеству, но не сам период: «все» рядом с
+    /// выбранными датами значит «все в этом периоде», иначе выбор дат терял бы смысл.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCountEnabled))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyCommand))]
+    private bool _showAll;
+
+    /// <summary>Поле количества дней активно, пока не показаны все записи.</summary>
+    public bool IsCountEnabled => !ShowAll;
+
+    /// <summary>Блок фильтров развёрнут; свёрнутый показывает только сводку и шеврон.</summary>
+    /// <remarks>
+    /// Начальное значение задаёт настройка <see cref="AppSettings.CollapseFiltersOnStartup"/>:
+    /// по умолчанию журнал открывается свёрнутым. Дальше состояние живёт только в окне.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FiltersToggleText))]
+    private bool _isFiltersExpanded;
+
+    /// <summary>Подсказка кнопки-шеврона: действие, которое она выполнит.</summary>
+    public string FiltersToggleText => IsFiltersExpanded ? "Свернуть даты" : "Развернуть даты";
+
+    /// <summary>
+    /// Применённый фильтр: то, что реально ушло в журнал и пересобрало список.
+    /// </summary>
+    /// <remarks>
+    /// Копия нужна, потому что поля правятся отдельно от «Применить». Сводка читает только эти
+    /// значения: иначе после ввода новой даты она показывала бы её, а журнал оставался прежним.
+    /// Обновляется в конце успешного <see cref="RefreshAsync"/>, одновременно со списком.
+    /// </remarks>
+    private DateOnly? _appliedFrom;
+
+    private DateOnly? _appliedTo;
+
+    private bool _appliedShowAll;
+
+    private int _appliedDaysCount;
+
+    /// <summary>
+    /// Строка свёрнутого фильтра: применённые даты, число дней в скобках или знак бесконечности.
+    /// </summary>
+    /// <remarks>
+    /// Обе даты пишутся без подписей «С» и «До» — диапазон и так читается как «от и до»;
+    /// подпись нужна только у одной границы, иначе непонятно, что именно задано.
+    ///
+    /// Без дат число выходит из скобок: «Последние 4» — это фраза, а не дата с пометкой.
+    /// При «Показать все» без дат видно «Все записи»: «Последние ∞» читалось бы странно.
+    /// Негодное число сюда не доходит: оно не применяется, а сводка показывает только применённое.
+    /// </remarks>
+    public string FilterSummary
+    {
+        get
+        {
+            var count = _appliedShowAll
+                ? "[∞]"
+                : $"[{_appliedDaysCount.ToString(CultureInfo.InvariantCulture)}]";
+
+            return (_appliedFrom, _appliedTo) switch
+            {
+                ({ } from, { } to) => $"{ShortDate(from)} — {ShortDate(to)} {count}",
+                ({ } from, null) => $"С {ShortDate(from)} {count}",
+                (null, { } to) => $"До {ShortDate(to)} {count}",
+                _ when _appliedShowAll => "Все записи",
+                _ => $"Последние {_appliedDaysCount.ToString(CultureInfo.InvariantCulture)}"
+            };
+        }
+    }
+
+    /// <summary>
+    /// Дата сводки тем же коротким видом, что и поле: <c>29.10.2026</c>. Формат задан явно,
+    /// чтобы сводка не зависела от культуры машины, — как и остальные даты приложения.
+    /// </summary>
+    private static string ShortDate(DateOnly date) =>
+        date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Текст на месте пустого журнала: с активным фильтром пустота означает «ничего не нашлось»,
+    /// а не «записей нет вовсе».
+    /// </summary>
+    [ObservableProperty]
+    private string _emptyText = "Записей пока нет";
+
+    /// <summary>Снимает нижнюю границу без перечитывания: фильтр применяется кнопкой.</summary>
+    [RelayCommand]
+    private void ClearDateFrom() => DateFrom = null;
+
+    /// <summary>Снимает верхнюю границу без перечитывания: фильтр применяется кнопкой.</summary>
+    [RelayCommand]
+    private void ClearDateTo() => DateTo = null;
+
     /// <summary>Место базы изменилось: окно показывает примечание рядом с кнопкой параметров.</summary>
     /// <remarks>
     /// Показ зовёт окно, а не модель: подсказке нужен якорь, и его знает только окно — так же, как
@@ -144,6 +270,15 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<DayRowViewModel> Days { get; } = [];
 
     public bool IsEmpty => Days.Count == 0;
+
+    /// <summary>
+    /// Идёт чтение журнала. Пока истинно, «Применить» показывает кольцо вместо надписи.
+    /// </summary>
+    /// <remarks>
+    /// Считается по <see cref="_loadingCount"/>: читать журнал могут одновременно разные
+    /// источники, и индикатор должен держаться до последнего ответа.
+    /// </remarks>
+    public bool IsBusy => _loadingCount > 0;
 
     /// <summary>Показывает последние записи, не более <paramref name="count"/>.</summary>
     /// <remarks>
@@ -161,10 +296,34 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private Task LoadAsync() => RefreshAsync();
 
-    private bool CanApply() => DaysCountRules.IsValid(DaysCount);
+    private bool CanApply() => !IsBusy && (ShowAll || DaysCountRules.IsValid(DaysCount));
 
+    /// <summary>
+    /// Применяет фильтр и сворачивает блок: сводка сразу показывает принятое.
+    /// </summary>
+    /// <remarks>
+    /// Сворачивание идёт после перечитывания, а не по нажатию: до ответа базы сводка показывала
+    /// бы новый фильтр рядом со старым списком. При отказе чтения исключение уходит наверх, и
+    /// блок остаётся развёрнутым — фильтр не применился.
+    /// </remarks>
     [RelayCommand(CanExecute = nameof(CanApply))]
-    private Task ApplyAsync() => RefreshAsync();
+    private async Task ApplyAsync()
+    {
+        await RefreshAsync().ConfigureAwait(true);
+
+        IsFiltersExpanded = false;
+    }
+
+    /// <summary>
+    /// Сворачивает или разворачивает блок фильтров.
+    /// </summary>
+    /// <remarks>
+    /// Ничего не применяет и не перечитывает: свёрнутая строка показывает последний применённый
+    /// фильтр, а не введённый. Иначе сворачивание ждало бы чтения из базы, а сводка временно
+    /// показывала бы ещё не применённые значения.
+    /// </remarks>
+    [RelayCommand]
+    private void ToggleFilters() => IsFiltersExpanded = !IsFiltersExpanded;
 
     /// <summary>Открывает окно добавления дня: немодальное, при открытом — выводит существующее вперёд.</summary>
     /// <remarks>
@@ -201,9 +360,15 @@ public sealed partial class MainViewModel : ObservableObject
     /// Перечитывает журнал и пересобирает строки дней.
     /// </summary>
     /// <remarks>
-    /// Читаются только показанные дни, а не вся история: отбор «последние N» идёт в базе, иначе
-    /// каждое применение тянуло бы упражнения и подходы за все годы. <see cref="TakeLatest"/>
-    /// остаётся на месте как правило показа, не зависящее от того, что сегодня вернула база.
+    /// Читаются только показанные дни, а не вся история: отбор по датам и «последние N» идут в
+    /// базе, иначе каждое применение тянуло бы упражнения и подходы за все годы. Лимит считается
+    /// уже внутри периода: при открытой нижней границе «последние N» — это самые свежие дни
+    /// периода, а не самые старые. <see cref="TakeLatest"/> остаётся на месте как правило показа,
+    /// не зависящее от того, что сегодня вернула база; при «Показать все» его нет вовсе.
+    ///
+    /// Обратный период меняется местами здесь, а не молча уходит в запрос: с перепутанными
+    /// границами база вернула бы пустоту, а поля после применения показывают исправленный
+    /// диапазон — то, что человек и имел в виду.
     ///
     /// Коллекция пересобирается целиком, а не приводится к порядку через <c>Move</c>: там у строк
     /// есть состояние контейнера — раскрытый план, — а здесь строка дня состоит из текста и
@@ -211,15 +376,92 @@ public sealed partial class MainViewModel : ObservableObject
     /// </remarks>
     private async Task RefreshAsync()
     {
-        var sessions = await _sessionRepository.GetLatestAsync(DaysCount).ConfigureAwait(true);
+        var (from, to) = NormalizeRange();
+        int? count = ShowAll ? null : DaysCount;
 
-        Days.Clear();
+        var version = Interlocked.Increment(ref _refreshVersion);
 
-        foreach (var session in TakeLatest(sessions, DaysCount))
+        BeginLoading();
+
+        try
         {
-            Days.Add(DayRowViewModel.Create(session));
+            // SQLite под EF Core отвечает синхронно: вызов на UI-потоке замораживал бы окно
+            // вместе с кольцом загрузки. Фабрика контекста потокобезопасна, репозиторий без
+            // состояния, поэтому чтение уходит в фон, а продолжение возвращается в окно.
+            var sessions = await Task.Run(() => _sessionRepository.GetAsync(from, to, count))
+                .ConfigureAwait(true);
+
+            // Пока читали, журнал мог быть запрошен снова: этот ответ устарел, и обновлять по
+            // нему список нельзя — более поздний запрос уже вернул свежие данные.
+            if (version != Volatile.Read(ref _refreshVersion))
+            {
+                return;
+            }
+
+            var shown = ShowAll ? sessions : TakeLatest(sessions, DaysCount);
+
+            Days.Clear();
+
+            foreach (var session in shown)
+            {
+                Days.Add(DayRowViewModel.Create(session));
+            }
+
+            EmptyText = from is not null || to is not null
+                ? "За выбранный период записей нет"
+                : "Записей пока нет";
+
+            // Снимок применённого фильтра — вместе со списком: сводка свёрнутой шапки не должна
+            // показывать значения, которые ещё не дошли до журнала.
+            _appliedFrom = from;
+            _appliedTo = to;
+            _appliedShowAll = ShowAll;
+            _appliedDaysCount = DaysCount;
+            OnPropertyChanged(nameof(FilterSummary));
+
+            OnPropertyChanged(nameof(IsEmpty));
+        }
+        finally
+        {
+            EndLoading();
+        }
+    }
+
+    /// <summary>Отмечает начало чтения: первый источник поднимает <see cref="IsBusy"/>.</summary>
+    private void BeginLoading()
+    {
+        _loadingCount++;
+
+        if (_loadingCount == 1)
+        {
+            OnPropertyChanged(nameof(IsBusy));
+            ApplyCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    /// <summary>Отмечает конец чтения: индикатор снимается только с последним ответом.</summary>
+    private void EndLoading()
+    {
+        _loadingCount--;
+
+        if (_loadingCount == 0)
+        {
+            OnPropertyChanged(nameof(IsBusy));
+            ApplyCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    /// <summary>Границы показа в том виде, в каком они уйдут в запрос; обратный период меняется местами.</summary>
+    private (DateOnly? From, DateOnly? To) NormalizeRange()
+    {
+        if (DateFrom is { } from && DateTo is { } to && from > to)
+        {
+            (DateFrom, DateTo) = (to, from);
         }
 
-        OnPropertyChanged(nameof(IsEmpty));
+        return (ToDateOnly(DateFrom), ToDateOnly(DateTo));
     }
+
+    private static DateOnly? ToDateOnly(DateTime? value) =>
+        value is { } date ? DateOnly.FromDateTime(date) : null;
 }

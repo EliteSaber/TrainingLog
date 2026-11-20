@@ -47,6 +47,37 @@ public sealed class AppSettingsStoreTests
         Assert.Equal(SqliteDatabasePath.FileName, reread.DatabaseName);
     }
 
+    /// <summary>Фильтр при запуске по умолчанию свёрнут — и в памяти, и в только что созданном файле.</summary>
+    [Fact]
+    public void Load_ФайлаНет_ФильтрПриЗапускеСвёрнут()
+    {
+        using var settings = new TemporarySettings();
+
+        Assert.True(settings.Store.Load().CollapseFiltersOnStartup);
+        Assert.True(new AppSettingsStore(settings.FilePath).Load().CollapseFiltersOnStartup);
+    }
+
+    /// <summary>Ключа в старом файле нет — это «как по умолчанию», то есть свёрнутый фильтр.</summary>
+    [Fact]
+    public void Load_КлючаФильтраНет_Свёрнут()
+    {
+        using var settings = new TemporarySettings();
+        settings.Write("""{"DaysCount": 5}""");
+
+        Assert.True(settings.Store.Load().CollapseFiltersOnStartup);
+    }
+
+    /// <summary>Развёрнутый вид — записанный <c>false</c>: настройка читается обратно без потерь.</summary>
+    [Fact]
+    public void Save_ФильтрПриЗапуске_ЧитаетсяОбратно()
+    {
+        using var settings = new TemporarySettings();
+
+        Assert.True(settings.Store.Save(new AppSettings { CollapseFiltersOnStartup = false }));
+
+        Assert.False(settings.Store.Load().CollapseFiltersOnStartup);
+    }
+
     [Fact]
     public void Save_ПотомЧитаетсяТоЖеЗначение()
     {

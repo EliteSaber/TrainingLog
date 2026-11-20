@@ -36,6 +36,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         // расширением, а поле показывает его без хвостового .db.
         var settings = store.Load();
         DaysCount = settings.DaysCount;
+        CollapseFiltersOnStartup = settings.CollapseFiltersOnStartup;
         DatabaseDirectory = settings.DatabaseDirectory;
         DatabaseName = DatabaseNameRules.ForDisplay(settings.DatabaseName);
 
@@ -96,6 +97,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private int _daysCount;
+
+    /// <summary>Главное окно открывается со свёрнутым блоком фильтров.</summary>
+    /// <remarks>
+    /// Действует при следующем запуске: главное окно читает файл один раз, при создании, и
+    /// сохранение параметров его текущий вид не меняет.
+    /// </remarks>
+    [ObservableProperty]
+    private bool _collapseFiltersOnStartup = AppSettings.DefaultCollapseFiltersOnStartup;
 
     /// <summary>Где лежит база, включая диск: путь к каталогу без имени файла.</summary>
     /// <remarks>
@@ -411,6 +420,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (!_store.Save(new AppSettings
             {
                 DaysCount = DaysCount,
+                CollapseFiltersOnStartup = CollapseFiltersOnStartup,
                 DatabaseDirectory = DatabaseDirectory,
                 // Расширение живёт в файле, а не в поле: настоящим именем файла владеет файл настроек.
                 DatabaseName = DatabaseNameRules.ToFileName(DatabaseName),

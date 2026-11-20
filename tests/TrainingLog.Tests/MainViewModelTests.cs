@@ -27,6 +27,38 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Equal(AppSettings.DefaultDaysCount, viewModel.DaysCount);
     }
 
+    /// <summary>По умолчанию фильтр при запуске свёрнут: в шапке только шеврон и сводка.</summary>
+    [Fact]
+    public void ПоУмолчанию_ФильтрСвёрнут()
+    {
+        using var database = new TemporaryDatabase();
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store);
+
+        Assert.False(viewModel.IsFiltersExpanded);
+        Assert.Equal("Развернуть даты", viewModel.FiltersToggleText);
+    }
+
+    /// <summary>
+    /// Снятая настройка запуска оставляет фильтр развёрнутым, и загрузка журнала его не
+    /// сворачивает: разворачивает только «Применить».
+    /// </summary>
+    [Fact]
+    public async Task Настройка_РазвёрнутыйФильтрПриЗапуске()
+    {
+        using var database = new TemporaryDatabase();
+        _settings.Store.Save(new AppSettings { CollapseFiltersOnStartup = false });
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store);
+
+        Assert.True(viewModel.IsFiltersExpanded);
+        Assert.Equal("Свернуть даты", viewModel.FiltersToggleText);
+
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsFiltersExpanded);
+    }
+
     /// <summary>
     /// Из файла, а не из константы: записано иное число, чем по умолчанию, — иначе проверка
     /// прошла бы и по старому коду с константой.
@@ -226,6 +258,516 @@ public sealed class MainViewModelTests : IDisposable
 
         Assert.Equal(5, viewModel.Days.Count);
         Assert.Equal("День 1", viewModel.Days[^1].PlanName);
+    }
+
+    /// <summary>
+    /// Задана только нижняя граница — видны все дни с неё: база получает открытую верхнюю
+    /// границу, а «Показать все» снимает ограничение числа.
+    /// </summary>
+    [Fact]
+    public async Task ApplyAsync_ТолькоНижняяГраница_ВсеЗаписиСДаты()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
+        }
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            ShowAll = true,
+            DateFrom = new DateTime(2026, 10, 3),
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal(["День 5", "День 4", "День 3"], viewModel.Days.Select(day => day.PlanName));
+    }
+
+    /// <summary>Задана только верхняя граница — видны все дни до неё включительно.</summary>
+    [Fact]
+    public async Task ApplyAsync_ТолькоВерхняяГраница_ВсеЗаписиДоДаты()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
+        }
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            ShowAll = true,
+            DateTo = new DateTime(2026, 10, 3),
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal(["День 3", "День 2", "День 1"], viewModel.Days.Select(day => day.PlanName));
+    }
+
+    /// <summary>
+    /// Период ограничивает выборку, а число берёт последние дни уже внутри него: иначе при
+    /// заданной нижней границе показывались бы самые старые дни периода.
+    /// </summary>
+    [Fact]
+    public async Task ApplyAsync_ПериодИКоличество_ПоследниеВнутриПериода()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
+        }
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            DaysCount = 2,
+            DateFrom = new DateTime(2026, 10, 2),
+            DateTo = new DateTime(2026, 10, 4),
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal(["День 4", "День 3"], viewModel.Days.Select(day => day.PlanName));
+    }
+
+    /// <summary>«Показать все» снимает ограничение числа, но не сам период.</summary>
+    [Fact]
+    public async Task ApplyAsync_ПоказатьВсе_СнимаетОграничениеЧисла()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
+        }
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            DaysCount = 2,
+            ShowAll = true,
+            DateFrom = new DateTime(2026, 10, 3),
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal(
+            ["День 5", "День 4", "День 3"],
+            viewModel.Days.Select(day => day.PlanName));
+    }
+
+    /// <summary>
+    /// При «Показать все» негодное число не гасит «Применить»: поле в этот момент недоступно и
+    /// на показ не влияет.
+    /// </summary>
+    [Fact]
+    public async Task ApplyCommand_ПоказатьВсе_НедопустимоеКоличествоНеГасит()
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            DaysCount = 0,
+            ShowAll = true,
+        };
+
+        Assert.True(viewModel.ApplyCommand.CanExecute(null));
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal(["День 5"], viewModel.Days.Select(day => day.PlanName));
+    }
+
+    /// <summary>Поле числа недоступно ровно тогда, когда показаны все записи.</summary>
+    [Fact]
+    public void IsCountEnabled_СледуетЗаГалочкой()
+    {
+        using var database = new TemporaryDatabase();
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store);
+
+        Assert.True(viewModel.IsCountEnabled);
+
+        viewModel.ShowAll = true;
+
+        Assert.False(viewModel.IsCountEnabled);
+
+        viewModel.ShowAll = false;
+
+        Assert.True(viewModel.IsCountEnabled);
+    }
+
+    /// <summary>
+    /// Крестик очищает дату, но журнал не перечитывает: фильтр применяется кнопкой, как и
+    /// остальные поля шапки.
+    /// </summary>
+    [Fact]
+    public async Task ClearDateFromCommand_ОбнуляетДатуБезПеречитывания()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
+        }
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            ShowAll = true,
+            DateFrom = new DateTime(2026, 10, 3),
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal(3, viewModel.Days.Count);
+
+        viewModel.ClearDateFromCommand.Execute(null);
+
+        Assert.Null(viewModel.DateFrom);
+        Assert.Equal(3, viewModel.Days.Count);
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal(5, viewModel.Days.Count);
+    }
+
+    /// <summary>Верхняя граница очищается так же: дата снимается, список ждёт «Применить».</summary>
+    [Fact]
+    public async Task ClearDateToCommand_ОбнуляетДатуБезПеречитывания()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
+        }
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            ShowAll = true,
+            DateTo = new DateTime(2026, 10, 3),
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal(3, viewModel.Days.Count);
+
+        viewModel.ClearDateToCommand.Execute(null);
+
+        Assert.Null(viewModel.DateTo);
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal(5, viewModel.Days.Count);
+    }
+
+    /// <summary>
+    /// Сводка обеих дат — диапазон без подписей «С» и «До», число в скобках и короткий формат,
+    /// как в самих полях.
+    /// </summary>
+    [Fact]
+    public async Task FilterSummary_ОбеДаты_ДиапазонБезПодписей()
+    {
+        using var database = new TemporaryDatabase();
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            DateFrom = new DateTime(2026, 10, 2),
+            DateTo = new DateTime(2026, 10, 4),
+            DaysCount = 2,
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal("02.10.2026 — 04.10.2026 [2]", viewModel.FilterSummary);
+    }
+
+    /// <summary>Одна нижняя граница подписана «С»: иначе непонятно, что задано.</summary>
+    [Fact]
+    public async Task FilterSummary_ТолькоНачало_СДата()
+    {
+        using var database = new TemporaryDatabase();
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            DateFrom = new DateTime(2026, 10, 3),
+            DaysCount = 4,
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal("С 03.10.2026 [4]", viewModel.FilterSummary);
+    }
+
+    /// <summary>Одна верхняя граница подписана «До».</summary>
+    [Fact]
+    public async Task FilterSummary_ТолькоКонец_ДоДата()
+    {
+        using var database = new TemporaryDatabase();
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            DateTo = new DateTime(2026, 10, 5),
+            DaysCount = 4,
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal("До 05.10.2026 [4]", viewModel.FilterSummary);
+    }
+
+    /// <summary>Без дат число выходит из скобок: это фраза «Последние N», а не дата с пометкой.</summary>
+    [Fact]
+    public async Task FilterSummary_БезДат_Последние()
+    {
+        using var database = new TemporaryDatabase();
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            DaysCount = 4,
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal("Последние 4", viewModel.FilterSummary);
+    }
+
+    /// <summary>«Показать все» заменяет число знаком бесконечности.</summary>
+    [Fact]
+    public async Task FilterSummary_ПоказатьВсе_Бесконечность()
+    {
+        using var database = new TemporaryDatabase();
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            DateFrom = new DateTime(2026, 10, 2),
+            DateTo = new DateTime(2026, 10, 4),
+            ShowAll = true,
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal("02.10.2026 — 04.10.2026 [∞]", viewModel.FilterSummary);
+    }
+
+    /// <summary>Без дат «Показать все» — это все записи, а не «Последние ∞».</summary>
+    [Fact]
+    public async Task FilterSummary_БезДатПоказатьВсе_ВсеЗаписи()
+    {
+        using var database = new TemporaryDatabase();
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            ShowAll = true,
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal("Все записи", viewModel.FilterSummary);
+    }
+
+    /// <summary>
+    /// Сводка показывает применённый фильтр: введённая, но не принятая дата её не меняет,
+    /// иначе свёрнутая шапка говорила бы о журнале неправду.
+    /// </summary>
+    [Fact]
+    public async Task FilterSummary_НеПрименённаяДата_НеМеняетСводку()
+    {
+        using var database = new TemporaryDatabase();
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            DateFrom = new DateTime(2026, 10, 2),
+            DateTo = new DateTime(2026, 10, 4),
+            DaysCount = 2,
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        viewModel.DateFrom = new DateTime(2026, 10, 3);
+
+        Assert.Equal("02.10.2026 — 04.10.2026 [2]", viewModel.FilterSummary);
+    }
+
+    /// <summary>
+    /// Сворачивание ничего не применяет и не перечитывает: сводка и список остаются прежними,
+    /// а введённая дата ждёт «Применить» после разворота.
+    /// </summary>
+    [Fact]
+    public async Task ToggleFiltersCommand_СворачиваетБезПрименения()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
+        }
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            IsFiltersExpanded = true,
+            DaysCount = 2,
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        // «Применить» свернула блок — разворачиваем, чтобы проверить именно ручное сворачивание.
+        viewModel.ToggleFiltersCommand.Execute(null);
+
+        viewModel.DateFrom = new DateTime(2026, 10, 5);
+
+        viewModel.ToggleFiltersCommand.Execute(null);
+
+        Assert.False(viewModel.IsFiltersExpanded);
+        Assert.Equal(["День 5", "День 4"], viewModel.Days.Select(day => day.PlanName));
+        Assert.Equal("Последние 2", viewModel.FilterSummary);
+
+        viewModel.ToggleFiltersCommand.Execute(null);
+
+        Assert.True(viewModel.IsFiltersExpanded);
+        Assert.Equal(new DateTime(2026, 10, 5), viewModel.DateFrom);
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsFiltersExpanded);
+        Assert.Equal(["День 5"], viewModel.Days.Select(day => day.PlanName));
+        Assert.Equal("С 05.10.2026 [2]", viewModel.FilterSummary);
+    }
+
+    /// <summary>
+    /// «Применить» сворачивает блок после успешного перечитывания: сводка и журнал сразу
+    /// показывают один и тот же принятый фильтр.
+    /// </summary>
+    [Fact]
+    public async Task ApplyCommand_ПослеПрименения_СворачиваетФильтр()
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            IsFiltersExpanded = true,
+            DaysCount = 1,
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsFiltersExpanded);
+        Assert.Equal("Последние 1", viewModel.FilterSummary);
+    }
+
+    /// <summary>
+    /// Пока журнал читается, «Применить» показывает кольцо и недоступна: повторное нажатие не
+    /// запустит второе чтение, а кольцо держится ровно до ответа.
+    /// </summary>
+    [Fact]
+    public async Task ApplyCommand_ПокаИдётЧтение_КнопкаНедоступна()
+    {
+        using var database = new TemporaryDatabase();
+        var repository = new GatedSessionRepository(database.SessionRepository);
+
+        var viewModel = new MainViewModel(new FakeWindowService(), repository, _settings.Store)
+        {
+            IsFiltersExpanded = true,
+            DaysCount = 1,
+        };
+
+        var applying = viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsBusy);
+        Assert.False(viewModel.ApplyCommand.CanExecute(null));
+
+        repository.Release();
+
+        await applying;
+
+        Assert.False(viewModel.IsBusy);
+        Assert.False(viewModel.IsFiltersExpanded);
+    }
+
+    /// <summary>
+    /// Отказ чтения снимает индикатор и оставляет блок развёрнутым: фильтр не применился, и
+    /// сводке нечего показывать.
+    /// </summary>
+    [Fact]
+    public async Task ApplyCommand_ОтказЧтения_СнимаетЗагрузкуИНеСворачивает()
+    {
+        using var database = new TemporaryDatabase();
+        var repository = new GatedSessionRepository(database.SessionRepository)
+        {
+            Failure = new InvalidOperationException("база недоступна"),
+        };
+
+        var viewModel = new MainViewModel(new FakeWindowService(), repository, _settings.Store)
+        {
+            IsFiltersExpanded = true,
+            DaysCount = 1,
+        };
+
+        var applying = viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsBusy);
+
+        repository.Release();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => applying);
+
+        Assert.False(viewModel.IsBusy);
+        Assert.True(viewModel.IsFiltersExpanded);
+    }
+
+    /// <summary>
+    /// Перепутанные границы меняются местами при применении: запрос с «С» позже «До» вернул бы
+    /// пустоту, а поля показывают исправленный диапазон.
+    /// </summary>
+    [Fact]
+    public async Task ApplyAsync_ОбратныйПериод_МеняетДатыМестами()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day), $"День {day}");
+        }
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            ShowAll = true,
+            DateFrom = new DateTime(2026, 10, 5),
+            DateTo = new DateTime(2026, 10, 2),
+        };
+
+        await viewModel.ApplyCommand.ExecuteAsync(null);
+
+        Assert.Equal(new DateTime(2026, 10, 2), viewModel.DateFrom);
+        Assert.Equal(new DateTime(2026, 10, 5), viewModel.DateTo);
+        Assert.Equal(
+            ["День 5", "День 4", "День 3", "День 2"],
+            viewModel.Days.Select(day => day.PlanName));
+    }
+
+    /// <summary>
+    /// Пустой журнал при активном фильтре говорит о периоде, а не об отсутствии записей: иначе
+    /// человек искал бы причину в базе, а не в датах.
+    /// </summary>
+    [Fact]
+    public async Task LoadAsync_ФильтрНичегоНеНашел_ТекстПоПериоду()
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
+
+        var viewModel = new MainViewModel(new FakeWindowService(), database.SessionRepository, _settings.Store)
+        {
+            ShowAll = true,
+            DateFrom = new DateTime(2026, 10, 10),
+        };
+
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsEmpty);
+        Assert.Equal("За выбранный период записей нет", viewModel.EmptyText);
+
+        viewModel.ClearDateFromCommand.Execute(null);
+
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsEmpty);
+        Assert.Equal("Записей пока нет", viewModel.EmptyText);
     }
 
     [Theory]

@@ -130,7 +130,48 @@
     </Style>
 
     <!--
-      DatePicker: поле даты в окне дня.
+      Крестик очистки даты: та же плоская «стеклянная» кнопка, что у очистки поиска в окне
+      параметров (GlassButtonIconFlat), но объявленная здесь. Ссылаться на неё из этого словаря
+      нельзя: StaticResource видит только ресурсы этого файла, а стекло лежит в GlassButton.xaml.
+      Токены стекла — из палитры, поэтому вид совпадает с полем поиска.
+    -->
+    <Style x:Key="DatePickerClearButton" TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource AddDayGlass}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AddDayBevel}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Surface"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="2"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AddDayGlassHover}" />
+                            <Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource AddDayBevelHover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Surface" Property="Background" Value="{DynamicResource SurfaceAlt}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+      DatePicker: поле даты в журнале и окне дня.
 
       Системный DatePicker в светлой теме от наших полей неотличим — системное поле тоже
       белое, как FieldBackground, — и это скрывало, что стиля у него нет вовсе. В тёмной теме
@@ -174,11 +215,16 @@
                         <!--
                           Подпись дня недели рисуется поверх текстовой части поля, перед кнопкой
                           календаря, в той же ячейке корневой сетки — вложенный контейнер менял
-                          желаемый размер DatePicker. Поле сохраняет родные отступы 5,2, справа
-                          добавлен резерв 48, иначе длинная дата зашла бы под подпись. Цвет подписи
-                          задан явно: DatePicker.Foreground — это TextOnLightSurface для календаря,
-                          и в тёмной теме он слился бы с фоном поля, поэтому подпись красится в
-                          TextPrimary, как и сама дата.
+                          желаемый размер DatePicker. Поле сохраняет родные отступы 5,2, а справа
+                          стоит резерв под то, что там лежит: 48, когда есть и подпись, и крестик.
+                          Меньшие значения выставляют триггеры ниже. Цвет подписи задан явно:
+                          DatePicker.Foreground — это TextOnLightSurface для календаря, и в тёмной
+                          теме он слился бы с фоном поля, поэтому подпись красится в TextPrimary,
+                          как и сама дата.
+
+                          Отступ подписи справа — 30: место занято крестиком очистки. Когда
+                          крестика нет (команда не задана или дата не выбрана), триггеры ниже
+                          возвращают 4 — ровно прежний вид окна дня.
                         -->
                         <primitives:DatePickerTextBox x:Name="PART_TextBox"
                                                        Grid.Column="0"
@@ -188,12 +234,40 @@
 
                         <TextBlock x:Name="WeekdaySuffix"
                                    Grid.Column="0"
-                                   Margin="0,0,4,0"
+                                   Margin="0,0,30,0"
                                    HorizontalAlignment="Right"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextPrimary}"
                                    IsHitTestVisible="False"
                                    Text="{Binding Path=(helpers:DatePickerSuffix.Text), RelativeSource={RelativeSource TemplatedParent}}" />
+
+                        <!--
+                          Крестик очистки — внутри поля, левее кнопки календаря: он часть поля,
+                          как крестик очистки поиска в окне параметров, а не соседняя кнопка.
+                          Резерв текста 48 px из шаблона уже вмещает его, поэтому ширина поля при
+                          появлении крестика не меняется.
+
+                          Видимость собирается триггерами: по умолчанию кнопка видима, а каждое
+                          из двух условий «нечего очищать» гасит её. Так шаблон не требует
+                          конвертеров и не знает модели окна.
+                        -->
+                        <Button x:Name="ClearButton"
+                                Grid.Column="0"
+                                Margin="0,0,4,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource DatePickerClearButton}"
+                                Command="{Binding Path=(helpers:DatePickerClear.Command), RelativeSource={RelativeSource TemplatedParent}}"
+                                ToolTip="Очистить дату">
+                            <!-- Глиф нарисован путём, как у очистки поиска: на 9 px глиф шрифта мельче линии. -->
+                            <Path Width="9"
+                                  Height="9"
+                                  Data="M 1,1 L 8,8 M 8,1 L 1,8"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.3"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" />
+                        </Button>
 
                         <Button x:Name="PART_Button"
                                 Grid.Column="1"
@@ -226,6 +300,44 @@
                                PlacementTarget="{Binding ElementName=PART_Root}"
                                StaysOpen="False" />
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <!--
+                          Крестик прячется, когда очищать нечего или нечем: дата не выбрана либо
+                          команда не задана. Условия стоят по отдельности, а не одним
+                          MultiTrigger: у «не null» в XAML нет значения, а два независимых гашения
+                          дают то же самое. Подпись дня возвращается к прежнему отступу, когда
+                          крестика нет, — иначе в окне дня она стояла бы с лишним зазором.
+                        -->
+                        <Trigger Property="SelectedDate" Value="{x:Null}">
+                            <Setter TargetName="ClearButton" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="WeekdaySuffix" Property="Margin" Value="0,0,4,0" />
+                        </Trigger>
+                        <Trigger Property="helpers:DatePickerClear.Command" Value="{x:Null}">
+                            <Setter TargetName="ClearButton" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="WeekdaySuffix" Property="Margin" Value="0,0,4,0" />
+                        </Trigger>
+
+                        <!--
+                          Правый резерв текста равен тому, что в нём лежит. Раньше 48 px стояли
+                          всегда, и в шапке главного окна, где подписи дня нет, пустые 26 px
+                          читались белой плашкой, а дата обрезалась на её границе. Порядок
+                          триггеров важен: более частное условие объявлено позже и перекрывает
+                          общие, поэтому при пустых обоих остаётся 5.
+                        -->
+                        <Trigger Property="helpers:DatePickerSuffix.Text" Value="">
+                            <Setter TargetName="PART_TextBox" Property="Padding" Value="5,2,26,2" />
+                        </Trigger>
+                        <Trigger Property="helpers:DatePickerClear.Command" Value="{x:Null}">
+                            <Setter TargetName="PART_TextBox" Property="Padding" Value="5,2,34,2" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="helpers:DatePickerSuffix.Text" Value="" />
+                                <Condition Property="helpers:DatePickerClear.Command" Value="{x:Null}" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PART_TextBox" Property="Padding" Value="5,2,5,2" />
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -316,6 +428,89 @@
                                           VerticalAlignment="Center"
                                           RecognizesAccessKey="True" />
                     </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Check" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource ControlHover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentStrong}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                            <Setter TargetName="Box" Property="Opacity" Value="0.55" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+      Чекбокс шапки: подпись слева, квадрат по центру правой зоны, ширина которой равна полю
+      числа. Так центр квадрата совпадает с центром поля под ним, а сам квадрат равен полю по
+      высоте — размеры приходят из экземпляра, а не заданы числом.
+
+      Стиль именованный: неявный шаблон с квадратом слева остаётся общим для остальных окон.
+    -->
+    <Style x:Key="CheckBoxSquareRight"
+           TargetType="CheckBox"
+           BasedOn="{StaticResource {x:Type CheckBox}}">
+        <!-- Высота по умолчанию: от неё считается квадрат, если экземпляр не задал свою -->
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <ContentPresenter x:Name="Label"
+                                          Grid.Column="0"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True" />
+
+                        <!--
+                          Правая зона шириной с поле числа: квадрат центрируется в ней, и его
+                          центр встаёт над центром поля «Количество дней» при любой ширине.
+                          Ширину шаблон взять у окна не может, поэтому она приходит в Tag
+                          чекбокса. Сторона квадрата — Height контрола, то есть высота поля.
+                        -->
+                        <Grid Grid.Column="1"
+                              Width="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                              HorizontalAlignment="Right">
+                            <Border x:Name="Box"
+                                    Width="{TemplateBinding Height}"
+                                    Height="{TemplateBinding Height}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Background="{DynamicResource FieldBackground}"
+                                    BorderBrush="{DynamicResource FieldBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="2"
+                                    SnapsToDevicePixels="True">
+                                <!--
+                                  Viewbox растягивает рычажок вместе с квадратом: тот же рисунок, что
+                                  в общем шаблоне, но при 24–36 px не выглядит крошкой в пустом поле.
+                                -->
+                                <Viewbox x:Name="Check"
+                                         Margin="5"
+                                         Stretch="Uniform"
+                                         Visibility="Hidden">
+                                    <Path Data="M 2.5,7 L 5.5,10 L 10.5,4"
+                                          Stroke="{DynamicResource AccentStrong}"
+                                          StrokeThickness="1.8"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round" />
+                                </Viewbox>
+                            </Border>
+                        </Grid>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Check" Property="Visibility" Value="Visible" />

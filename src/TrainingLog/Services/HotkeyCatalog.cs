@@ -57,6 +57,7 @@ public static class HotkeyCatalog
             new HotkeyAction("Main.OpenPlans", "Планы", null, HotkeyKind.Window),
             new HotkeyAction("Main.OpenSettings", "Параметры…", null, HotkeyKind.Window),
             new HotkeyAction("Main.Apply", "Применить", null, HotkeyKind.Window),
+            new HotkeyAction("Main.FiltersToggle", "Свернуть/развернуть фильтр", null, HotkeyKind.Window),
             new HotkeyAction("Main.AddDay", "Добавить день", null, HotkeyKind.Window),
             new HotkeyAction("Main.SelectedUp", "Строка выше (↑)", "Up", HotkeyKind.Window),
             new HotkeyAction("Main.SelectedDown", "Строка ниже (↓)", "Down", HotkeyKind.Window),

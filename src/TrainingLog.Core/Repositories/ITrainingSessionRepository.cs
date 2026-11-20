@@ -11,16 +11,21 @@ public interface ITrainingSessionRepository
     /// <remarks>
     /// Упражнения и подходы приходят вместе с записью и упорядочены по номеру выполнения: строка
     /// дня показывает их слева направо именно в этом порядке.
+    ///
+    /// <paramref name="count"/> ограничивает показ последними записями уже внутри периода, а не
+    /// до его отбора: иначе окно с открытой нижней границей показало бы самые старые дни.
+    /// Отбор и лимит идут в базе, чтобы не тянуть историю с упражнениями ради нескольких строк.
     /// </remarks>
     Task<IReadOnlyList<TrainingSession>> GetAsync(
         DateOnly? fromInclusive = null,
         DateOnly? toInclusive = null,
+        int? count = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Последние <paramref name="count"/> записей по дате, свежие сверху.</summary>
     /// <remarks>
-    /// Отбор идёт в базе, а не после чтения всего журнала: окну нужны только показанные дни, и
-    /// тянуть историю целиком с упражнениями и подходами ради нескольких строк незачем.
+    /// Обёртка над <see cref="GetAsync"/> без границ: путь выборки один, и правило «свежие
+    /// сверху, лимит после сортировки» не расходится между двумя методами.
     /// </remarks>
     Task<IReadOnlyList<TrainingSession>> GetLatestAsync(
         int count,

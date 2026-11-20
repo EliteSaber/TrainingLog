@@ -129,6 +129,7 @@ public sealed class HotkeyCatalogTests
     public void ActionOf_НеизвестныйId_Null()
     {
         Assert.NotNull(HotkeyCatalog.ActionOf("Day.Save"));
+        Assert.NotNull(HotkeyCatalog.ActionOf("Main.FiltersToggle"));
         Assert.Null(HotkeyCatalog.ActionOf("Removed.Nobody"));
     }
 }

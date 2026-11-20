@@ -78,6 +78,42 @@
               отступы окна.
             -->
             <helpers:ScrollBarMarginConverter x:Key="ScrollBarMargin" />
+
+            <!--
+              Сводка свёрнутого фильтра: кнопка без вида кнопки. Фон прозрачный, рамки и отступов
+              нет, поэтому кликабельной становится вся надпись, а выглядит она обычным текстом.
+              Наведение и нажатие меняют цвет — так видно, что по сводке можно щёлкнуть. Фокуса у
+              кнопки нет: клавиатурой блок разворачивает шеврон, и лишняя остановка Tab не нужна.
+            -->
+            <Style x:Key="FilterSummaryLink" TargetType="Button">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource AccentStrong}" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryPressed}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -102,65 +138,329 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Column="0"
+            <!--
+              Шапка показывает только настройки показа. Надпись «Журнал тренировок» стоит в средней
+              колонке и видна только при свёрнутом фильтре: тогда это единственный заголовок шапки,
+              а центр свободного места приходится ровно между свёрнутым блоком и шестерёнкой.
+              В развёрнутом виде заголовка нет совсем — место занимают фильтры.
+
+              Развёрнутый вид — таблица из двух строк: в первой «С» и «Показать все», во второй
+              «До» и «Количество дней». По строкам выровнены и даты, и настройки, поэтому поле
+              числа стоит ровно напротив поля «До» независимо от высоты шрифта, а «Применить»
+              центрируется по общей высоте обеих строк. Шестерёнка живёт в отдельной колонке: она
+              действие окна, а не показ, и остаётся справа.
+
+              Шеврон слева сворачивает блок до одной строки-сводки: «29.10.2026 — 18.11.2026 [4]»
+              или «Последние 4». Свёрнутый вид прячет поля, галочку и «Применить», а показывает
+              только применённый фильтр: введённое, но не принятое, сводку не меняет. Щелчок по
+              самой сводке разворачивает блок — это та же команда, что у шеврона.
+
+              Всё в шапке применяется одной кнопкой «Применить» (и Enter): даты, галочка и число
+              — одно состояние показа, а не три разных. Поэтому крестик очистки даты список не
+              перечитывает — он правит фильтр, как и сам выбор даты.
+            -->
+            <Grid Grid.Column="0"
+                  VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!--
+                  Шеврон: плоская кнопка 20×20 без объёма и свечения — вровень с полями, а не
+                  стеклянной пилюлей. Вниз — блок свёрнут, вверх — развёрнут; направление меняет
+                  Data триггером, а не два разных пути. Подсказка приходит из модели.
+                -->
+                <Button Grid.Column="0"
+                        Margin="0,0,6,0"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource GlassButtonIconFlat}"
+                        ToolTip="{Binding FiltersToggleText}"
+                        AutomationProperties.Name="{Binding FiltersToggleText}"
+                        Command="{Binding ToggleFiltersCommand}"
+                        helpers:Hotkey.Id="Main.FiltersToggle">
+                    <Path Width="10"
+                          Height="10"
+                          Stretch="Uniform"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.5"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Data" Value="M 0,0 L 7,7 L 14,0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFiltersExpanded}" Value="True">
+                                        <Setter Property="Data" Value="M 0,7 L 7,0 L 14,7" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+                </Button>
+
+                <Grid Grid.Column="1">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsFiltersExpanded}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Grid.Column="0"
+                               Background="Transparent"
+                               VerticalAlignment="Center"
+                               Text="С"
+                               helpers:ClickToFocus.Target="{Binding ElementName=DateFromPicker}" />
+
+                    <DatePicker x:Name="DateFromPicker"
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                Width="170"
+                                Margin="8,0,16,0"
+                                VerticalAlignment="Center"
+                                SelectedDateFormat="Short"
+                                SelectedDate="{Binding DateFrom, Mode=TwoWay}"
+                                helpers:DatePickerClear.Command="{Binding ClearDateFromCommand}" />
+
+                    <!--
+                      Галочка стоит рядом с полем числа: она снимает именно его ограничение. Пока она
+                      отмечена, поле числа недоступно, а его подпись бледнеет — так видно, что число
+                      сейчас не действует, но настройка не потеряна.
+
+                      Квадрат чекбокса стоит по центру над полем числа и равен ему по высоте: Tag —
+                      ширина поля (шаблон не видит элементы окна), Height — его ActualHeight.
+                    -->
+                    <CheckBox Grid.Row="0"
+                              Grid.Column="2"
+                              Height="{Binding ActualHeight, ElementName=DaysCountBox}"
+                              Margin="0,0,12,0"
+                              VerticalAlignment="Center"
+                              Style="{StaticResource CheckBoxSquareRight}"
+                              Tag="{Binding ActualWidth, ElementName=DaysCountBox}"
+                              Content="Показать все"
+                              IsChecked="{Binding ShowAll, Mode=TwoWay}" />
+
+                    <TextBlock Grid.Row="1"
+                               Grid.Column="0"
+                               Margin="0,8,0,0"
+                               Background="Transparent"
+                               VerticalAlignment="Center"
+                               Text="До"
+                               helpers:ClickToFocus.Target="{Binding ElementName=DateToPicker}" />
+
+                    <DatePicker x:Name="DateToPicker"
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Width="170"
+                                Margin="8,8,16,0"
+                                VerticalAlignment="Center"
+                                SelectedDateFormat="Short"
+                                SelectedDate="{Binding DateTo, Mode=TwoWay}"
+                                helpers:DatePickerClear.Command="{Binding ClearDateToCommand}" />
+
+                    <StackPanel Grid.Row="1"
+                                Grid.Column="2"
+                                Margin="0,8,12,0"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                        <TextBlock Background="Transparent"
+                                   VerticalAlignment="Center"
+                                   Text="Количество дней"
+                                   helpers:ClickToFocus.Target="{Binding ElementName=DaysCountBox}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowAll}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <!--
+                          BlurOnKeys возвращает фокус списку по Esc и Enter: без снятия фокуса поле гасит
+                          стрелки выделения кареткой, а клик по журналу фокус не переносит (нефокусируемое).
+                          Enter не гасится — «Применить» срабатывает IsDefault'ом, и фокус уходит уже после.
+                        -->
+                        <TextBox x:Name="DaysCountBox"
+                                 Width="52"
+                                 Margin="8,0,0,0"
+                                 Padding="4,3"
+                                 HorizontalContentAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 IsEnabled="{Binding IsCountEnabled}"
+                                 helpers:AllowedCharsInput.Allowed="Digits"
+                                 helpers:BlurOnKeys.Keys="Escape,Enter"
+                                 helpers:BlurOnKeys.Target="{Binding ElementName=DaysList}"
+                                 Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+
+                    <!--
+                      Enter применяет фильтр. IsDefault, а не горячая клавиша: KeyBinding в проекте
+                      занят под Ctrl+S, а оба механизма на одной кнопке означали бы двойное выполнение. До
+                      кнопки Enter доходит сам: фильтр цифр глотает в PreviewKeyDown только пробел, а
+                      AcceptsReturn у поля не задан.
+
+                      Кнопка относится к обеим строкам, поэтому RowSpan и центрирование по их общей
+                      высоте, а не отдельный ряд.
+                    -->
+                    <!--
+                      На время чтения «Применить» уступает место кольцу: надпись скрыта через
+                      Hidden, а не Collapsed, поэтому ширина кнопки не меняется и шапка не
+                      прыгает. Кольцо — дорожка TextSecondary с прозрачностью и акцентная дуга;
+                      вращается по часовой, пока IsBusy. Чтение уходит в фон (см. RefreshAsync),
+                      иначе UI-поток был бы занят и анимация стояла.
+
+                      Кольцо фиксированное, 16×16, как шестерёнка и шеврон: иконки в проекте не
+                      масштабируются вместе со шрифтом. Доступное имя задано явно — с текстом оно
+                      исчезло бы.
+                    -->
+                    <Button Grid.RowSpan="2"
+                            Grid.Column="3"
+                            Margin="0,0,4,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource GlassButtonSoft}"
+                            IsDefault="True"
+                            AutomationProperties.Name="Применить"
+                            Command="{Binding ApplyCommand}"
+                            helpers:Hotkey.Id="Main.Apply">
+                        <Grid>
+                            <TextBlock Text="Применить">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                <Setter Property="Visibility" Value="Hidden" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <Grid Width="16"
+                                  Height="16"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Grid.RenderTransform>
+                                    <RotateTransform />
+                                </Grid.RenderTransform>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="ApplySpinner">
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                             From="0"
+                                                                             To="360"
+                                                                             Duration="0:0:0.9"
+                                                                             RepeatBehavior="Forever" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="ApplySpinner" />
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+
+                                <!-- Дорожка: полное кольцо, приглушённое, чтобы дуга читалась отдельно. -->
+                                <Ellipse Width="14"
+                                         Height="14"
+                                         Stroke="{DynamicResource TextSecondary}"
+                                         StrokeThickness="2"
+                                         Opacity="0.35" />
+
+                                <!-- Дуга ~100°: от верха по часовой, с круглыми торцами. -->
+                                <Path Width="16"
+                                      Height="16"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Top"
+                                      Stretch="None"
+                                      Data="M 8,1 A 7,7 0 0 1 14.894,9.215"
+                                      Stroke="{DynamicResource AccentStrong}"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" />
+                            </Grid>
+                        </Grid>
+                    </Button>
+                </Grid>
+
+                <!--
+                  Свёрнутый вид: одна строка-сводка вместо полей. Это кнопка, а не TextBlock:
+                  щелчок по всей надписи разворачивает блок той же командой, что и шеврон.
+                  Видимость обратна развёрнутому блоку, а текст собирает модель — с датами,
+                  числом в скобках или знаком бесконечности. TextTrimming остался у TextBlock
+                  внутри кнопки: длинная сводка обрезается, как и раньше.
+                -->
+                <Button x:Name="FilterSummaryButton"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        ToolTip="{Binding FiltersToggleText}"
+                        Command="{Binding ToggleFiltersCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource FilterSummaryLink}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsFiltersExpanded}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <TextBlock Text="{Binding FilterSummary}"
+                               TextTrimming="CharacterEllipsis" />
+                </Button>
+            </Grid>
+
+            <!--
+              Заголовок виден только при свёрнутом фильтре: в развёрнутом виде на его месте
+              фильтры, и подпись дублировала бы название из полосы окна. Центрируется по средней
+              колонке — то есть между правым краем фильтра и шестерёнкой.
+            -->
+            <TextBlock x:Name="HeaderTitle"
+                       Grid.Column="1"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       Text="{Binding Title}"
                        FontSize="{DynamicResource TitleSize}"
                        FontWeight="SemiBold"
-                       VerticalAlignment="Center"
-                       Text="{Binding Title}" />
-
-            <!--
-              Сколько дней показывать — рядом с заголовком, а не внизу: это настройка показа, а не
-              действие над записью. Значение применяется кнопкой, поэтому поле не меняет список само.
-              Пустое или негодное поле гасит «Применить»; AllowedCharsInput оставляет только цифры,
-              поэтому «мусор» здесь — пустое поле и значение за пределом DaysCountRules, оба случая
-              гасят кнопку.
-
-              BlurOnKeys возвращает фокус списку по Esc и Enter: без снятия фокуса поле гасит
-              стрелки выделения кареткой, а клик по журналу фокус не переносит (нефокусируемое).
-              Enter не гасится — «Применить» срабатывает IsDefault'ом, и фокус уходит уже после.
-
-              Background="Transparent" у подписи обязателен: без фона она попадает под мышь только по
-              самим буквам, и клик по пробелу не передал бы фокус (ловушка 13).
-            -->
-            <StackPanel Grid.Column="2"
-                        Margin="0,0,12,0"
-                        VerticalAlignment="Center"
-                        Orientation="Horizontal">
-                <TextBlock Background="Transparent"
-                           VerticalAlignment="Center"
-                           Text="Количество дней"
-                           helpers:ClickToFocus.Target="{Binding ElementName=DaysCountBox}" />
-
-                <TextBox x:Name="DaysCountBox"
-                         Width="52"
-                         Margin="8,0,0,0"
-                         Padding="4,3"
-                         HorizontalContentAlignment="Center"
-                         VerticalContentAlignment="Center"
-                         helpers:AllowedCharsInput.Allowed="Digits"
-                         helpers:BlurOnKeys.Keys="Escape,Enter"
-                         helpers:BlurOnKeys.Target="{Binding ElementName=DaysList}"
-                         Text="{Binding DaysCount, UpdateSourceTrigger=PropertyChanged}" />
-            </StackPanel>
-
-            <!--
-              Enter применяет количество дней. IsDefault, а не горячая клавиша: KeyBinding в проекте
-              занят под Ctrl+S, а оба механизма на одной кнопке означали бы двойное выполнение. До
-              кнопки Enter доходит сам: фильтр цифр глотает в PreviewKeyDown только пробел, а
-              AcceptsReturn у поля не задан.
-            -->
-            <Button Grid.Column="3"
-                    Margin="0,0,4,0"
-                    VerticalAlignment="Center"
-                    Style="{StaticResource GlassButtonSoft}"
-                    IsDefault="True"
-                    Command="{Binding ApplyCommand}"
-                    helpers:Hotkey.Id="Main.Apply"
-                    Content="Применить" />
+                       TextTrimming="CharacterEllipsis">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsFiltersExpanded}" Value="False">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
 
             <!--
               Шестерёнка «Параметры…»: на стекле; Fill пути привязан к Foreground
@@ -168,7 +468,7 @@
               триггеров стиля вместе с текстом.
             -->
             <Button x:Name="SettingsButton"
-                    Grid.Column="4"
+                    Grid.Column="2"
                     Padding="8"
                     VerticalAlignment="Center"
                     Style="{StaticResource GlassButtonIconSoft}"
@@ -658,7 +958,7 @@
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource TextSecondary}"
                        IsHitTestVisible="False"
-                       Text="Записей пока нет"
+                       Text="{Binding EmptyText}"
                        Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Grid>
 

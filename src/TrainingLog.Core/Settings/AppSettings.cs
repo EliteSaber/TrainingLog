@@ -22,6 +22,17 @@ public sealed class AppSettings
     /// <summary>Сколько дней показывать в журнале. Из файла может быть любым целым.</summary>
     public int DaysCount { get; set; } = DefaultDaysCount;
 
+    /// <summary>Блок фильтров при запуске свёрнут: видны только шеврон и строка-сводка.</summary>
+    /// <remarks>
+    /// Умолчание — свёрнутый вид: фильтры занимают две строки шапки, а нужны не в каждом
+    /// запуске. Настройка действует только при старте: главное окно читает файл один раз, при
+    /// создании, и сохранение параметров на месте ничего не переключает.
+    /// </remarks>
+    public const bool DefaultCollapseFiltersOnStartup = true;
+
+    /// <summary>Сворачивать блок фильтров при запуске.</summary>
+    public bool CollapseFiltersOnStartup { get; set; } = DefaultCollapseFiltersOnStartup;
+
     /// <summary>Где лежит база. Пустым не остаётся: умолчание подставляет хранилище файла.</summary>
     public string DatabaseDirectory { get; set; } = SqliteDatabasePath.DefaultDirectory;
 

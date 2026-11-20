@@ -154,6 +154,59 @@ public sealed class TrainingSessionRepositoryTests
     }
 
     [Fact]
+    public async Task GetAsync_ПериодИЛимит_ПоследниеВнутриПериода()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day));
+        }
+
+        var latest = await database.SessionRepository.GetAsync(
+            new DateOnly(2026, 10, 2),
+            new DateOnly(2026, 10, 5),
+            count: 2);
+
+        // Лимит считается после отбора периода и сортировки: «последние два» — это 5 и 4,
+        // а не первые два дня периода.
+        Assert.Equal(
+            [new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 4)],
+            latest.Select(session => session.Date));
+    }
+
+    [Fact]
+    public async Task GetAsync_ОткрытыеГраницы_ОграничиваютТолькоСвоюСторону()
+    {
+        using var database = new TemporaryDatabase();
+        for (var day = 1; day <= 5; day++)
+        {
+            await AddSessionAsync(database, new DateOnly(2026, 10, day));
+        }
+
+        var fromThird = await database.SessionRepository.GetAsync(new DateOnly(2026, 10, 3));
+        var toThird = await database.SessionRepository.GetAsync(toInclusive: new DateOnly(2026, 10, 3));
+
+        Assert.Equal(
+            [new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 4), new DateOnly(2026, 10, 3)],
+            fromThird.Select(session => session.Date));
+
+        Assert.Equal(
+            [new DateOnly(2026, 10, 3), new DateOnly(2026, 10, 2), new DateOnly(2026, 10, 1)],
+            toThird.Select(session => session.Date));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task GetAsync_НегодныйЛимит_Пусто(int count)
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5));
+
+        Assert.Empty(await database.SessionRepository.GetAsync(count: count));
+    }
+
+    [Fact]
     public async Task GetLatestAsync_БерётТолькоПоследниеСоСставом()
     {
         using var database = new TemporaryDatabase();

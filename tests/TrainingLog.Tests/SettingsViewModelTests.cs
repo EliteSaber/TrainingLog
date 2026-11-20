@@ -30,6 +30,34 @@ public sealed class SettingsViewModelTests
         Assert.Equal("спорт", viewModel.DatabaseName);
     }
 
+    /// <summary>Настройка запуска читается из файла: снятая галочка — развёрнутый фильтр.</summary>
+    [Fact]
+    public void ФильтрПриЗапуске_БерётсяИзФайла()
+    {
+        using var settings = new TemporarySettings();
+        settings.Write("""{"CollapseFiltersOnStartup": false}""");
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.False(viewModel.CollapseFiltersOnStartup);
+    }
+
+    /// <summary>Снятая галочка пишется тем же «Сохранить» и читается обратно из файла.</summary>
+    [Fact]
+    public void Save_ФильтрПриЗапуске_ПишетсяВФайл()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store)
+        {
+            CollapseFiltersOnStartup = false,
+        };
+
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.True(viewModel.Accepted);
+        Assert.False(new AppSettingsStore(settings.FilePath).Load().CollapseFiltersOnStartup);
+    }
+
     /// <summary>
     /// Пустая запись в файле — гарнитура по умолчанию «Segoe UI», и ComboBox, и откат показывают
     /// её, а не пустоту: применённый шрифт приложения и поле выбора обязаны совпадать.

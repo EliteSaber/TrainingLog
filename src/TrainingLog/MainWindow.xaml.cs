@@ -71,6 +71,7 @@ public partial class MainWindow : Window
             .Invoke("Main.OpenPlans", () => Run(_viewModel.OpenPlansCommand))
             .Invoke("Main.OpenSettings", () => Run(_viewModel.OpenSettingsCommand))
             .Invoke("Main.Apply", () => Run(_viewModel.ApplyCommand))
+            .Invoke("Main.FiltersToggle", () => Run(_viewModel.ToggleFiltersCommand))
             .Invoke("Main.AddDay", () => Run(_viewModel.AddDayCommand))
             .Row("Main.EditDay", DaysList, row =>
             {

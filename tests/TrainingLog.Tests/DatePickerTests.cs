@@ -1,7 +1,12 @@
+using System.Globalization;
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Threading;
+using CommunityToolkit.Mvvm.Input;
 using TrainingLog.Controls;
 using TrainingLog.Services;
 
@@ -136,8 +141,159 @@ public sealed class DatePickerTests
         });
     }
 
+    /// <summary>
+    /// Крестик очистки даты: без команды в поле его нет. Шаблон общий, и окно дня, где чистить
+    /// нечего, не должно получить лишнюю кнопку.
+    /// </summary>
+    [Fact]
+    public void Шаблон_Крестик_БезКомандыСкрыт()
+    {
+        StaRunner.Run(() =>
+        {
+            var picker = CreatePicker(new DateTime(2026, 11, 12));
+
+            picker.ApplyTemplate();
+
+            var clear = picker.Template.FindName("ClearButton", picker) as Button;
+
+            Assert.NotNull(clear);
+            Assert.Equal(Visibility.Collapsed, clear.Visibility);
+        });
+    }
+
+    /// <summary>Команда задана, но дата не выбрана — очищать нечего, крестик скрыт.</summary>
+    [Fact]
+    public void Шаблон_Крестик_БезДатыСкрыт()
+    {
+        StaRunner.Run(() =>
+        {
+            var picker = CreatePicker(null);
+            DatePickerClear.SetCommand(picker, new RelayCommand(() => { }));
+
+            picker.ApplyTemplate();
+
+            var clear = picker.Template.FindName("ClearButton", picker) as Button;
+
+            Assert.NotNull(clear);
+            Assert.Equal(Visibility.Collapsed, clear.Visibility);
+        });
+    }
+
+    /// <summary>
+    /// Дата выбрана и команда задана — крестик виден и по нажатию выполняет команду модели.
+    /// </summary>
+    /// <remarks>
+    /// Нажатие — через <see cref="UIElementAutomationPeer"/>: <c>RaiseEvent(ClickEvent)</c>
+    /// команду кнопки не выполняет, и проверка прошла бы на пустом месте.
+    /// </remarks>
+    [Fact]
+    public void Крестик_ДатаИКоманда_ВиденИВыполняетКоманду()
+    {
+        StaRunner.Run(() =>
+        {
+            var executed = false;
+
+            var picker = CreatePicker(new DateTime(2026, 11, 12));
+            DatePickerClear.SetCommand(picker, new RelayCommand(() => executed = true));
+
+            picker.ApplyTemplate();
+
+            var clear = picker.Template.FindName("ClearButton", picker) as Button;
+
+            Assert.NotNull(clear);
+            Assert.Equal(Visibility.Visible, clear.Visibility);
+
+            var invoker = (IInvokeProvider)UIElementAutomationPeer
+                .CreatePeerForElement(clear)!
+                .GetPattern(PatternInterface.Invoke);
+
+            invoker.Invoke();
+
+            clear.Dispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));
+
+            Assert.True(executed);
+        });
+    }
+
+    /// <summary>
+    /// Правый резерв текста равен тому, что в нём лежит: крестик, подпись дня или оба.
+    /// </summary>
+    /// <remarks>
+    /// Раньше 48 px стояли всегда, и в шапке главного окна, где подписи дня нет, пустые
+    /// 26 px читались белой плашкой, а дата обрезалась на её границе.
+    /// </remarks>
+    [Theory]
+    [InlineData("", false, 5)]
+    [InlineData("", true, 26)]
+    [InlineData("[чт]", false, 34)]
+    [InlineData("[чт]", true, 48)]
+    public void Шаблон_Резерв_ПоТомуЧтоЛежит(string suffix, bool hasCommand, double expectedRight)
+    {
+        StaRunner.Run(() =>
+        {
+            var picker = CreatePicker(new DateTime(2026, 11, 12));
+            DatePickerSuffix.SetText(picker, suffix);
+
+            if (hasCommand)
+            {
+                DatePickerClear.SetCommand(picker, new RelayCommand(() => { }));
+            }
+
+            picker.ApplyTemplate();
+
+            var text = picker.Template.FindName("PART_TextBox", picker) as TextBox;
+            Assert.NotNull(text);
+
+            Assert.Equal(expectedRight, text.Padding.Right);
+        });
+    }
+
+    /// <summary>
+    /// При максимальном кегле (150 % от базового 11) дата помещается в поле целиком:
+    /// резерв под крестик и кнопка календаря не отнимают у неё больше, чем нужно.
+    /// </summary>
+    [Fact]
+    public void Поле_ДатаВлезаетЦеликом_ПриКрупномКегле()
+    {
+        StaRunner.Run(() =>
+        {
+            var picker = CreatePicker(new DateTime(2026, 11, 12));
+            DatePickerClear.SetCommand(picker, new RelayCommand(() => { }));
+            picker.SelectedDateFormat = DatePickerFormat.Short;
+            picker.FontSize = 16.5;
+
+            var size = new Size(170, 40);
+            picker.Measure(size);
+            picker.Arrange(new Rect(size));
+            picker.UpdateLayout();
+
+            var text = picker.Template.FindName("PART_TextBox", picker) as TextBox;
+            Assert.NotNull(text);
+
+            var available = text.ActualWidth
+                - text.BorderThickness.Left
+                - text.BorderThickness.Right
+                - text.Padding.Left
+                - text.Padding.Right;
+
+            var formatted = new FormattedText(
+                text.Text,
+                CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch),
+                text.FontSize,
+                Brushes.Black,
+                VisualTreeHelper.GetDpi(text).PixelsPerDip);
+
+            Assert.True(
+                formatted.WidthIncludingTrailingWhitespace <= available,
+                $"Дата «{text.Text}» шириной {formatted.WidthIncludingTrailingWhitespace:F1} "
+                + $"не влезает в {available:F1}.");
+        });
+    }
+
     /// <summary>Поле даты с палитрой и стилями: без них шаблон взял бы системный вид.</summary>
-    private static DatePicker CreatePicker(DateTime date)
+    private static DatePicker CreatePicker(DateTime? date)
     {
         var picker = new DatePicker { SelectedDate = date };
 

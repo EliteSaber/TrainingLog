@@ -123,6 +123,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <!--
@@ -410,6 +411,20 @@
                                           SelectedItem="{Binding SelectedTheme}"
                                           DisplayMemberPath="Display" />
                             </Grid>
+
+                            <!--
+                              Поведение при запуске: свёрнутый фильтр оставляет в шапке журнала одну
+                              строку-сводку вместо двух строк с полями. Действует при следующем
+                              запуске — главное окно читает файл при создании, и сохранение
+                              параметров не переключает вид на месте.
+                            -->
+                            <CheckBox Grid.Row="7"
+                                      Margin="0,14,0,0"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Center"
+                                      Content="Свёрнутый фильтр при запуске"
+                                      ToolTip="Применяется при следующем запуске программы"
+                                      IsChecked="{Binding CollapseFiltersOnStartup}" />
                         </Grid>
                     </Border>
                 </ScrollViewer>
