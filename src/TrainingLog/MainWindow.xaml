@@ -324,15 +324,14 @@
                       высоте, а не отдельный ряд.
                     -->
                     <!--
-                      На время чтения «Применить» уступает место кольцу: надпись скрыта через
-                      Hidden, а не Collapsed, поэтому ширина кнопки не меняется и шапка не
-                      прыгает. Кольцо — дорожка TextSecondary с прозрачностью и акцентная дуга;
-                      вращается по часовой, пока IsBusy. Чтение уходит в фон (см. RefreshAsync),
-                      иначе UI-поток был бы занят и анимация стояла.
+                      На время чтения «Применить» показывает кольцо вместо надписи. Вид и вращение
+                      задаёт общий шаблон стеклянной кнопки (Themes/GlassButton.xaml), здесь —
+                      только признак занятости. Надпись скрыта через Hidden, поэтому ширина
+                      кнопки не меняется и шапка не прыгает. Доступное имя задано явно — с текстом
+                      оно исчезло бы.
 
-                      Кольцо фиксированное, 16×16, как шестерёнка и шеврон: иконки в проекте не
-                      масштабируются вместе со шрифтом. Доступное имя задано явно — с текстом оно
-                      исчезло бы.
+                      Чтение уходит в фон (см. RefreshAsync), иначе UI-поток был бы занят и
+                      анимация стояла.
                     -->
                     <Button Grid.RowSpan="2"
                             Grid.Column="3"
@@ -341,73 +340,10 @@
                             Style="{StaticResource GlassButtonSoft}"
                             IsDefault="True"
                             AutomationProperties.Name="Применить"
+                            helpers:BusyButton.IsBusy="{Binding IsBusy}"
                             Command="{Binding ApplyCommand}"
-                            helpers:Hotkey.Id="Main.Apply">
-                        <Grid>
-                            <TextBlock Text="Применить">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                <Setter Property="Visibility" Value="Hidden" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-
-                            <Grid Width="16"
-                                  Height="16"
-                                  RenderTransformOrigin="0.5,0.5">
-                                <Grid.RenderTransform>
-                                    <RotateTransform />
-                                </Grid.RenderTransform>
-                                <Grid.Style>
-                                    <Style TargetType="Grid">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                                <DataTrigger.EnterActions>
-                                                    <BeginStoryboard x:Name="ApplySpinner">
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                                                             From="0"
-                                                                             To="360"
-                                                                             Duration="0:0:0.9"
-                                                                             RepeatBehavior="Forever" />
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.EnterActions>
-                                                <DataTrigger.ExitActions>
-                                                    <StopStoryboard BeginStoryboardName="ApplySpinner" />
-                                                </DataTrigger.ExitActions>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Grid.Style>
-
-                                <!-- Дорожка: полное кольцо, приглушённое, чтобы дуга читалась отдельно. -->
-                                <Ellipse Width="14"
-                                         Height="14"
-                                         Stroke="{DynamicResource TextSecondary}"
-                                         StrokeThickness="2"
-                                         Opacity="0.35" />
-
-                                <!-- Дуга ~100°: от верха по часовой, с круглыми торцами. -->
-                                <Path Width="16"
-                                      Height="16"
-                                      HorizontalAlignment="Left"
-                                      VerticalAlignment="Top"
-                                      Stretch="None"
-                                      Data="M 8,1 A 7,7 0 0 1 14.894,9.215"
-                                      Stroke="{DynamicResource AccentStrong}"
-                                      StrokeThickness="2"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round" />
-                            </Grid>
-                        </Grid>
-                    </Button>
+                            helpers:Hotkey.Id="Main.Apply"
+                            Content="Применить" />
                 </Grid>
 
                 <!--

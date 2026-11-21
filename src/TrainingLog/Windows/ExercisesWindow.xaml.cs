@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
+using TrainingLog.Controls;
 using TrainingLog.Core;
 using TrainingLog.Core.Models;
 using TrainingLog.Services;
@@ -57,7 +58,7 @@ public partial class ExercisesWindow : Window
     }
 
     /// <summary>Удаление упражнения с подтверждением: как клику по кнопке из строки.</summary>
-    private async void ConfirmDelete(Exercise exercise)
+    private async void ConfirmDelete(Exercise exercise, Button? button = null)
     {
         if (DataContext is not ExercisesViewModel viewModel)
         {
@@ -72,9 +73,28 @@ public partial class ExercisesWindow : Window
             MessageBoxImage.Warning,
             MessageBoxResult.No);
 
-        if (answer == MessageBoxResult.Yes && viewModel.DeleteCommand.CanExecute(exercise))
+        if (answer != MessageBoxResult.Yes || !viewModel.DeleteCommand.CanExecute(exercise))
+        {
+            return;
+        }
+
+        // Кольцо ставится на нажатую строку, а не на все кнопки списка: команда одна на строки,
+        // и привязка к её IsRunning зажгла бы кольца у всех видимых «Удалить».
+        if (button is not null)
+        {
+            BusyButton.SetIsBusy(button, true);
+        }
+
+        try
         {
             await viewModel.DeleteCommand.ExecuteAsync(exercise);
+        }
+        finally
+        {
+            if (button is not null)
+            {
+                BusyButton.SetIsBusy(button, false);
+            }
         }
     }
 
@@ -94,7 +114,7 @@ public partial class ExercisesWindow : Window
     /// </summary>
     private async void OnDeleteClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { CommandParameter: Exercise exercise })
+        if (sender is not Button { CommandParameter: Exercise exercise } button)
         {
             return;
         }
@@ -106,7 +126,7 @@ public partial class ExercisesWindow : Window
             return;
         }
 
-        ConfirmDelete(exercise);
+        ConfirmDelete(exercise, button);
     }
 
     /// <summary>
@@ -114,7 +134,7 @@ public partial class ExercisesWindow : Window
     /// представления. Результат показывается сообщением — оба, и успех, и отказ: отказ записи иначе
     /// остался бы незамеченным, а файл человек ищет по своему выбору пути.
     /// </summary>
-    private void OnExportClick(object sender, RoutedEventArgs e)
+    private async void OnExportClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not ExercisesViewModel viewModel)
         {
@@ -135,7 +155,7 @@ public partial class ExercisesWindow : Window
             return;
         }
 
-        viewModel.ExportCommand.Execute(dialog.FileName);
+        await viewModel.ExportCommand.ExecuteAsync(dialog.FileName);
 
         MessageBox.Show(
             this,

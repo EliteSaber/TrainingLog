@@ -183,7 +183,9 @@ public sealed partial class PlansViewModel : ObservableObject
             return;
         }
 
-        if (!await _repository.DeleteAsync(plan.Id).ConfigureAwait(true))
+        // SQLite под EF Core отвечает синхронно: без фона окно замирало бы вместе с кольцом
+        // загрузки. Фабрика контекста потокобезопасна, репозиторий без состояния.
+        if (!await Task.Run(() => _repository.DeleteAsync(plan.Id)).ConfigureAwait(true))
         {
             return;
         }

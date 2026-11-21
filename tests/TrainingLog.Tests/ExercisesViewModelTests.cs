@@ -140,7 +140,7 @@ public sealed class ExercisesViewModelTests
 
         try
         {
-            viewModel.ExportCommand.Execute(path);
+            await viewModel.ExportCommand.ExecuteAsync(path);
 
             Assert.True(viewModel.ExportSucceeded);
             Assert.Equal(3, viewModel.Count);
@@ -181,7 +181,7 @@ public sealed class ExercisesViewModelTests
 
         try
         {
-            viewModel.ExportCommand.Execute(path);
+            await viewModel.ExportCommand.ExecuteAsync(path);
 
             Assert.False(viewModel.ExportSucceeded);
             Assert.False(File.Exists(path));
@@ -193,13 +193,13 @@ public sealed class ExercisesViewModelTests
     }
 
     [Fact]
-    public void Export_БезПути_НичегоНеПишет()
+    public async Task Export_БезПути_НичегоНеПишет()
     {
         using var database = new TemporaryDatabase();
         var viewModel = new ExercisesViewModel(database.Repository, new FakeWindowService());
         viewModel.NewName = "Жим";
 
-        viewModel.ExportCommand.Execute(null);
+        await viewModel.ExportCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.ExportSucceeded);
     }

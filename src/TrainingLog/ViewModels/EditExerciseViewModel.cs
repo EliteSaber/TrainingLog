@@ -68,7 +68,9 @@ public sealed partial class EditExerciseViewModel : ObservableObject
     {
         var candidate = new Exercise { Id = _exercise.Id, Name = Name };
 
-        var outcome = await _repository.UpdateAsync(candidate).ConfigureAwait(true);
+        // SQLite под EF Core отвечает синхронно: без фона окно замирало бы вместе с кольцом
+        // загрузки. Кандидат собран здесь, привязанных к интерфейсу объектов запись не трогает.
+        var outcome = await Task.Run(() => _repository.UpdateAsync(candidate)).ConfigureAwait(true);
 
         if (outcome != UpdateExerciseOutcome.Updated)
         {

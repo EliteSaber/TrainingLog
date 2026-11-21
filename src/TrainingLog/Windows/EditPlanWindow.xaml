@@ -485,6 +485,8 @@
                     Orientation="Horizontal">
             <Button Style="{StaticResource GlassButtonSoft}"
                     Command="{Binding AcceptCommand}"
+                    AutomationProperties.Name="{Binding AcceptText}"
+                    helpers:BusyButton.IsBusy="{Binding AcceptCommand.IsRunning}"
                     helpers:Hotkey.Id="EditPlan.Accept"
                     Content="{Binding AcceptText}"
                     IsDefault="True" />

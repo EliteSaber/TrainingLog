@@ -59,8 +59,14 @@ public sealed partial class ExercisesViewModel : ObservableObject
     [ObservableProperty]
     private Exercise? _editedExercise;
 
-    /// <summary>Выгружать нечего, пока справочник пуст.</summary>
-    public bool CanExport => _all.Count > 0;
+    /// <summary>Идёт запись файла: кнопка выгрузки показывает кольцо и недоступна.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanExport))]
+    [NotifyCanExecuteChangedFor(nameof(ExportCommand))]
+    private bool _isExporting;
+
+    /// <summary>Выгружать нечего, пока справочник пуст; во время записи кнопка тоже погашена.</summary>
+    public bool CanExport => _all.Count > 0 && !IsExporting;
 
     /// <summary>Записался ли файл последней выгрузки.</summary>
     /// <remarks>
@@ -106,7 +112,9 @@ public sealed partial class ExercisesViewModel : ObservableObject
     {
         var exercise = new Exercise { Name = NewName };
 
-        var outcome = await _repository.AddAsync(exercise).ConfigureAwait(true);
+        // SQLite под EF Core отвечает синхронно: без фона окно замирало бы вместе с кольцом
+        // загрузки. Фабрика контекста потокобезопасна, репозиторий без состояния.
+        var outcome = await Task.Run(() => _repository.AddAsync(exercise)).ConfigureAwait(true);
 
         if (outcome != AddExerciseOutcome.Added)
         {
@@ -180,7 +188,7 @@ public sealed partial class ExercisesViewModel : ObservableObject
             return;
         }
 
-        if (!await _repository.DeleteAsync(exercise.Id).ConfigureAwait(true))
+        if (!await Task.Run(() => _repository.DeleteAsync(exercise.Id)).ConfigureAwait(true))
         {
             return;
         }
@@ -203,7 +211,7 @@ public sealed partial class ExercisesViewModel : ObservableObject
     /// нельзя: у кнопки с обработчиком `Click` команда выполнилась бы с пустым параметром.
     /// </remarks>
     [RelayCommand(CanExecute = nameof(CanExport))]
-    private void Export(string? path)
+    private async Task ExportAsync(string? path)
     {
         // Проверка повторяется в теле команды, а не только в предикате: предикат отвечает за
         // кнопку, а Execute его не спрашивает (ловушка 46).
@@ -214,7 +222,22 @@ public sealed partial class ExercisesViewModel : ObservableObject
             return;
         }
 
-        ExportSucceeded = ExerciseFileWriter.Write(path, NamesForExport());
+        // Список собирается на UI-потоке: перебирать ObservableCollection в фоне нельзя, его
+        // в это время может менять другое действие окна.
+        var names = NamesForExport().ToList();
+
+        IsExporting = true;
+
+        try
+        {
+            // Запись файла уходит в фон: на сетевой папке она может ждать диск, и окно с кольцом
+            // не должно замирать вместе с ней.
+            ExportSucceeded = await Task.Run(() => ExerciseFileWriter.Write(path, names)).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsExporting = false;
+        }
     }
 
     private IEnumerable<string> NamesForExport() =>

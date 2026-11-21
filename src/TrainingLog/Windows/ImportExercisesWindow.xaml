@@ -175,6 +175,8 @@
             <Button Style="{StaticResource GlassButtonSoft}"
                     Click="OnSaveClick"
                     helpers:Hotkey.Id="Import.Save"
+                    AutomationProperties.Name="Сохранить"
+                    helpers:BusyButton.IsBusy="{Binding IsSaving}"
                     Content="Сохранить"
                     IsDefault="True"
                     IsEnabled="{Binding CanSave}" />

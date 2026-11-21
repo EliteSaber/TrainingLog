@@ -74,6 +74,12 @@ public sealed partial class ImportExercisesViewModel : ObservableObject
     /// <summary>Упражнения записаны. Окно сообщает о записи и закрывается по нему.</summary>
     public bool Accepted { get; private set; }
 
+    /// <summary>Идёт запись справочника: кнопка сохранения показывает кольцо и не нажимается.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private bool _isSaving;
+
     [RelayCommand]
     private async Task InitializeAsync()
     {
@@ -125,7 +131,7 @@ public sealed partial class ImportExercisesViewModel : ObservableObject
     /// Дешёвый предикат, а не полный пересчёт: свойство проверяется на каждый символ в поле.
     /// Ответ обязан совпадать с «<see cref="PrepareNames"/> не пуст» — проверяется тестом.
     /// </remarks>
-    public bool CanSave => ExerciseImportRules.HasSavable(Text, _existingNames, ClearExisting);
+    public bool CanSave => ExerciseImportRules.HasSavable(Text, _existingNames, ClearExisting) && !IsSaving;
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
@@ -139,12 +145,24 @@ public sealed partial class ImportExercisesViewModel : ObservableObject
             return;
         }
 
-        var outcome = await _repository.ImportAsync(names, ClearExisting).ConfigureAwait(true);
+        IsSaving = true;
 
-        if (outcome != ImportExercisesOutcome.Imported)
+        try
         {
-            Status = "Не удалось записать упражнения: одно из названий уже занято в справочнике. Обновите окно упражнений и повторите.";
-            return;
+            // Импорт — одна транзакция по базе: SQLite под EF Core отвечает синхронно, и без фона
+            // окно замирало бы вместе с кольцом загрузки. Список названий собран заранее и в
+            // фоне не меняется.
+            var outcome = await Task.Run(() => _repository.ImportAsync(names, ClearExisting)).ConfigureAwait(true);
+
+            if (outcome != ImportExercisesOutcome.Imported)
+            {
+                Status = "Не удалось записать упражнения: одно из названий уже занято в справочнике. Обновите окно упражнений и повторите.";
+                return;
+            }
+        }
+        finally
+        {
+            IsSaving = false;
         }
 
         Status = string.Empty;

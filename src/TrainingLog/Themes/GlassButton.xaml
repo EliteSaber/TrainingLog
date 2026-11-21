@@ -182,9 +182,54 @@
               надписи читались муточно. Чёткий текст важнее невидимого на малом кегле обвода.
             -->
             <Grid x:Name="ContentRoot" Margin="6">
-                <ContentPresenter Margin="{TemplateBinding Padding}"
+                <ContentPresenter x:Name="ButtonContent"
+                                  Margin="{TemplateBinding Padding}"
                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+
+                <!--
+                  Кольцо занятости. Стоит в общем шаблоне, а не в разметке каждой кнопки: вид и
+                  вращение обязаны совпадать у «Применить», «Сохранить», «Принять» и «Удалить», а
+                  копия разметки разъехалась бы при первой же правке.
+
+                  Надпись прячется через Hidden, а не Collapsed: скрытое содержимое продолжает
+                  участвовать в мерке, поэтому ширина кнопки не меняется и шапка не прыгает.
+                  Кольцо фиксированное, 16×16, как иконки: вместе со шрифтом оно не масштабируется.
+
+                  Показывается оно только при BusyButton.IsBusy. Анимация в триггере шаблона
+                  запускается и останавливается вместе с признаком; быстрое действие успевает
+                  закончиться до кадра отрисовки, и кольцо не мигает.
+                -->
+                <Grid x:Name="BusyRing"
+                      Width="16"
+                      Height="16"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      RenderTransformOrigin="0.5,0.5"
+                      Visibility="Collapsed">
+                    <Grid.RenderTransform>
+                        <RotateTransform />
+                    </Grid.RenderTransform>
+
+                    <!-- Дорожка: полное кольцо, приглушённое, чтобы дуга читалась отдельно. -->
+                    <Ellipse Width="14"
+                             Height="14"
+                             Stroke="{DynamicResource TextSecondary}"
+                             StrokeThickness="2"
+                             Opacity="0.35" />
+
+                    <!-- Дуга ~100°: от верха по часовой, с круглыми торцами. -->
+                    <Path Width="16"
+                          Height="16"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Stretch="None"
+                          Data="M 8,1 A 7,7 0 0 1 14.894,9.215"
+                          Stroke="{DynamicResource AccentStrong}"
+                          StrokeThickness="2"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round" />
+                </Grid>
             </Grid>
         </Grid>
         <ControlTemplate.Triggers>
@@ -288,6 +333,34 @@
                 <Setter TargetName="LeftEdge" Property="Fill" Value="#73FFFFFF" />
                 <Setter TargetName="RightEdge" Property="Fill" Value="#33FFFFFF" />
                 <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+            </Trigger>
+
+            <!--
+              Занятая кнопка. Триггер шаблона, а не стиля: содержимое и кольцо — части шаблона и
+              по имени доступны только отсюда. Свойство читается тем же Trigger'ом, что и
+              IsMouseOver: в ControlTemplate.Triggers RelativeSource=TemplatedParent смотрит на
+              TemplatedParent самой кнопки, а не на неё, и DataTrigger по нему не срабатывает
+              никогда. Присоединённое свойство объявлено на кнопке, поэтому обычный Trigger
+              видит его как её собственное.
+            -->
+            <Trigger Property="helpers:BusyButton.IsBusy" Value="True">
+                <Setter TargetName="ButtonContent" Property="Visibility" Value="Hidden" />
+                <Setter TargetName="BusyRing" Property="Visibility" Value="Visible" />
+                <Trigger.EnterActions>
+                    <BeginStoryboard x:Name="BusySpinner">
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetName="BusyRing"
+                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                             From="0"
+                                             To="360"
+                                             Duration="0:0:0.9"
+                                             RepeatBehavior="Forever" />
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <StopStoryboard BeginStoryboardName="BusySpinner" />
+                </Trigger.ExitActions>
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>

@@ -256,6 +256,7 @@
                                         <Button Margin="2,0,0,0"
                                                 VerticalAlignment="Center"
                                                 Style="{StaticResource GlassButtonIconSoft}"
+                                                AutomationProperties.Name="Удалить"
                                                 Click="OnDeleteClick"
                                                 CommandParameter="{Binding}"
                                                 Content="Удалить">

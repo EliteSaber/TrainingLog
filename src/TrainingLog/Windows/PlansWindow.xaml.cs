@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using TrainingLog.Controls;
 using TrainingLog.Core.Models;
 using TrainingLog.Core.Repositories;
 using TrainingLog.Services;
@@ -77,6 +78,15 @@ public partial class PlansWindow : Window
     /// </summary>
     private void OnExercisesChanged(object? sender, EventArgs e)
     {
+        // Запись в справочник идёт в фоне, и событие репозитория приходит из пула потоков.
+        // Перечитывание планов трогает привязанные коллекции: переносим его в окно.
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnExercisesChanged(sender, e));
+
+            return;
+        }
+
         if (DataContext is PlansViewModel viewModel)
         {
             viewModel.LoadCommand.Execute(null);
@@ -96,7 +106,7 @@ public partial class PlansWindow : Window
     }
 
     /// <summary>Удаление плана с подтверждением: как клику по кнопке из строки.</summary>
-    private async void ConfirmDelete(TrainingPlan plan)
+    private async void ConfirmDelete(TrainingPlan plan, Button? button = null)
     {
         if (DataContext is not PlansViewModel viewModel)
         {
@@ -111,9 +121,28 @@ public partial class PlansWindow : Window
             MessageBoxImage.Warning,
             MessageBoxResult.No);
 
-        if (answer == MessageBoxResult.Yes && viewModel.DeleteCommand.CanExecute(plan))
+        if (answer != MessageBoxResult.Yes || !viewModel.DeleteCommand.CanExecute(plan))
+        {
+            return;
+        }
+
+        // Кольцо ставится на нажатую строку, а не на все кнопки списка: команда одна на строки,
+        // и привязка к её IsRunning зажгла бы кольца у всех видимых «Удалить».
+        if (button is not null)
+        {
+            BusyButton.SetIsBusy(button, true);
+        }
+
+        try
         {
             await viewModel.DeleteCommand.ExecuteAsync(plan);
+        }
+        finally
+        {
+            if (button is not null)
+            {
+                BusyButton.SetIsBusy(button, false);
+            }
         }
     }
 
@@ -123,7 +152,7 @@ public partial class PlansWindow : Window
     /// </summary>
     private async void OnDeleteClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { CommandParameter: TrainingPlan plan })
+        if (sender is not Button { CommandParameter: TrainingPlan plan } button)
         {
             return;
         }
@@ -135,6 +164,6 @@ public partial class PlansWindow : Window
             return;
         }
 
-        ConfirmDelete(plan);
+        ConfirmDelete(plan, button);
     }
 }

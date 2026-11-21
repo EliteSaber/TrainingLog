@@ -216,6 +216,17 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// </remarks>
     public bool IsLoading => _loadingCount > 0;
 
+    /// <summary>Идёт запись дня: обе кнопки сохранения показывают кольцо и не нажимаются.</summary>
+    /// <remarks>
+    /// Флаг общий на «Сохранить» и «Сохранить и закрыть»: запись одна и та же, и второе нажатие
+    /// во время первой ушло бы в базу параллельно. Кольцо поэтому горит на обеих кнопках, а не
+    /// только на нажатой, — иначе вторая осталась бы живой на вид.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SaveAndCloseCommand))]
+    private bool _isSaving;
+
     /// <summary>Разрешён ли ввод: обратное <see cref="IsLoading"/>.</summary>
     /// <remarks>
     /// Отдельное свойство, а не инверсия в разметке: конвертер «не наоборот» означал бы ещё одно
@@ -938,7 +949,7 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// Предикат только читает посчитанное в <see cref="UpdateSaveState"/>: обе команды
     /// спрашивают его на каждый символ, и перебор подходов с разбором строк был бы двойной работой.
     /// </remarks>
-    private bool CanAccept() => _canAccept;
+    private bool CanAccept() => _canAccept && !IsSaving;
 
     /// <summary>Сохраняет день и закрывает окно.</summary>
     [RelayCommand(CanExecute = nameof(CanAccept))]
@@ -974,9 +985,22 @@ public sealed partial class AddDayViewModel : ObservableObject
             return;
         }
 
-        var saved = _existing is null
-            ? await AddAsync(session).ConfigureAwait(true)
-            : await UpdateAsync(session).ConfigureAwait(true);
+        // SQLite под EF Core отвечает синхронно: без фона окно замирало бы вместе с кольцом
+        // загрузки. Запись собрана выше, привязанных к интерфейсу объектов репозиторий не трогает.
+        IsSaving = true;
+
+        bool saved;
+
+        try
+        {
+            saved = _existing is null
+                ? await AddAsync(session).ConfigureAwait(true)
+                : await UpdateAsync(session).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
 
         if (!saved)
         {
@@ -1160,7 +1184,7 @@ public sealed partial class AddDayViewModel : ObservableObject
 
     private async Task<bool> AddAsync(TrainingSession session)
     {
-        var outcome = await _sessionRepository.AddAsync(session).ConfigureAwait(true);
+        var outcome = await Task.Run(() => _sessionRepository.AddAsync(session)).ConfigureAwait(true);
 
         switch (outcome)
         {
@@ -1179,7 +1203,7 @@ public sealed partial class AddDayViewModel : ObservableObject
 
     private async Task<bool> UpdateAsync(TrainingSession session)
     {
-        var outcome = await _sessionRepository.UpdateAsync(session).ConfigureAwait(true);
+        var outcome = await Task.Run(() => _sessionRepository.UpdateAsync(session)).ConfigureAwait(true);
 
         switch (outcome)
         {

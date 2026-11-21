@@ -75,6 +75,8 @@
                     Orientation="Horizontal">
             <Button Style="{StaticResource GlassButtonSoft}"
                     Command="{Binding AcceptCommand}"
+                    AutomationProperties.Name="Принять"
+                    helpers:BusyButton.IsBusy="{Binding AcceptCommand.IsRunning}"
                     helpers:Hotkey.Id="EditExercise.Accept"
                     Content="Принять"
                     IsDefault="True" />

@@ -643,6 +643,8 @@
                         VerticalAlignment="Center"
                         Style="{StaticResource GlassButtonSoft}"
                         Command="{Binding SaveCommand}"
+                        AutomationProperties.Name="Сохранить"
+                        helpers:BusyButton.IsBusy="{Binding IsSaving}"
                         helpers:Hotkey.Id="Day.Save"
                         Content="Сохранить"
                         IsDefault="True" />
@@ -694,6 +696,8 @@
                             VerticalAlignment="Center">
                     <Button Style="{StaticResource GlassButtonSoft}"
                             Command="{Binding SaveAndCloseCommand}"
+                            AutomationProperties.Name="Сохранить и закрыть"
+                            helpers:BusyButton.IsBusy="{Binding IsSaving}"
                             helpers:Hotkey.Id="Day.SaveAndClose"
                             Content="Сохранить и закрыть" />
 

@@ -442,9 +442,12 @@ public sealed partial class EditPlanViewModel : ObservableObject
             candidate.AddExercise(row.Exercise);
         }
 
+        // SQLite под EF Core отвечает синхронно: без фона окно замирало бы вместе с кольцом
+        // загрузки. Кандидат собран здесь и к интерфейсу не привязан: репозиторий меняет его
+        // название и состав, а строки справочника остаются нетронутыми.
         var saved = _isNew
-            ? await _planRepository.AddAsync(candidate).ConfigureAwait(true) == AddTrainingPlanOutcome.Added
-            : await _planRepository.UpdateAsync(candidate).ConfigureAwait(true) == UpdateTrainingPlanOutcome.Updated;
+            ? await Task.Run(() => _planRepository.AddAsync(candidate)).ConfigureAwait(true) == AddTrainingPlanOutcome.Added
+            : await Task.Run(() => _planRepository.UpdateAsync(candidate)).ConfigureAwait(true) == UpdateTrainingPlanOutcome.Updated;
 
         if (!saved)
         {

@@ -133,10 +133,8 @@ public sealed class EditorWindowTests
 
                 ShowAway(window);
                 viewModel.Name = "Жим лёжа";
-                var task = viewModel.AcceptCommand.ExecuteAsync(null);
 
-                Pump(window);
-                task.GetAwaiter().GetResult();
+                RunCommand(window, () => viewModel.AcceptCommand.ExecuteAsync(null));
 
                 Assert.Equal(1, saved);
                 Assert.False(window.IsVisible);
@@ -300,13 +298,37 @@ public sealed class EditorWindowTests
         return null;
     }
 
-    /// <summary>Прокачка диспетчера: асинхронное сохранение должно дойти до окна.</summary>
+    /// <summary>
+    /// Запускает асинхронную команду окна и доводит её до конца.
+    /// </summary>
+    /// <remarks>
+    /// Запись в базу уходит в фон, и продолжение возвращается в UI-поток. Без контекста
+    /// диспетчера оно пришло бы из пула потоков, и окно закрывалось бы из чужого потока.
+    /// Прокачка идёт, пока задача не завершится: фиксированное число кадров не гарантирует,
+    /// что фоновая запись успела.
+    /// </remarks>
     /// <param name="window">Окно теста.</param>
-    private static void Pump(Window window)
+    /// <param name="start">Запуск команды.</param>
+    private static void RunCommand(Window window, Func<Task> start)
     {
-        for (var attempt = 0; attempt < 20; attempt++)
+        var previous = SynchronizationContext.Current;
+
+        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(window.Dispatcher));
+
+        try
         {
-            window.Dispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));
+            var task = start();
+
+            while (!task.IsCompleted)
+            {
+                window.Dispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));
+            }
+
+            task.GetAwaiter().GetResult();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
         }
     }
 }
