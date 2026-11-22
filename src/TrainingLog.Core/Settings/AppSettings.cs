@@ -75,6 +75,19 @@ public sealed class AppSettings
     /// </remarks>
     public string Theme { get; set; } = DefaultTheme;
 
+    /// <summary>Поведение примечания, пока пользователь ничего не выбрал: поле свёрнуто.</summary>
+    public const string DefaultNotesExpansion = NotesExpansionRules.Default;
+
+    /// <summary>
+    /// Как показывать поле примечания в окне дня при смене упражнения: свёрнуто, по заполненности,
+    /// по подсказке прошлого дня, по обоим признакам или всегда раскрыто.
+    /// </summary>
+    /// <remarks>
+    /// Строкой, а не перечислением: файл настроек правят руками, и значение должно читаться
+    /// глазами. Канон задаёт <see cref="NotesExpansionRules"/>, пригодность проверяет он же.
+    /// </remarks>
+    public string NotesExpansion { get; set; } = DefaultNotesExpansion;
+
     /// <summary>Полный адрес файла базы: сохранённые директория и наименование вместе.</summary>
     public string DatabasePath => Path.Combine(DatabaseDirectory, DatabaseName);
 

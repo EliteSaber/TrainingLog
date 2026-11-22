@@ -92,6 +92,10 @@ public sealed class AppSettingsStore
         // не нужно.
         settings.Theme = ThemeRules.Normalize(settings.Theme);
 
+        // Примечание — тем же договором, что и тема: негодное значение откатывается к умолчанию
+        // только в памяти, файл правят руками, и переписывать его после опечатки не нужно.
+        settings.NotesExpansion = NotesExpansionRules.Normalize(settings.NotesExpansion);
+
         // «Hotkeys»: null JSON-десериализатор пишет и поверх инициализатора AppSettings, и
         // дальше HotkeyService упал бы на null-источнике. Умолчание вместо секции — тот же
         // договор, что у DaysCount вне диапазона: значение в памяти заменяется, файл не трогается.

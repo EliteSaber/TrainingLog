@@ -467,6 +467,41 @@ public sealed class SettingsWindowTests
     }
 
     /// <summary>
+    /// Выбор поведения примечания на вкладке «Общие»: пять пунктов, по умолчанию «Свернуто»,
+    /// список связан с моделью.
+    /// </summary>
+    /// <remarks>
+    /// Проверяется разметка, а не только модель: без привязки окно показывало бы пустой список,
+    /// и тест модели этого не заметил бы.
+    /// </remarks>
+    [Fact]
+    public void ВыборПримечания_ПятьПунктов_ИСвязанСМоделью()
+    {
+        StaRunner.Run(() =>
+        {
+            using var settings = new TemporarySettings();
+            var window = OpenWindow(settings, tab: 0);
+
+            try
+            {
+                var viewModel = (SettingsViewModel)window.DataContext;
+                var box = (ComboBox)window.FindName("NotesExpansionBox")!;
+
+                Assert.Same(viewModel.NotesExpansionOptions, box.ItemsSource);
+                Assert.Equal(5, box.Items.Count);
+
+                var selected = Assert.IsType<NotesExpansionOption>(box.SelectedItem);
+
+                Assert.Equal(NotesExpansionRules.Default, selected.Value);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>
     /// Кнопки отделены от содержимого вкладки линией: без неё подвал окна читался как
     /// последняя строка параметров.
     /// </summary>

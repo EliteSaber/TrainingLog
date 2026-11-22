@@ -108,10 +108,13 @@ public partial class App : Application
                 hotkeys),
             // Окно дня одно на добавление и на правку: какая это запись, модель узнаёт по дате,
             // поэтому фабрика одна, а null означает сегодняшний день.
+            // Настройка примечания читается здесь, при открытии окна: сохранение параметров при
+            // уже открытом окне дня подействует на следующее открытие.
             day => new AddDayWindow(new AddDayViewModel(
                 provider.GetRequiredService<ITrainingSessionRepository>(),
                 provider.GetRequiredService<ITrainingPlanRepository>(),
-                day),
+                day,
+                provider.GetRequiredService<AppSettingsStore>().Load().NotesExpansion),
                 hotkeys),
             () => new SettingsWindow(new SettingsViewModel(
                 provider.GetRequiredService<AppSettingsStore>(),

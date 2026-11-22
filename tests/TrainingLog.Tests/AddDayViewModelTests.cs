@@ -1,5 +1,6 @@
 using TrainingLog.Core.Models;
 using TrainingLog.Core.Repositories;
+using TrainingLog.Core.Settings;
 using TrainingLog.ViewModels;
 
 namespace TrainingLog.Tests;
@@ -2142,6 +2143,147 @@ public void Индикаторы_НеЗажигаютсяОдновременн�
 
     Assert.False(row.HasNote);
     Assert.False(row.HasNotePlaceholder);
+}
+
+/// <summary>
+/// Умолчание — «свернуто»: смена упражнения закрывает поле, раскрытое вручную.
+/// </summary>
+[Fact]
+public async Task Примечание_Свернуто_ЗакрываетРучноеПриСмене()
+{
+    using var database = new TemporaryDatabase();
+    await CreatePlanAsync(database, "Ноги", "Приседание", "Жим");
+
+    var viewModel = await CreateInitializedAsync(database);
+    viewModel.SelectedPlan = Assert.Single(viewModel.Plans);
+    await SettleAsync();
+
+    viewModel.Current!.IsNotesExpanded = true;
+
+    viewModel.NextCommand.Execute(null);
+
+    Assert.False(viewModel.Current!.IsNotesExpanded);
+}
+
+/// <summary>
+/// «Если заполнено» раскрывает упражнение с примечанием и оставляет пустое свёрнутым.
+/// </summary>
+[Fact]
+public async Task Примечание_ЕслиЗаполнено_РаскрываетсяПоТексту()
+{
+    using var database = new TemporaryDatabase();
+    await CreatePlanAsync(database, "Ноги", "Приседание", "Жим");
+
+    var viewModel = new AddDayViewModel(
+        database.SessionRepository,
+        database.PlanRepository,
+        notesExpansion: NotesExpansionRules.WhenFilled);
+
+    await viewModel.InitializeCommand.ExecuteAsync(null);
+    viewModel.SelectedPlan = Assert.Single(viewModel.Plans);
+    await SettleAsync();
+
+    viewModel.Current!.NoteText = "колени побаливали";
+
+    // Набор текста ручное состояние не трогает: правило срабатывает на смене упражнения.
+    Assert.False(viewModel.Current.IsNotesExpanded);
+
+    viewModel.NextCommand.Execute(null);
+
+    Assert.False(viewModel.Current!.IsNotesExpanded);
+
+    viewModel.PreviousCommand.Execute(null);
+
+    Assert.True(viewModel.Current!.IsNotesExpanded);
+}
+
+/// <summary>«Если есть подсказка» раскрывает поле после подтягивания примечания прошлого дня.</summary>
+[Fact]
+public async Task Примечание_ЕслиПодсказка_РаскрываетсяПриПодтягивании()
+{
+    using var database = new TemporaryDatabase();
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var previous = new TrainingSession
+    {
+        Date = new DateOnly(2026, 10, 8),
+        PlanId = plan.Id,
+        PlanName = plan.Name,
+    };
+
+    previous.AddExercise(plan.Exercises[0], "болело левое плечо").AddSet(10, 60m);
+
+    await database.SessionRepository.AddAsync(previous);
+
+    var viewModel = new AddDayViewModel(
+        database.SessionRepository,
+        database.PlanRepository,
+        notesExpansion: NotesExpansionRules.WhenHint);
+
+    await viewModel.InitializeCommand.ExecuteAsync(null);
+    await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
+
+    viewModel.SelectedPlan = plan;
+
+    await SettleAsync();
+
+    Assert.True(viewModel.Current!.HasNotePlaceholder);
+    Assert.True(viewModel.Current.IsNotesExpanded);
+}
+
+/// <summary>Правка дня с заполненным примечанием раскрывает поле после наполнения строк.</summary>
+[Fact]
+public async Task Примечание_ПравкаДня_РаскрываетсяПоЗаполненному()
+{
+    using var database = new TemporaryDatabase();
+    var day = new DateOnly(2026, 10, 5);
+    var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
+
+    var session = new TrainingSession { Date = day, PlanId = plan.Id, PlanName = plan.Name };
+    session.AddExercise(plan.Exercises[0], "колени побаливали").AddSet(8, 60m);
+    await database.SessionRepository.AddAsync(session);
+
+    var viewModel = new AddDayViewModel(
+        database.SessionRepository,
+        database.PlanRepository,
+        day,
+        NotesExpansionRules.WhenFilled);
+
+    await viewModel.InitializeCommand.ExecuteAsync(null);
+
+    Assert.True(viewModel.Current!.HasNote);
+    Assert.True(viewModel.Current.IsNotesExpanded);
+}
+
+/// <summary>
+/// «Всегда раскрыто» — про автоматическое состояние: вручную свернуть можно, и до смены
+/// упражнения правило это не перебивает.
+/// </summary>
+[Fact]
+public async Task Примечание_ВсегдаРаскрыто_РучноеСворачиваниеНеПеребивается()
+{
+    using var database = new TemporaryDatabase();
+    await CreatePlanAsync(database, "Ноги", "Приседание", "Жим");
+
+    var viewModel = new AddDayViewModel(
+        database.SessionRepository,
+        database.PlanRepository,
+        notesExpansion: NotesExpansionRules.Expanded);
+
+    await viewModel.InitializeCommand.ExecuteAsync(null);
+    viewModel.SelectedPlan = Assert.Single(viewModel.Plans);
+    await SettleAsync();
+
+    Assert.True(viewModel.Current!.IsNotesExpanded);
+
+    viewModel.Current.IsNotesExpanded = false;
+    viewModel.Current.NoteText = "спина";
+
+    Assert.False(viewModel.Current.IsNotesExpanded);
+
+    viewModel.NextCommand.Execute(null);
+
+    Assert.True(viewModel.Current!.IsNotesExpanded);
 }
 
 /// <summary>

@@ -23,6 +23,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     // Поле под SelectedTheme: свойство тоже написано вручную, см. комментарий у него.
     private ThemeOption _selectedTheme;
 
+    // Поле под SelectedNotesExpansion: свойство тоже написано вручную, см. комментарий у него.
+    private NotesExpansionOption _selectedNotesExpansion;
+
     /// <param name="store">Файл настроек.</param>
     /// <param name="fonts">Каталог шрифтов системы; без него (тесты) в списке только «по цепочке».</param>
     public SettingsViewModel(AppSettingsStore store, FontCatalog? fonts = null)
@@ -68,6 +71,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         _selectedTheme = ThemeOptions.FirstOrDefault(option => option.Value == theme)
             ?? ThemeOptions.First(option => option.Value == ThemeRules.Default);
         SavedTheme = theme;
+
+        // Примечание окна дня: из файла, срез не нужен — предпросмотра у настройки нет.
+        var notesExpansion = NotesExpansionRules.Normalize(settings.NotesExpansion);
+
+        NotesExpansionOptions = BuildNotesExpansionOptions();
+        _selectedNotesExpansion = NotesExpansionOptions.FirstOrDefault(option => option.Value == notesExpansion)
+            ?? NotesExpansionOptions.First(option => option.Value == NotesExpansionRules.Default);
 
         HotkeyGroups = BuildHotkeyGroups(settings.Hotkeys);
 
@@ -265,6 +275,31 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// </remarks>
     public string SavedTheme { get; }
 
+    /// <summary>Пункты выбора поведения примечания: значение и подпись.</summary>
+    /// <remarks>
+    /// Строятся один раз в конструкторе: список из пяти пунктов не меняется, а пересобирать его
+    /// при каждом показе вкладки незачем.
+    /// </remarks>
+    public IReadOnlyList<NotesExpansionOption> NotesExpansionOptions { get; }
+
+    /// <summary>Как показывать примечание в окне дня при смене упражнения.</summary>
+    /// <remarks>
+    /// Свойство написано вручную, а не <c>[ObservableProperty]</c>: ComboBox присылает null, когда
+    /// выбранный пункт пропадает из списка, и null в модели означал бы «правила нет». Тот же приём,
+    /// что у темы и выбранного шрифта.
+    /// </remarks>
+    public NotesExpansionOption SelectedNotesExpansion
+    {
+        get => _selectedNotesExpansion;
+        set
+        {
+            if (value is not null)
+            {
+                SetProperty(ref _selectedNotesExpansion, value);
+            }
+        }
+    }
+
     /// <summary>Подсказка об отказе по вводу.</summary>
     public HintState Hint { get; } = new();
 
@@ -427,6 +462,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 FontFamily = SelectedFont.Name,
                 FontSizePercent = SelectedScale,
                 Theme = SelectedTheme.Value,
+                NotesExpansion = SelectedNotesExpansion.Value,
                 Hotkeys = AssignedHotkeys(),
                 WindowSizes = sizes,
             }))
@@ -701,6 +737,22 @@ public sealed partial class SettingsViewModel : ObservableObject
         new ThemeOption(ThemeRules.System, "Системная"),
     ];
 
+    /// <summary>Пункты выбора поведения примечания: подписи на русском, значения канонические.</summary>
+    /// <remarks>
+    /// Порядок — от «никогда» к «всегда»: пользователь выбирает степень раскрытия, и подписи
+    /// читаются как одна шкала.
+    /// </remarks>
+    private static IReadOnlyList<NotesExpansionOption> BuildNotesExpansionOptions() =>
+    [
+        new NotesExpansionOption(NotesExpansionRules.Collapsed, "Свернуто"),
+        new NotesExpansionOption(NotesExpansionRules.WhenFilled, "Раскрыто, если заполнено"),
+        new NotesExpansionOption(NotesExpansionRules.WhenHint, "Раскрыто, если есть подсказка"),
+        new NotesExpansionOption(
+            NotesExpansionRules.WhenFilledOrHint,
+            "Раскрыто, если заполнено или есть подсказка"),
+        new NotesExpansionOption(NotesExpansionRules.Expanded, "Всегда раскрыто"),
+    ];
+
     /// <summary>Имя из файла: непустое — как есть, пустое — гарнитура по умолчанию.</summary>
     private static string ResolveFontName(string? font) =>
         FontRules.NormalizeName(font) is { Length: > 0 } name
@@ -757,6 +809,13 @@ public sealed partial class SettingsViewModel : ObservableObject
 /// окна.
 /// </remarks>
 public sealed record ThemeOption(string Value, string Display);
+
+/// <summary>Пункт выбора поведения примечания: каноническое значение и подпись для окна.</summary>
+/// <remarks>
+/// Отдельный тип по той же причине, что и <see cref="ThemeOption"/>: в списке показывается
+/// подпись, а в файл пишется значение, и одно поле не может быть и тем, и другим.
+/// </remarks>
+public sealed record NotesExpansionOption(string Value, string Display);
 
 /// <summary>Группа вкладки горячих клавиш: назначения одного окна.</summary>
 public sealed class HotkeyGroupViewModel(

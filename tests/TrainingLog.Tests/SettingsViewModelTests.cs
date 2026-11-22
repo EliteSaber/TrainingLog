@@ -847,6 +847,87 @@ public sealed class SettingsViewModelTests
         Assert.Contains(nameof(SettingsViewModel.SelectedTheme), notified);
     }
 
+    /// <summary>Настройка примечания открывается на сохранённой: иначе первое сохранение снесло бы выбор.</summary>
+    [Fact]
+    public void Примечание_ОткрываетсяНаСохранённом()
+    {
+        using var settings = new TemporarySettings();
+        settings.Store.Save(new AppSettings
+        {
+            NotesExpansion = NotesExpansionRules.WhenHint,
+        });
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.Equal(NotesExpansionRules.WhenHint, viewModel.SelectedNotesExpansion.Value);
+    }
+
+    /// <summary>Записи в файле нет — «свернуто»: тот же выбор, что и у окна дня без настройки.</summary>
+    [Fact]
+    public void Примечание_БезЗаписи_Умолчание()
+    {
+        using var settings = new TemporarySettings();
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.Equal(NotesExpansionRules.Default, viewModel.SelectedNotesExpansion.Value);
+    }
+
+    /// <summary>Пунктов пять, и они идут от «свернуто» к «всегда раскрыто».</summary>
+    [Fact]
+    public void Примечание_ПятьПунктов_ПоШкале()
+    {
+        using var settings = new TemporarySettings();
+
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        Assert.Equal(
+            [
+                NotesExpansionRules.Collapsed,
+                NotesExpansionRules.WhenFilled,
+                NotesExpansionRules.WhenHint,
+                NotesExpansionRules.WhenFilledOrHint,
+                NotesExpansionRules.Expanded,
+            ],
+            viewModel.NotesExpansionOptions.Select(option => option.Value));
+    }
+
+    /// <summary>Выбранное поведение пишется тем же «Сохранить», что и остальные настройки.</summary>
+    [Fact]
+    public void Save_ВыбранноеПримечание_ПишетсяВФайл()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store)
+        {
+            SelectedNotesExpansion = new NotesExpansionOption(
+                NotesExpansionRules.Expanded,
+                "Всегда раскрыто"),
+        };
+
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.Equal(
+            NotesExpansionRules.Expanded,
+            new AppSettingsStore(settings.FilePath).Load().NotesExpansion);
+    }
+
+    /// <summary>Смена выбора поднимает уведомление: окно по нему не остаётся с прежней подписью.</summary>
+    [Fact]
+    public void Примечание_Смена_Уведомляет()
+    {
+        using var settings = new TemporarySettings();
+        var viewModel = new SettingsViewModel(settings.Store);
+
+        var notified = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => notified.Add(args.PropertyName);
+
+        viewModel.SelectedNotesExpansion = new NotesExpansionOption(
+            NotesExpansionRules.WhenFilled,
+            "Раскрыто, если заполнено");
+
+        Assert.Contains(nameof(SettingsViewModel.SelectedNotesExpansion), notified);
+    }
+
     /// <summary>Строки размеров: по одной на каждое окно приложения.</summary>
     [Fact]
     public void Размеры_БезЗаписиВФайле_ИзКаталога()

@@ -288,6 +288,64 @@ public sealed class AppSettingsStoreTests
         Assert.Equal(content, File.ReadAllText(settings.FilePath));
     }
 
+    /// <summary>Примечание из файла читается: значение доезжает до модели как есть.</summary>
+    [Fact]
+    public void Load_ПримечаниеИзФайла_Читается()
+    {
+        using var settings = new TemporarySettings();
+        settings.Write("""{"NotesExpansion": "WhenHint"}""");
+
+        var loaded = settings.Store.Load();
+
+        Assert.Equal(NotesExpansionRules.WhenHint, loaded.NotesExpansion);
+    }
+
+    /// <summary>Примечания в файле нет — умолчание: «не записано» значит «свёрнуто».</summary>
+    [Fact]
+    public void Load_ПримечанияНет_Умолчание()
+    {
+        using var settings = new TemporarySettings();
+        settings.Write("""{"DaysCount": 5}""");
+
+        var loaded = settings.Store.Load();
+
+        Assert.Equal(NotesExpansionRules.Default, loaded.NotesExpansion);
+    }
+
+    /// <summary>
+    /// Негодное значение откатывается к умолчанию в памяти, а файл не переписывается: правят его
+    /// руками, и молчаливая замена испортила бы недописанное — тот же договор, что у темы.
+    /// </summary>
+    [Fact]
+    public void Load_НегодноеПримечание_ОткатываетсяКУмолчанию_ФайлНеПереписывается()
+    {
+        const string content = """{"NotesExpansion": "Свернуто"}""";
+
+        using var settings = new TemporarySettings();
+        settings.Write(content);
+
+        var loaded = settings.Store.Load();
+
+        Assert.Equal(NotesExpansionRules.Default, loaded.NotesExpansion);
+        Assert.Equal(content, File.ReadAllText(settings.FilePath));
+    }
+
+    /// <summary>Сохранённое значение возвращается из файла тем же: круг «записали — прочитали».</summary>
+    [Fact]
+    public void Save_Примечание_ВозвращаетсяИзФайла()
+    {
+        using var settings = new TemporarySettings();
+
+        Assert.True(settings.Store.Save(new AppSettings
+        {
+            NotesExpansion = NotesExpansionRules.WhenFilledOrHint,
+        }));
+
+        Assert.Equal(
+            NotesExpansionRules.WhenFilledOrHint,
+            settings.Store.Load().NotesExpansion);
+    }
+
     /// <summary>Отступы при записи: в файл заглядывают глазами, когда правят руками.</summary>
     [Fact]
     public void Save_ПишетJsonСОтступами()

@@ -131,6 +131,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <!--
@@ -432,6 +433,43 @@
                                       Content="Свёрнутый фильтр при запуске"
                                       ToolTip="Применяется при следующем запуске программы"
                                       IsChecked="{Binding CollapseFiltersOnStartup}" />
+
+                            <!--
+                              Поведение примечания в окне дня: когда его раскрывать при смене
+                              упражнения. Ручное раскрытие и сворачивание настройка не ограничивает —
+                              она задаёт только автоматическое состояние при переключении.
+
+                              Действует при следующем открытии окна дня: модель окна читает значение
+                              один раз, при создании, и сохранение параметров текущее окно не меняет.
+
+                              Показывается подпись, а в файл пишется значение: у пункта их два, и
+                              ComboBox берёт подпись через DisplayMemberPath. Ширина по содержимому:
+                              самая длинная подпись не должна обрезаться.
+                            -->
+                            <Grid Grid.Row="8" Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           VerticalAlignment="Center"
+                                           Background="Transparent"
+                                           TextWrapping="Wrap"
+                                           Text="Примечание"
+                                           helpers:ClickToFocus.Target="{Binding ElementName=NotesExpansionBox}" />
+
+                                <ComboBox x:Name="NotesExpansionBox"
+                                          Grid.Column="1"
+                                          Margin="8,0,0,0"
+                                          MinWidth="220"
+                                          HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"
+                                          ItemsSource="{Binding NotesExpansionOptions}"
+                                          SelectedItem="{Binding SelectedNotesExpansion}"
+                                          DisplayMemberPath="Display"
+                                          ToolTip="Применяется при следующем открытии окна дня" />
+                            </Grid>
                         </Grid>
                     </Border>
                 </ScrollViewer>

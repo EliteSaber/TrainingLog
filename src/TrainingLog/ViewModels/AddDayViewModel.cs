@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TrainingLog.Core.Models;
 using TrainingLog.Core.Repositories;
+using TrainingLog.Core.Settings;
 
 namespace TrainingLog.ViewModels;
 
@@ -109,19 +110,37 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// </remarks>
     private PlanExerciseViewModel? _currentExercise;
 
+    /// <summary>
+    /// Как раскрывать примечание при смене упражнения. Значение из файла на момент открытия окна.
+    /// </summary>
+    /// <remarks>
+    /// Читается один раз, при создании модели: сохранение параметров при уже открытом окне дня
+    /// подействует при следующем открытии. Внутри окна ручное раскрытие ничем не ограничено —
+    /// правило задаёт только автоматическое состояние на смене упражнения.
+    /// </remarks>
+    private readonly string _notesExpansion;
+
     /// <param name="sessionRepository">Журнал тренировок.</param>
     /// <param name="planRepository">Планы тренировок: состав дня берётся из плана.</param>
     /// <param name="day">Дата, на которую открывается окно. <c>null</c> — добавляется сегодня.</param>
+    /// <param name="notesExpansion">
+    /// Поведение примечания при смене упражнения; негодное значение сводится к умолчанию.
+    /// </param>
     public AddDayViewModel(
         ITrainingSessionRepository sessionRepository,
         ITrainingPlanRepository planRepository,
-        DateOnly? day = null)
+        DateOnly? day = null,
+        string notesExpansion = NotesExpansionRules.Default)
     {
         ArgumentNullException.ThrowIfNull(sessionRepository);
         ArgumentNullException.ThrowIfNull(planRepository);
 
         _sessionRepository = sessionRepository;
         _planRepository = planRepository;
+
+        // Нормализация в конструкторе: значение приходит из файла, который правят руками, и
+        // негодная опечатка не должна ронять окно.
+        _notesExpansion = NotesExpansionRules.Normalize(notesExpansion);
 
         // Дата кладётся в поле напрямую, а не через свойство Date: сеттер зовёт LoadDateCommand, а
         // планы в конструкторе ещё не загружены, и собственное значение DatePicker при показе окна
@@ -454,6 +473,10 @@ public sealed partial class AddDayViewModel : ObservableObject
             }
 
             ApplyPreviousSets(previous);
+
+            // Подсказка прошлого дня появилась после наполнения строк, и смены текущего
+            // упражнения уже не будет: правило применяется явно.
+            ApplyNotesExpansion();
         }
         finally
         {
@@ -663,8 +686,31 @@ public sealed partial class AddDayViewModel : ObservableObject
             _isApplyingSets = false;
         }
 
+        // Отдельный вызов, а не полагание на смену текущего упражнения: строки уже новые, и
+        // признак сменился ещё в BuildExercises, когда примечания были пусты. После ApplyExistingSets
+        // примечание может быть заполнено, и правило нужно применить к готовому содержимому.
+        ApplyNotesExpansion();
+
         // Единственное уведомление за перестройку — уже с готовым значением.
         Refresh();
+    }
+
+    /// <summary>Раскрывает или сворачивает примечание текущего упражнения по настройке.</summary>
+    /// <remarks>
+    /// Только на смене упражнения и после наполнения примечаний: внутри одного упражнения ручное
+    /// состояние не трогается, иначе набор текста перебивал бы свёрнутое или раскрытое поле.
+    /// </remarks>
+    private void ApplyNotesExpansion()
+    {
+        if (Current is not { } row)
+        {
+            return;
+        }
+
+        row.IsNotesExpanded = NotesExpansionRules.IsExpanded(
+            _notesExpansion,
+            row.HasNote,
+            row.HasNotePlaceholder);
     }
 
     /// <summary>Подписывает состав на изменения: появление и исчезновение подходов, ввод в них и правку примечания.</summary>
@@ -790,6 +836,9 @@ public sealed partial class AddDayViewModel : ObservableObject
 
         if (!ReferenceEquals(previousExercise, _currentExercise))
         {
+            // Правило применяется до уведомления: подписчики увидят уже готовое состояние.
+            ApplyNotesExpansion();
+
             CurrentExerciseChanged?.Invoke();
         }
 
