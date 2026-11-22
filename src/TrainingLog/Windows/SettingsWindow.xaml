@@ -79,14 +79,21 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Полоса заголовка: отрицательные отступы снимают отступ корневой сетки — полоса от краёв окна. -->
         <helpers:TitleBar Grid.Row="0"
                           Margin="-16,-16,-16,16" />
 
+        <!--
+          Нижний отступ содержимого снят: содержимое вкладки и его полоса прокрутки должны
+          примыкать к линии подвала вплотную, иначе между ними и линией остаётся полоса фона.
+          Верхний и боковые отступы — прежние 10.
+        -->
         <TabControl x:Name="SettingsTabs"
-                    Grid.Row="1">
+                    Grid.Row="1"
+                    Padding="10,10,10,0">
 
             <TabItem Header="Общие">
                 <!--
@@ -839,12 +846,25 @@
         </TabControl>
 
         <!--
+          Линия над подвалом: отделяет отказ записи и кнопки от содержимого вкладки. Без неё
+          кнопки читались как последняя строка параметров, а не как действие над окном.
+          Ширина — по корневой сетке, вровень с линией под вкладками: содержимое получает
+          рамку сверху и снизу. Зазора сверху нет: линия — нижняя граница содержимого
+          вкладки, и скролл примыкает к ней вплотную.
+        -->
+        <Border x:Name="FooterSeparator"
+                Grid.Row="2"
+                Height="1"
+                Background="{DynamicResource LineSoft}"
+                SnapsToDevicePixels="True" />
+
+        <!--
           Отказ записи — красной строкой до успеха, а не подсказкой: подсказка живёт пять секунд,
           а настройка не записана. Строка в сетке, а не в панели: панель отдаёт бесконечную
           ширину, и перенос перестал бы работать (ловушка 35). Стоит вне вкладок: отказ записи
           может случиться и из вкладки горячих клавиш.
         -->
-        <TextBlock Grid.Row="2"
+        <TextBlock Grid.Row="3"
                    Margin="0,12,0,0"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource TextError}"
@@ -858,8 +878,8 @@
           IsCancel у «Отменить» убран: в немодальном окне он не работает, и кнопка закрывает
           окно обработчиком, как это делает окно дня. Esc ловит окно (см. OnKeyDown).
         -->
-        <StackPanel Grid.Row="3"
-                    Margin="0,16,0,0"
+        <StackPanel Grid.Row="4"
+                    Margin="0,12,0,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
             <Button Style="{StaticResource GlassButtonSoft}"
@@ -890,7 +910,7 @@
                             Text="{Binding Hint.Text}" />
 
         <!-- Рамка окна: элемент-обводка поверх содержимого, до самых краёв окна (как на главном). -->
-        <Border Grid.RowSpan="4"
+        <Border Grid.RowSpan="5"
                 Margin="-16,-16,-16,-16"
                 IsHitTestVisible="False"
                 Style="{StaticResource WindowFrame}" />

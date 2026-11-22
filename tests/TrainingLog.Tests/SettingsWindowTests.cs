@@ -467,6 +467,47 @@ public sealed class SettingsWindowTests
     }
 
     /// <summary>
+    /// Кнопки отделены от содержимого вкладки линией: без неё подвал окна читался как
+    /// последняя строка параметров.
+    /// </summary>
+    [Fact]
+    public void Подвал_ОтделёнЛинией()
+    {
+        StaRunner.Run(() =>
+        {
+            using var settings = new TemporarySettings();
+            var window = OpenWindow(settings, tab: 0);
+
+            try
+            {
+                var line = Assert.IsType<Border>(window.FindName("FooterSeparator"));
+                var tabs = (TabControl)window.FindName("SettingsTabs")!;
+
+                Assert.Equal(1, line.Height);
+                Assert.Equal(PaletteColor(line, "LineSoft"), ((SolidColorBrush)line.Background).Color);
+
+                // Линия вровень с содержимым: та же ширина, что у полосы вкладок.
+                Assert.Equal(tabs.ActualWidth, line.ActualWidth, 3);
+
+                // Низ содержимого вкладки примыкает к линии: ни у линии, ни у содержимого
+                // нет нижнего отступа, иначе между скроллом и линией оставалась полоса фона.
+                Assert.Equal(0, line.Margin.Top);
+                Assert.Equal(0, tabs.Padding.Bottom);
+
+                var content = Assert.IsType<ScrollViewer>(tabs.SelectedContent);
+                var contentBottom = content.TranslatePoint(new Point(0, content.ActualHeight), window).Y;
+                var lineTop = line.TranslatePoint(new Point(0, 0), window).Y;
+
+                Assert.Equal(lineTop, contentBottom, 3);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>
     /// Крестик очистки поиска: появляется на непустом поле, чистит его по нажатию.
     /// </summary>
     /// <remarks>
