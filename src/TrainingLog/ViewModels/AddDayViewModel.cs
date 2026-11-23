@@ -101,6 +101,29 @@ public sealed partial class AddDayViewModel : ObservableObject
     private bool _hasUnsavedChanges;
 
     /// <summary>
+    /// Есть ли в собранной записи нулевой вес или нулевые повторения, посчитано последним
+    /// <see cref="Refresh"/>.
+    /// </summary>
+    /// <remarks>
+    /// Кэш по той же причине, что <see cref="_hasUnsavedChanges"/>: геттеры читаются привязкой
+    /// на каждый символ. Ноль означает незаполненное поле, и дата источника остаётся после
+    /// сохранения, пока такие поля есть.
+    /// </remarks>
+    private bool _hasZeroValues;
+
+    /// <summary>
+    /// Подавляет побочные эффекты сеттера плана, пока <see cref="LoadDateAsync"/> наполняет окно.
+    /// </summary>
+    /// <remarks>
+    /// Сеттер зовёт перестройку и подтягивание, а <see cref="LoadDateAsync"/> после присваивания
+    /// перестраивает окно ещё раз — при одном плане на две даты сеттер не сработал бы вовсе.
+    /// SQLite отвечает синхронно, и подтягивание, запущенное сеттером, успевает примениться
+    /// <b>до</b> этой второй перестройки: она стирает подсказки и значения прошлого дня. Пока
+    /// флаг стоит, сеттер молчит, а перестройка и подтягивание зовутся явно и по порядку.
+    /// </remarks>
+    private bool _isLoadingDate;
+
+    /// <summary>
     /// Активное упражнение последнего <see cref="Refresh"/>.
     /// </summary>
     /// <remarks>
@@ -284,6 +307,42 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// </remarks>
     public bool HasUnsavedChanges => _hasUnsavedChanges;
 
+    /// <summary>
+    /// Показывать ли дату источника после сохранения: она остаётся, пока в записи есть нулевой
+    /// вес или нулевые повторения.
+    /// </summary>
+    /// <remarks>
+    /// Ноль — признак незаполненного поля: день записан, но часть значений не набрана, и дата
+    /// источника отвечает на вопрос, откуда взялись подставленные веса. Без подтягивания
+    /// показывать нечего: даты источника нет.
+    /// </remarks>
+    public bool HasPulledFromHint => _pulledFromDate is not null && (_hasUnsavedChanges || _hasZeroValues);
+
+    /// <summary>Есть ли надпись у кнопки «Сохранить»: «Не сохранено» или дата источника.</summary>
+    public bool HasUnsavedHint => HasUnsavedChanges || HasPulledFromHint;
+
+    /// <summary>
+    /// Текст надписи у кнопки «Сохранить»: «Не сохранено» и дата источника.
+    /// </summary>
+    /// <remarks>
+    /// «Не сохранено» гаснет после записи, а дата источника при нулевых полях остаётся
+    /// (<see cref="HasPulledFromHint"/>). Текст собирается здесь, а не двумя Run в разметке:
+    /// видимость частей независима, а у Run её нет. Перенос целого текста сохраняет поведение
+    /// на узком окне.
+    /// </remarks>
+    public string UnsavedHintText
+    {
+        get
+        {
+            if (!HasUnsavedChanges)
+            {
+                return HasPulledFromHint ? PulledFromDateText : string.Empty;
+            }
+
+            return HasPulledFromHint ? $"Не сохранено {PulledFromDateText}" : "Не сохранено";
+        }
+    }
+
     /// <summary>Дата в доменном виде. Пустое поле даёт сегодняшний день: записать день некуда.</summary>
     public DateOnly Day => DateOnly.FromDateTime(Date ?? DateTime.Today);
 
@@ -339,9 +398,18 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// Подтягивание идёт отдельной командой, а не внутри перестройки: перестройка обязана быть
     /// синхронной (её же зовёт <see cref="LoadDateAsync"/> посреди чтения), а чтение из базы
     /// асинхронно.
+    ///
+    /// На время загрузки даты побочные эффекты подавлены: <see cref="LoadDateAsync"/> зовёт
+    /// перестройку и подтягивание сам, после присваивания, иначе его перестройка стёрла бы
+    /// синхронно применённый ответ подтягивания (см. <see cref="_isLoadingDate"/>).
     /// </remarks>
     partial void OnSelectedPlanChanged(TrainingPlan? value)
     {
+        if (_isLoadingDate)
+        {
+            return;
+        }
+
         RebuildWindow();
 
         LoadPreviousCommand.Execute(null);
@@ -417,13 +485,25 @@ public sealed partial class AddDayViewModel : ObservableObject
             ? string.Empty
             : "План этой записи удалён из справочника: выберите план, чтобы записать день заново.";
 
-        SelectedPlan = plan;
+        // Сеттер на время присваивания подавлен: его перестройка и подтягивание обогнали бы
+        // перестройку ниже и были бы ею стёрты (см. _isLoadingDate).
+        _isLoadingDate = true;
 
-        // Перестройка идёт и под смену плана, и под смену даты. Сеттер SelectedPlan сработает не
-        // всегда: у двух дат план один, значение не меняется, OnSelectedPlanChanged не зовётся — и
-        // ни сброс активного упражнения, ни наполнение подходов не случатся. Поэтому они зовутся
-        // явно, а повторный вызов через сеттер безвреден: обе операции идемпотентны.
+        try
+        {
+            SelectedPlan = plan;
+        }
+        finally
+        {
+            _isLoadingDate = false;
+        }
+
+        // Перестройка и подтягивание зовутся явно и по порядку: сеттер SelectedPlan сработал бы
+        // не всегда — у двух дат план один, значение не меняется, — а ответ подтягивания обязан
+        // примениться к готовым строкам, а не быть стёртым следующей перестройкой.
         RebuildWindow();
+
+        LoadPreviousCommand.Execute(null);
 
         OnPropertyChanged(nameof(Title));
     }
@@ -432,10 +512,11 @@ public sealed partial class AddDayViewModel : ObservableObject
     private TrainingPlan? SelectPlan(TrainingSession? session) =>
         session is null ? null : Plans.SingleOrDefault(plan => plan.Id == session.PlanId);
 
-    /// <summary>Подтягивает подходы и веса прошлого раза с тем же планом.</summary>
+    /// <summary>Подтягивает прошлый день с тем же планом: значения при добавлении, подсказки при правке.</summary>
     /// <remarks>
-    /// Только при добавлении: за день, который уже записан, показываются подходы самой записи, и
-    /// подтягивание затерло бы их.
+    /// При добавлении веса становятся значениями, а повторения — подсказками. За день, который
+    /// уже записан, показываются подходы самой записи: прошлый день ставится только подсказками
+    /// в нулевые поля и значения записи не затирает.
     ///
     /// Дата и план запоминаются **до** чтения, а проверяются после: планы переключают быстро, и без
     /// проверки в окно попали бы веса того плана, который выбрали минуту назад. Тот же приём, что в
@@ -448,7 +529,7 @@ public sealed partial class AddDayViewModel : ObservableObject
     [RelayCommand]
     private async Task LoadPreviousAsync()
     {
-        if (_existing is not null || SelectedPlan is not { } plan)
+        if (SelectedPlan is not { } plan)
         {
             return;
         }
@@ -472,7 +553,16 @@ public sealed partial class AddDayViewModel : ObservableObject
                 return;
             }
 
-            ApplyPreviousSets(previous);
+            // Режим определяется на момент применения, а не на момент запуска: пока шло чтение,
+            // день могли сохранить, и значения поверх формы затёрли бы набранное.
+            if (_existing is null)
+            {
+                ApplyPreviousSets(previous);
+            }
+            else
+            {
+                ApplyPreviousHints(previous);
+            }
 
             // Подсказка прошлого дня появилась после наполнения строк, и смены текущего
             // упражнения уже не будет: правило применяется явно.
@@ -540,6 +630,79 @@ public sealed partial class AddDayViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Ставит прошлый день подсказками в нулевые поля записи: ноль означает, что значение не
+    /// указывали, и прошлое число полезно как ориентир, но значением записи оно не становится.
+    /// Пустое примечание записи получает подсказкой примечание прошлого дня — по тому же
+    /// правилу: незаполненное поле сверяется с прошлым разом, а не подменяется им.
+    /// </summary>
+    /// <remarks>
+    /// Подсказка ставится только ненулевому прошлому значению: «0» подсказкой не показывается —
+    /// то же правило, что в <see cref="ToSetInput"/>. Сопоставление подходов — по порядку, как в
+    /// <see cref="ApplyPreviousSets"/>: подходы в записях стоят в порядке выполнения. Наполнение
+    /// под <c>_isApplyingSets</c>: очистка нулевого веса на миг меняет форму, и надпись
+    /// «Не сохранено» не должна мигать. Дата источника ставится, только если подсказка появилась:
+    /// без подсказок показывать в скобках нечего.
+    /// </remarks>
+    private void ApplyPreviousHints(TrainingSession previous)
+    {
+        _isApplyingSets = true;
+        var anyHint = false;
+
+        try
+        {
+            foreach (var row in Exercises)
+            {
+                var entry = previous.Exercises.SingleOrDefault(item => item.ExerciseId == row.Exercise.Id);
+
+                if (entry is null)
+                {
+                    continue;
+                }
+
+                // Примечание записи пусто — прошлое показывается подсказкой; заполненное
+                // примечание правится как значение, и подсказка под ним не нужна.
+                if (row.NoteText.Length == 0 && !string.IsNullOrEmpty(entry.Notes))
+                {
+                    row.NotePlaceholder = entry.Notes;
+                    anyHint = true;
+                }
+
+                // Список, а не ICollection: сопоставление идёт по порядку, а индекса у
+                // ICollection нет. Порядок подходов из базы — по Order (см. репозиторий).
+                var previousSets = entry.Sets.ToList();
+
+                for (var index = 0; index < row.Sets.Count && index < previousSets.Count; index++)
+                {
+                    var set = row.Sets[index];
+                    var previousSet = previousSets[index];
+
+                    if (set.TryParseWeight(out var weight) && weight == 0m && previousSet.Weight > 0m)
+                    {
+                        set.WeightPlaceholder = previousSet.Weight.ToString("0.##", CultureInfo.CurrentCulture);
+                        set.WeightText = string.Empty;
+                        anyHint = true;
+                    }
+
+                    if (set.TryParseRepetitions(out var repetitions) && repetitions == 0 && previousSet.Repetitions > 0)
+                    {
+                        set.RepetitionPlaceholder = previousSet.Repetitions.ToString(CultureInfo.CurrentCulture);
+                        anyHint = true;
+                    }
+                }
+            }
+        }
+        finally
+        {
+            _isApplyingSets = false;
+
+            if (anyHint)
+            {
+                _pulledFromDate = previous.Date;
+            }
+        }
+    }
+
     /// <summary>Сообщает о смене состояния чтения.</summary>
     /// <remarks>
     /// Оба свойства уведомляются отсюда и только отсюда: они вычисляются от одного и того же
@@ -584,7 +747,7 @@ public sealed partial class AddDayViewModel : ObservableObject
             {
                 foreach (var set in entry.Sets)
                 {
-                    row.Sets.Add(ToSetInput(set, repetitionsAsPlaceholder: false));
+                    row.Sets.Add(ToSetInput(set, repetitionsAsPlaceholder: false, isFromRecord: true));
                 }
             }
 
@@ -607,7 +770,11 @@ public sealed partial class AddDayViewModel : ObservableObject
     /// </remarks>
     /// <param name="set">Подход записи журнала.</param>
     /// <param name="repetitionsAsPlaceholder">Показать ли повторения плейсхолдером.</param>
-    private static SetInputViewModel ToSetInput(TrainingSet set, bool repetitionsAsPlaceholder)
+    /// <param name="isFromRecord">
+    /// Подход собран из записи дня: он обязан пережить пересохранение, даже когда оба поля
+    /// нулевые и показаны пустыми с подсказками (<see cref="SetInputViewModel.IsFromRecord"/>).
+    /// </param>
+    private static SetInputViewModel ToSetInput(TrainingSet set, bool repetitionsAsPlaceholder, bool isFromRecord = false)
     {
         // Ноль повторений означает, что поле тогда просто не заполняли: подсказка «0» читалась бы
         // как «делай ноль повторений». Вес нулевым быть может и по делу, поэтому подсказка про него
@@ -618,6 +785,7 @@ public sealed partial class AddDayViewModel : ObservableObject
 
         return new SetInputViewModel
         {
+            IsFromRecord = isFromRecord,
             WeightText = set.Weight.ToString("0.##", CultureInfo.CurrentCulture),
 
             // Форматируется по текущей культуре: в русской раскладке десятичный разделитель — запятая,
@@ -772,16 +940,18 @@ public sealed partial class AddDayViewModel : ObservableObject
 
     /// <summary>Изменение подхода пересчитывает окно.</summary>
     /// <remarks>
-    /// Производные признаки пропускаются: <c>IsValid</c>, <c>HasData</c> и
-    /// <c>HasRepetitionPlaceholder</c> поднимаются вслед за самими полями и пересчёт не требуют,
-    /// а реакция на них считала бы состояние трижды за один удар. Незнакомое свойство, наоборот,
-    /// пересчитывает: новое поле не останется без обновления, даже если его забудут перечислить.
+    /// Производные признаки пропускаются: <c>IsValid</c>, <c>HasData</c>,
+    /// <c>HasRepetitionPlaceholder</c> и <c>HasWeightPlaceholder</c> поднимаются вслед за самими
+    /// полями и пересчёт не требуют, а реакция на них считала бы состояние трижды за один удар.
+    /// Незнакомое свойство, наоборот, пересчитывает: новое поле не останется без обновления, даже
+    /// если его забудут перечислить.
     /// </remarks>
     private void OnSetPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(SetInputViewModel.IsValid)
             or nameof(SetInputViewModel.HasData)
-            or nameof(SetInputViewModel.HasRepetitionPlaceholder))
+            or nameof(SetInputViewModel.HasRepetitionPlaceholder)
+            or nameof(SetInputViewModel.HasWeightPlaceholder))
         {
             return;
         }
@@ -863,9 +1033,13 @@ public sealed partial class AddDayViewModel : ObservableObject
 
         // Признак несохранённого считается здесь же: он зависит от состава и от ввода, а через
         // [ObservableProperty] не поднялся бы. На время наполнения уведомление подавлено.
+        // Надпись у «Сохранить» зависит и от даты источника, поэтому уведомляется вместе с ним.
         if (!_isApplyingSets)
         {
             OnPropertyChanged(nameof(HasUnsavedChanges));
+            OnPropertyChanged(nameof(HasPulledFromHint));
+            OnPropertyChanged(nameof(HasUnsavedHint));
+            OnPropertyChanged(nameof(UnsavedHintText));
         }
     }
 
@@ -881,6 +1055,7 @@ public sealed partial class AddDayViewModel : ObservableObject
         {
             _canAccept = false;
             _hasUnsavedChanges = false;
+            _hasZeroValues = false;
             return;
         }
 
@@ -892,6 +1067,12 @@ public sealed partial class AddDayViewModel : ObservableObject
         _hasUnsavedChanges = current is null
             ? Exercises.Any(row => row.HasData)
             : Differs(_savedSnapshot, current);
+
+        // Ноль в записи — признак незаполненного поля: дата источника обязана пережить
+        // сохранение, пока такие поля есть. Негодный текст запись не собирает, но при нём
+        // горит «Не сохранено», и дата источника показывается вместе с ним.
+        _hasZeroValues = current is not null
+            && current.Exercises.Any(entry => entry.Sets.Any(set => set.Weight == 0m || set.Repetitions == 0));
     }
 
     /// <summary>

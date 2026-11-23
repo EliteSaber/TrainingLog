@@ -22,6 +22,7 @@ public sealed partial class SetInputViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsValid))]
     [NotifyPropertyChangedFor(nameof(HasData))]
+    [NotifyPropertyChangedFor(nameof(HasWeightPlaceholder))]
     private string _weightText = string.Empty;
 
     /// <summary>Количество повторений. Пусто — не указано.</summary>
@@ -57,6 +58,40 @@ public sealed partial class SetInputViewModel : ObservableObject
     public bool HasRepetitionPlaceholder =>
         RepetitionPlaceholder.Length > 0 && RepetitionText.Length == 0;
 
+    /// <summary>
+    /// Вес прошлого раза — плейсхолдером, то есть подсказкой, а не значением.
+    /// </summary>
+    /// <remarks>
+    /// Ставится только при правке дня и только нулевому весу записи: ноль означает, что вес не
+    /// указывали, и прошлое число полезно как ориентир. При подтягивании прошлого дня на
+    /// добавлении вес по-прежнему становится значением. Плейсхолдер не участвует ни в
+    /// <see cref="HasData"/>, ни в разборе: пустое поле разбирается как ноль — ровно как и без
+    /// подсказки.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWeightPlaceholder))]
+    private string _weightPlaceholder = string.Empty;
+
+    /// <summary>Показывать ли плейсхолдер веса: подсказка есть, а поле ещё пусто.</summary>
+    /// <remarks>
+    /// Гаснет по <see cref="WeightText"/>, как и подсказка повторений: как только пользователь
+    /// начал набирать, подсказка под введённым числом не нужна.
+    /// </remarks>
+    public bool HasWeightPlaceholder =>
+        WeightPlaceholder.Length > 0 && WeightText.Length == 0;
+
+    /// <summary>
+    /// Подход собран из записи дня при правке, а не набран с нуля.
+    /// </summary>
+    /// <remarks>
+    /// Нулевой вес записи показывается пустым полем с подсказкой прошлого дня, и без этого
+    /// признака подход 0×0 потерял бы <see cref="HasData"/>: выпал бы из записи при повторном
+    /// сохранении, а надпись «Не сохранено» загорелась бы на нетронутом открытом дне. При
+    /// подтягивании прошлого дня на добавлении признак не ставится: там плейсхолдер данными
+    /// не считается.
+    /// </remarks>
+    public bool IsFromRecord { get; init; }
+
     /// <summary>Пригодны ли оба поля для сохранения.</summary>
     /// <remarks>
     /// Разбор кэшируется: геттер читают и привязка, и проверка сохранения на каждый символ, а
@@ -75,8 +110,12 @@ public sealed partial class SetInputViewModel : ObservableObject
     /// Заполнено ли хоть одно из двух значений: пустой подход в день не попадает, иначе «Сохранить»
     /// была бы активна с пустым окном на руках. Плейсхолдер данными не считается — подсказка о
     /// прошлом разе не должна ни включать подход в запись, ни гасить надпись о несохранённом.
+    /// Исключение — <see cref="IsFromRecord"/>: подход записи обязан пережить пересохранение,
+    /// даже когда оба его поля нулевые и показаны пустыми с подсказками.
     /// </summary>
-    public bool HasData => !string.IsNullOrWhiteSpace(WeightText) || !string.IsNullOrWhiteSpace(RepetitionText);
+    public bool HasData => IsFromRecord
+        || !string.IsNullOrWhiteSpace(WeightText)
+        || !string.IsNullOrWhiteSpace(RepetitionText);
 
     /// <summary>Разбирает вес подхода. Пустое поле даёт ноль.</summary>
     /// <param name="weight">Вес в килограммах.</param>

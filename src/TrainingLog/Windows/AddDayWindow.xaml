@@ -329,16 +329,29 @@
 
                                       Part задаёт Tab-переход: поля идут по единой цепочке
                                       «все веса, затем все повторения», а не по порядку дерева.
+
+                                      Плейсхолдер веса рисуется поверх поля, как у повторений:
+                                      фон TextBox непрозрачный, подложка под ним не видна, поэтому
+                                      блок объявлен после TextBox. IsHitTestVisible=False обязателен:
+                                      иначе надпись перехватывала бы нажатия и в поле нельзя было бы
+                                      ни поставить каретку, ни вставить из буфера.
                                     -->
-                                    <TextBox Grid.Row="0"
-                                             Width="84"
-                                             Padding="4,3"
-                                             HorizontalContentAlignment="Center"
-                                             Background="{DynamicResource SurfaceAlt}"
-                                             helpers:AllowedCharsInput.Allowed="DigitsWithSeparators"
-                                             helpers:SetFieldNavigation.Part="Weight"
-                                             ToolTip="Вес, кг"
-                                             Text="{Binding WeightText, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Grid Grid.Row="0" Width="84">
+                                        <TextBox Padding="4,3"
+                                                 HorizontalContentAlignment="Center"
+                                                 Background="{DynamicResource SurfaceAlt}"
+                                                 helpers:AllowedCharsInput.Allowed="DigitsWithSeparators"
+                                                 helpers:SetFieldNavigation.Part="Weight"
+                                                 ToolTip="Вес, кг"
+                                                 Text="{Binding WeightText, UpdateSourceTrigger=PropertyChanged}" />
+
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   IsHitTestVisible="False"
+                                                   Foreground="{DynamicResource TextSecondary}"
+                                                   Text="{Binding WeightPlaceholder}"
+                                                   Visibility="{Binding HasWeightPlaceholder, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </Grid>
 
                                     <!--
                                       Поле повторений — целое неотрицательное число, поэтому
@@ -527,12 +540,17 @@
                       упражнении ломается и оставляет Visible (ловушка 54).
                     -->
                     <Grid ClipToBounds="True" Margin="0,6,0,0">
+                        <!--
+                          TargetNullValue здесь запрещён: он работает и в обратную сторону —
+                          очищенное до него поле записывает в источник null, а HasNotePlaceholder
+                          читает NoteText.Length и падает (ловушка 65). Источник по контракту
+                          ненулевой, пустой текст пишет "".
+                        -->
                         <TextBox AcceptsReturn="True"
                                  Padding="4,3"
                                  TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Auto"
                                  Text="{Binding Current.NoteText,
-                                                TargetNullValue='',
                                                 UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Margin="5,4,0,0"
@@ -654,27 +672,26 @@
                   Надпись стоит у «Сохранить», а не у кнопок закрытия: она относится к тому, что не
                   записано. Цвет тот же, что у сообщения об отказе.
 
-                  Дата источника — второй Run того же элемента: расстояние между словами задавал бы
-                  разметка, а текст живёт в модели, и два элемента разъехались бы при правке
-                  формулировки.
+                  Текст собирается в модели (UnsavedHintText): «Не сохранено» гаснет после записи,
+                  а дата источника при нулевых полях остаётся — видимость частей независима, а у
+                  Run видимости нет. Перенос целого текста сохраняет поведение на узком окне
+                  (ловушка 49).
 
                   Отступ задан на самой надписи, а не на панели: в горизонтальной панели отступ
                   контейнера отодвигает панель, а элементы внутри стоят вплотную (ловушка 48).
                   HorizontalAlignment не задан намеренно: центрированный элемент не переносится
                   (ловушка 35), нужен Stretch.
 
-                  Mode=OneWay обязателен на Run.Text: привязка без сеттера у источника двусторонняя
-                  по умолчанию и упала бы при создании окна (ловушка 39).
+                  Mode=OneWay задан явно: привязка без сеттера у источника двусторонняя по
+                  умолчанию (ловушка 39).
                 -->
                 <TextBlock Grid.Column="1"
                            Margin="12,0,12,0"
                            VerticalAlignment="Center"
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource TextError}"
-                           Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Run Text="Не сохранено" />
-                    <Run Text="{Binding PulledFromDateText, Mode=OneWay}" />
-                </TextBlock>
+                           Visibility="{Binding HasUnsavedHint, Converter={StaticResource BooleanToVisibilityConverter}}"
+                           Text="{Binding UnsavedHintText, Mode=OneWay}" />
 
                 <!--
                   Панель по центру по вертикали, а не на всю высоту строки. В горизонтальной
