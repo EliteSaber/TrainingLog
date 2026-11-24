@@ -110,7 +110,7 @@ public sealed class AddDayViewModelTests
         viewModel.CurrentExerciseChanged += () => raised++;
 
         viewModel.SelectedPlan = viewModel.Plans.Single();
-        await SettleAsync();
+        await WaitUntilAsync(() => !viewModel.IsLoading);
 
         // Первое появление упражнений — тоже смена: до выбора плана активного не было.
         Assert.Equal(1, raised);
@@ -149,7 +149,7 @@ public sealed class AddDayViewModelTests
         var viewModel = await CreateInitializedAsync(database);
 
         viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Ноги");
-        await SettleAsync();
+        await WaitUntilAsync(() => !viewModel.IsLoading);
 
         var raised = 0;
         viewModel.CurrentExerciseChanged += () => raised++;
@@ -157,7 +157,7 @@ public sealed class AddDayViewModelTests
         var legs = viewModel.Current!;
 
         viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Верх");
-        await SettleAsync();
+        await WaitUntilAsync(() => !viewModel.IsLoading);
 
         Assert.Equal(1, raised);
         Assert.NotSame(legs, viewModel.Current);
@@ -688,7 +688,7 @@ public async Task AddSetCommand_БезПлана_КомандаНеактивн�
 
         viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Ноги");
 
-        await SettleAsync();
+        await WaitUntilAsync(() => !viewModel.IsLoading);
 
         Assert.Equal(string.Empty, Assert.Single(viewModel.Exercises[0].Sets).WeightText);
     }
@@ -784,6 +784,8 @@ public async Task AddSetCommand_БезПлана_КомандаНеактивн�
     /// <remarks>
     /// Повторное чтение за ту же дату запрещено: <c>DatePicker</c> присоединяется со своим
     /// значением по умолчанию и двусторонней привязкой пишет его в источник (ловушка 37).
+    /// Лишнее чтение ловится счётчиком обращений к базе: вызов репозитория происходит синхронно
+    /// в сеттере даты, поэтому проверка не зависит от того, успел ли ответ прийти.
     /// </remarks>
     [Fact]
     public async Task ТаЖеДатаДругимВременем_НеПеречитываетБазу()
@@ -792,19 +794,15 @@ public async Task AddSetCommand_БезПлана_КомандаНеактивн�
         var day = new DateOnly(2026, 10, 5);
         await CreatePlanAsync(database, "Ноги", "Приседание");
 
-        var viewModel = await CreateInitializedAsync(database);
+        var fake = new FakeSessionRepository(database.SessionRepository);
+        var viewModel = await CreateInitializedAsync(database, fake);
         await LoadDayAsync(viewModel, day);
 
-        var notifications = TrackNotifications(viewModel);
+        var calls = fake.DateCalls;
 
         viewModel.Date = day.ToDateTime(new TimeOnly(18, 30));
 
-        await Task.Yield();
-        await Task.Yield();
-
-        // Каждая загрузка за день заканчивается уведомлением о заголовке, поэтому лишний
-        // перезапуск команды виден по нему.
-        Assert.DoesNotContain(nameof(AddDayViewModel.Title), notifications);
+        Assert.Equal(calls, fake.DateCalls);
     }
 
 /// <summary>
@@ -981,13 +979,9 @@ public async Task СменаДатыНаДатуСЗаписью_Подтяги�
     }
 
     /// <remarks>
-    /// Настоящая пауза (<c>Task.Delay</c>), а не <c>Task.Yield</c>: чтение возвращается в
-    /// диспетчер, и число уступок в тесте ничего не гарантирует.
-    /// </remarks>
-    private static Task SettleAsync() => Task.Delay(50);
-
-    /// <remarks>
-    /// Пока гейт не отпущен, состояние не наступит никогда — ждать надо условия, а не времени.
+    /// Ждать надо условия, а не времени: фиксированная пауза — гонка на загруженной машине.
+    /// Признак завершения берётся из того, что проверяет сам тест: <c>!IsLoading</c> наступает
+    /// до <c>Refresh</c>, и ожидание только по нему отпустило бы тест с ещё не пересчитанной формой.
     /// </remarks>
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
@@ -1003,23 +997,25 @@ public async Task СменаДатыНаДатуСЗаписью_Подтяги�
 
     /// <summary>
     /// Подпись дня недели в поле даты меняется вместе с датой и не хранит своего значения.
+    /// Ожидаемые сокращения — литералы при зафиксированной культуре: вычисление ожидания тем же
+    /// <c>Dates.Weekday</c> проверяло бы метод им самим.
     /// </summary>
     [Fact]
     public async Task Дата_ПодписьДняНедели()
     {
         using var database = new TemporaryDatabase();
+        using var culture = CultureScope.Use("ru-RU");
         var viewModel = await CreateInitializedAsync(database);
 
         var notifications = TrackNotifications(viewModel);
         var monday = new DateOnly(2026, 11, 9);
         await LoadDayAsync(viewModel, monday);
-        Assert.Equal($"[{Dates.Weekday(monday)}]", viewModel.DateWeekdayText);
+        Assert.Equal("[пн]", viewModel.DateWeekdayText);
         Assert.Contains(nameof(AddDayViewModel.DateWeekdayText), notifications);
 
         var thursday = new DateOnly(2026, 10, 8);
         await LoadDayAsync(viewModel, thursday);
-        Assert.Equal($"[{Dates.Weekday(thursday)}]", viewModel.DateWeekdayText);
-        Assert.NotEqual($"[{Dates.Weekday(monday)}]", viewModel.DateWeekdayText);
+        Assert.Equal("[чт]", viewModel.DateWeekdayText);
 
         viewModel.Date = null;
         Assert.Equal(string.Empty, viewModel.DateWeekdayText);
@@ -1083,7 +1079,7 @@ private static async Task<AddDayViewModel> CreateReadyWithPreviousDayAsync(Tempo
 
         viewModel.SelectedPlan = plan;
 
-        await SettleAsync();
+        await WaitUntilAsync(() => !viewModel.IsLoading);
 
         return viewModel;
     }
@@ -1482,14 +1478,14 @@ public void Differs_ЗаписиНет_ЛожьНаПустомДнеИИсти�
 }
 
 [Fact]
-public void Differs_ОдинаковоеЧислоРазнымФорматом_Ложь()
+public void Differs_ОдинаковыйВесРазногоМасштаба_Ложь()
 {
-    // Поле разбирается, поэтому «60» и «60,0» — одно значение: «Не сохранено» из-за формата
-    // записи было бы враньём.
+    // Differs сравнивает разобранные значения, а не строки полей: 60 и 60.0 — одно число,
+    // и «Не сохранено» из-за масштаба десятичной записи было бы враньём. Толерантность к
+    // формату строк («60» против «60,0») живёт в разборе полей, а не здесь.
     var saved = Session("Ноги", ("Приседание", 8, 60m));
     var current = Session("Ноги", ("Приседание", 8, 60.0m));
 
-    Assert.Equal(saved.Exercises.Single().Sets.Single().Weight, current.Exercises.Single().Sets.Single().Weight);
     Assert.False(AddDayViewModel.Differs(saved, current));
 }
 
@@ -1501,6 +1497,7 @@ public void Differs_ОдинаковоеЧислоРазнымФорматом_�
 public async Task ПодтягиваниеПрошлогоДня_ВесаЗначениямиПовторенияПодсказкой()
 {
     using var database = new TemporaryDatabase();
+    using var culture = CultureScope.Use("ru-RU");
     var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
 
     var day = new DateOnly(2026, 10, 10);
@@ -1519,7 +1516,7 @@ public async Task ПодтягиваниеПрошлогоДня_ВесаЗна�
 
     viewModel.SelectedPlan = plan;
 
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var row = viewModel.Current!;
 
@@ -1535,8 +1532,7 @@ public async Task ПодтягиваниеПрошлогоДня_ВесаЗна�
     Assert.True(row.Sets.All(set => set.HasRepetitionPlaceholder));
 
     // Дата источника показывается рядом с «Не сохранено» — по ней видно, откуда значения.
-    Assert.Equal($"(на основе 08 октября 2026 [{Dates.Weekday(new DateOnly(2026, 10, 8))}])",
-        viewModel.PulledFromDateText);
+    Assert.Equal("(на основе 08 октября 2026 [чт])", viewModel.PulledFromDateText);
 }
 
 /// <summary>
@@ -1640,7 +1636,7 @@ public async Task Подтягивание_НулевыеПовторения_П
 
     viewModel.SelectedPlan = plan;
 
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -1680,7 +1676,9 @@ public async Task Подтягивание_ПрошлогоДняНет_Форм
 
     viewModel.SelectedPlan = legs;
 
-    await SettleAsync();
+    // Ждём не только конца чтения, но и пересчёта формы: Refresh идёт после снятия
+    // IsLoading, и признак несохранённого считается именно там.
+    await WaitUntilAsync(() => !viewModel.IsLoading && !viewModel.HasUnsavedChanges);
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -1714,7 +1712,7 @@ public async Task Подтягивание_ПравкаДняНеЗатраги�
     var viewModel = await CreateInitializedAsync(database);
     await LoadDayAsync(viewModel, day);
 
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -1744,7 +1742,12 @@ public async Task Правка_НулевыеПовторения_Подсказ
 
     var viewModel = await CreateInitializedAsync(database);
     await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
-    await SettleAsync();
+
+    // Подсказка ставится до снятия IsLoading, а признак несохранённого — уже после, в Refresh.
+    await WaitUntilAsync(() => !viewModel.IsLoading
+        && viewModel.Current is { Sets.Count: > 0 }
+        && viewModel.Current.Sets[0].HasRepetitionPlaceholder
+        && !viewModel.HasUnsavedChanges);
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -1775,7 +1778,11 @@ public async Task Правка_НулевойВес_ПодсказкаПрошл
 
     var viewModel = await CreateInitializedAsync(database);
     await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
-    await SettleAsync();
+
+    await WaitUntilAsync(() => !viewModel.IsLoading
+        && viewModel.Current is { Sets.Count: > 0 }
+        && viewModel.Current.Sets[0].HasWeightPlaceholder
+        && !viewModel.HasUnsavedChanges);
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -1811,7 +1818,9 @@ public async Task Правка_НулевойПодход_НеТеряетсяП
 
     var viewModel = await CreateInitializedAsync(database);
     await LoadDayAsync(viewModel, day);
-    await SettleAsync();
+
+    // Пригодность сохранения — тоже из Refresh: ждём её, а не только снятия индикатора.
+    await WaitUntilAsync(() => !viewModel.IsLoading && viewModel.SaveCommand.CanExecute(null));
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -1853,7 +1862,7 @@ public async Task Правка_ДатаВКонструкторе_Подсказ
 
     var viewModel = new AddDayViewModel(database.SessionRepository, database.PlanRepository, day);
     await viewModel.InitializeCommand.ExecuteAsync(null);
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -1878,7 +1887,7 @@ public async Task Правка_ПрошлогоДняНет_ПодсказокН
 
     var viewModel = await CreateInitializedAsync(database);
     await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -1909,7 +1918,7 @@ public async Task Правка_ПрошлыеНули_ПодсказкиНет()
 
     var viewModel = await CreateInitializedAsync(database);
     await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -1939,7 +1948,7 @@ public async Task Правка_ЧужойПланВПрошломДне_Подс
 
     var viewModel = await CreateInitializedAsync(database);
     await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -1973,12 +1982,12 @@ public async Task Правка_СменаДаты_ПодсказкиПеречи
 
     var viewModel = await CreateInitializedAsync(database);
     await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     Assert.Equal("10", Assert.Single(viewModel.Current!.Sets).RepetitionPlaceholder);
 
     await LoadDayAsync(viewModel, new DateOnly(2026, 10, 12));
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var set = Assert.Single(viewModel.Current!.Sets);
 
@@ -2017,7 +2026,10 @@ public async Task Правка_ВводЗаблокированПокаПодс�
 
     fake.Release();
 
-    await WaitUntilAsync(() => !viewModel.IsLoading);
+    // Ждём саму подсказку, а не только снятие индикатора: между ними ответ ещё применяется.
+    await WaitUntilAsync(() => !viewModel.IsLoading
+        && viewModel.Current is { Sets.Count: > 0 }
+        && viewModel.Current.Sets[0].HasRepetitionPlaceholder);
 
     Assert.True(viewModel.CanFill);
     Assert.True(Assert.Single(viewModel.Current!.Sets).HasRepetitionPlaceholder);
@@ -2086,13 +2098,18 @@ public async Task Подтягивание_УпражненияНетВПрош�
 
     viewModel.SelectedPlan = plan;
 
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var bench = viewModel.Exercises.Single(row => row.Name == "Жим");
     var set = Assert.Single(bench.Sets);
 
     Assert.Equal(string.Empty, set.WeightText);
     Assert.False(set.HasRepetitionPlaceholder);
+
+    // Подтягивание состоялось: у упражнения, которое в прошлый раз делали, стоит прошлый вес.
+    // Без этой проверки тест прошёл бы и при вовсе не сработавшем подтягивании.
+    var squat = viewModel.Exercises.Single(row => row.Name == "Приседание");
+    Assert.Equal("60", Assert.Single(squat.Sets).WeightText);
 }
 
 /// <summary>
@@ -2142,6 +2159,18 @@ public async Task Подтягивание_Пересечение_Индикат
     var fake = new FakeSessionRepository(database.SessionRepository) { DelayOnlyCall = 1 };
     var viewModel = await CreateInitializedAsync(database, fake);
 
+    // Уведомление IsLoading идёт на каждое начало и каждое завершение чтения. Третье по счёту —
+    // завершение второго, незадержанного чтения: ждать надо его, а не времени — иначе на медленной
+    // машине регрессия к флагу успела бы погасить индикатор после проверки.
+    var loadingNotifications = 0;
+    viewModel.PropertyChanged += (_, args) =>
+    {
+        if (args.PropertyName == nameof(AddDayViewModel.IsLoading))
+        {
+            Interlocked.Increment(ref loadingNotifications);
+        }
+    };
+
     await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
 
     viewModel.SelectedPlan = viewModel.Plans.Single(plan => plan.Name == "Ноги");
@@ -2152,7 +2181,7 @@ public async Task Подтягивание_Пересечение_Индикат
 
     await WaitUntilAsync(() => fake.Calls >= 2);
 
-    await SettleAsync();
+    await WaitUntilAsync(() => Volatile.Read(ref loadingNotifications) >= 3);
 
     Assert.True(viewModel.IsLoading);
     Assert.False(viewModel.CanFill);
@@ -2193,7 +2222,7 @@ public async Task Подтягивание_ОтветНаСменённыйПл�
 
     fake.Release();
 
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     Assert.Equal("Жим", Assert.Single(viewModel.Exercises).Name);
     Assert.Equal(string.Empty, Assert.Single(viewModel.Current!.Sets).WeightText);
@@ -2238,7 +2267,7 @@ public async Task Подтягивание_НадписьНеГоритПока�
 
     fake.Release();
 
-    await SettleAsync();
+    await WaitUntilAsync(() => viewModel.HasUnsavedChanges);
 
     // А после наполнения — загорается: подтянутые веса это данные, которых нет в базе.
     Assert.Contains(true, seen);
@@ -2252,6 +2281,7 @@ public async Task Подтягивание_НадписьНеГоритПока�
 public async Task Подтягивание_СменаДатыУбираетДатуИсточника()
 {
     using var database = new TemporaryDatabase();
+    using var culture = CultureScope.Use("ru-RU");
     var plan = await CreatePlanAsync(database, "Ноги", "Приседание");
 
     var previous = new TrainingSession { Date = new DateOnly(2026, 10, 8), PlanId = plan.Id, PlanName = plan.Name };
@@ -2264,10 +2294,9 @@ public async Task Подтягивание_СменаДатыУбираетДа�
     await LoadDayAsync(viewModel, new DateOnly(2026, 10, 10));
     viewModel.SelectedPlan = plan;
 
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
-    Assert.Equal($"(на основе 08 октября 2026 [{Dates.Weekday(new DateOnly(2026, 10, 8))}])",
-        viewModel.PulledFromDateText);
+    Assert.Equal("(на основе 08 октября 2026 [чт])", viewModel.PulledFromDateText);
 
     // Запись за новую дату есть, план тот же: сеттер SelectedPlan не срабатывает, и
     // подтягивание выходит сразу.
@@ -2384,7 +2413,7 @@ public async Task Подтягивание_ПримечаниеПрошлого�
 
     viewModel.SelectedPlan = plan;
 
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var row = viewModel.Current!;
 
@@ -2428,7 +2457,9 @@ public async Task Подтягивание_ПримечаниеБезПодхо�
 
     viewModel.SelectedPlan = plan;
 
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading
+        && viewModel.Current?.HasNotePlaceholder == true
+        && !viewModel.HasUnsavedChanges);
 
     var row = viewModel.Current!;
 
@@ -2489,7 +2520,10 @@ public async Task Правка_ПустоеПримечание_Подсказк
 
     var viewModel = await CreateInitializedAsync(database);
     await LoadDayAsync(viewModel, day);
-    await SettleAsync();
+
+    await WaitUntilAsync(() => !viewModel.IsLoading
+        && viewModel.Current?.HasNotePlaceholder == true
+        && !viewModel.HasUnsavedChanges);
 
     var row = viewModel.Current!;
 
@@ -2525,7 +2559,7 @@ public async Task Правка_ЗаполненноеПримечание_Под
 
     var viewModel = await CreateInitializedAsync(database);
     await LoadDayAsync(viewModel, day);
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     var row = viewModel.Current!;
 
@@ -2560,7 +2594,7 @@ public async Task Примечание_Правка_ЕслиПодсказка_�
         NotesExpansionRules.WhenHint);
 
     await viewModel.InitializeCommand.ExecuteAsync(null);
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     Assert.True(viewModel.Current!.HasNotePlaceholder);
     Assert.True(viewModel.Current.IsNotesExpanded);
@@ -2711,7 +2745,7 @@ public async Task Примечание_Свернуто_ЗакрываетРуч
 
     var viewModel = await CreateInitializedAsync(database);
     viewModel.SelectedPlan = Assert.Single(viewModel.Plans);
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     viewModel.Current!.IsNotesExpanded = true;
 
@@ -2736,7 +2770,7 @@ public async Task Примечание_ЕслиЗаполнено_Раскрыв
 
     await viewModel.InitializeCommand.ExecuteAsync(null);
     viewModel.SelectedPlan = Assert.Single(viewModel.Plans);
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     viewModel.Current!.NoteText = "колени побаливали";
 
@@ -2780,7 +2814,7 @@ public async Task Примечание_ЕслиПодсказка_Раскрыв
 
     viewModel.SelectedPlan = plan;
 
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     Assert.True(viewModel.Current!.HasNotePlaceholder);
     Assert.True(viewModel.Current.IsNotesExpanded);
@@ -2827,7 +2861,7 @@ public async Task Примечание_ВсегдаРаскрыто_Ручное
 
     await viewModel.InitializeCommand.ExecuteAsync(null);
     viewModel.SelectedPlan = Assert.Single(viewModel.Plans);
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     Assert.True(viewModel.Current!.IsNotesExpanded);
 
@@ -2861,7 +2895,7 @@ public async Task БезПлана_УпражненияНет_ИПримечан
     Assert.NotNull(viewModel.Current);
     Assert.True(viewModel.HasCurrent);
 
-    await SettleAsync();
+    await WaitUntilAsync(() => !viewModel.IsLoading);
 
     viewModel.SelectedPlan = null;
 

@@ -18,6 +18,8 @@ internal sealed class FakeSessionRepository(ITrainingSessionRepository inner) : 
 
     private int _calls;
 
+    private int _dateCalls;
+
     /// <summary>Задержать только это чтение по счёту, с единицы. <c>0</c> — задерживать все.</summary>
     /// <remarks>
     /// Выбор одного вызова из нескольких и делает проверку возможной: чтобы доказать, что
@@ -28,6 +30,9 @@ internal sealed class FakeSessionRepository(ITrainingSessionRepository inner) : 
 
     /// <summary>Сколько чтений началось, задержанных и обычных.</summary>
     public int Calls => _calls;
+
+    /// <summary>Сколько раз читалась запись за дату: счётчик для проверок «лишнего чтения нет».</summary>
+    public int DateCalls => Volatile.Read(ref _dateCalls);
 
     /// <summary>Отпустить отложенные чтения.</summary>
     public void Release() => _gate.TrySetResult();
@@ -59,8 +64,12 @@ internal sealed class FakeSessionRepository(ITrainingSessionRepository inner) : 
         CancellationToken cancellationToken = default) =>
         inner.GetLatestAsync(count, cancellationToken);
 
-    public Task<TrainingSession?> GetByDateAsync(DateOnly targetDate, CancellationToken cancellationToken = default) =>
-        inner.GetByDateAsync(targetDate, cancellationToken);
+    public Task<TrainingSession?> GetByDateAsync(DateOnly targetDate, CancellationToken cancellationToken = default)
+    {
+        Interlocked.Increment(ref _dateCalls);
+
+        return inner.GetByDateAsync(targetDate, cancellationToken);
+    }
 
     public Task<AddTrainingSessionOutcome> AddAsync(
         TrainingSession session,

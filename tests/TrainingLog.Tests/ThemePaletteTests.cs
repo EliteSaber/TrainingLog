@@ -69,11 +69,30 @@ public sealed class ThemePaletteTests
 
             // Сравнение с тёмной палитрой, а не с зашитым цветом: палитра — дело вкуса, и
             // тест должен ломаться от ошибки подмены, а не от правки оттенка.
-            Assert.Equal(
-                ((SolidColorBrush)dark["WindowBackground"]).Color,
-                ((SolidColorBrush)live["WindowBackground"]).Color);
+            //
+            // Все токены, а не один: ошибка подмены в отдельном ключе оставила бы часть
+            // интерфейса в прежней теме — ровно дефект, ради которого палитра и меняется.
+            foreach (var key in dark.Keys.Cast<object>())
+            {
+                Assert.True(live.Contains(key), $"Ключ {key} не попал в палитру.");
+
+                Assert.Equal(Describe(dark[key]), Describe(live[key]));
+            }
         });
     }
+
+    /// <summary>
+    /// Значение токена в сравнимом виде. Кисти WPF не переопределяют равенство, поэтому
+    /// сравниваются их значения: цвет и прозрачность, а у градиента ещё и точки.
+    /// </summary>
+    private static string Describe(object? value) => value switch
+    {
+        SolidColorBrush brush => $"solid {brush.Color} {brush.Opacity}",
+        LinearGradientBrush brush =>
+            $"linear {brush.StartPoint} {brush.EndPoint} {brush.Opacity} "
+            + string.Join(";", brush.GradientStops.Select(stop => $"{stop.Offset}:{stop.Color}")),
+        _ => value?.ToString() ?? "<null>",
+    };
 
     /// <summary>
     /// Ссылка DynamicResource перечитывает значение: без этого окна остались бы в прежней теме.

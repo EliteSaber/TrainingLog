@@ -13,13 +13,55 @@ namespace TrainingLog.Tests;
 /// </remarks>
 internal sealed class GatedSessionRepository(ITrainingSessionRepository inner) : ITrainingSessionRepository
 {
-    private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly object _sync = new();
+    private readonly List<TaskCompletionSource> _gates = [];
+
+    private bool _released;
+    private int _calls;
 
     /// <summary>Отказ, которым закончится отложенное чтение. <c>null</c> — чтение пройдёт.</summary>
     public Exception? Failure { get; init; }
 
-    /// <summary>Отпустить отложенное чтение.</summary>
-    public void Release() => _gate.TrySetResult();
+    /// <summary>Сколько чтений журнала началось.</summary>
+    public int Calls
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _calls;
+            }
+        }
+    }
+
+    /// <summary>Отпустить все отложенные чтения, в том числе ещё не начавшиеся.</summary>
+    public void Release()
+    {
+        lock (_sync)
+        {
+            _released = true;
+
+            foreach (var gate in _gates)
+            {
+                gate.TrySetResult();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Отпустить одно чтение по счёту, с единицы. Раздельные гейты нужны проверке пересечения:
+    /// поздний запрос отвечает раньше раннего, и порядок завершения задаётся тестом, а не случаем.
+    /// </summary>
+    public void Release(int call)
+    {
+        lock (_sync)
+        {
+            if (call >= 1 && call <= _gates.Count)
+            {
+                _gates[call - 1].TrySetResult();
+            }
+        }
+    }
 
     public async Task<IReadOnlyList<TrainingSession>> GetAsync(
         DateOnly? fromInclusive = null,
@@ -27,7 +69,22 @@ internal sealed class GatedSessionRepository(ITrainingSessionRepository inner) :
         int? count = null,
         CancellationToken cancellationToken = default)
     {
-        await _gate.Task.ConfigureAwait(false);
+        TaskCompletionSource gate;
+
+        lock (_sync)
+        {
+            _calls++;
+
+            gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _gates.Add(gate);
+
+            if (_released)
+            {
+                gate.TrySetResult();
+            }
+        }
+
+        await gate.Task.ConfigureAwait(false);
 
         if (Failure is { } failure)
         {

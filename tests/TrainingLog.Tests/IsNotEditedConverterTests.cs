@@ -31,6 +31,21 @@ public sealed class IsNotEditedConverterTests
         Assert.True((bool)result);
     }
 
+    /// <summary>
+    /// Сравнение по ссылке, а не по имени: правится конкретный объект, и другой объект с тем же
+    /// именем редактируемым не считается. Сравнение по имени погасило бы кнопку у обеих строк.
+    /// </summary>
+    [Fact]
+    public void Convert_РазныеОбъектыСОдинаковымИменем_КнопкаАктивна()
+    {
+        var exercise = new Core.Models.Exercise { Name = "Жим" };
+        var sameName = new Core.Models.Exercise { Name = "Жим" };
+
+        var result = Converter.Convert([exercise, sameName], typeof(bool), null!, CultureInfo.InvariantCulture);
+
+        Assert.True((bool)result);
+    }
+
     /// <summary>Окна правки нет — редактируемого объекта нет, и все кнопки активны.</summary>
     [Fact]
     public void Convert_ПравкиНет_КнопкаАктивна()

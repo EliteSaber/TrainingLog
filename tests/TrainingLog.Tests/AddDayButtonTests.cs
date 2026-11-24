@@ -26,6 +26,11 @@ public sealed class AddDayButtonTests
         });
     }
 
+    /// <remarks>
+    /// Центрирование надписи здесь не проверяется: его задаёт баланс отступов содержимого в
+    /// разметке главного окна (правый отступ надписи равен левой группе «иконка + отступы»),
+    /// а копия содержимого в тесте проверяла бы собственную симметрию, а не разметку приложения.
+    /// </remarks>
     [Fact]
     public void Кнопка_БольшойКегль_РастётВместеСНадписью()
     {
@@ -37,15 +42,6 @@ public sealed class AddDayButtonTests
 
             Assert.True(size.Width > 216);
             Assert.True(size.Height > 40);
-
-            button.Arrange(new Rect(size));
-            var label = (TextBlock)((Grid)button.Content!).Children[1];
-            var labelCenter = label.TransformToVisual(button)
-                .Transform(new Point(label.ActualWidth / 2, 0)).X;
-
-            // Правый отступ равен левой группе (иконка с отступами), поэтому центр
-            // надписи совпадает с центром кнопки при любом кегле.
-            Assert.Equal(size.Width / 2, labelCenter, 1);
         });
     }
 

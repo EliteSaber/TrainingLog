@@ -96,26 +96,63 @@ public sealed class ExercisesViewModelTests
     /// Правка упражнения меняет имя — и сортировка могла поменяться, поэтому видимый список
     /// перестраивается. Перестраивает его окно правки, когда сообщает о записи.
     /// </summary>
+    /// <remarks>
+    /// Переименование обязано менять порядок: с одним упражнением перестройка ненаблюдаема,
+    /// и тест прошёл бы даже с вовсе не подключённым обратным вызовом. Объект переименовывает
+    /// сам тест — как это делает окно правки, — поэтому проверяется порядок, а не имя.
+    /// </remarks>
     [Fact]
     public async Task EditCommand_ПослеПравки_ПерестраиваетСписок()
     {
         using var database = new TemporaryDatabase();
-        var exercise = new Exercise { Name = "Жим" };
-        await database.Repository.AddAsync(exercise);
+        await database.Repository.AddAsync(new Exercise { Name = "Жим" });
+        await database.Repository.AddAsync(new Exercise { Name = "Тяга" });
 
         var windowService = new FakeWindowService();
         var viewModel = new ExercisesViewModel(database.Repository, windowService);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
+        Assert.Equal(["Жим", "Тяга"], viewModel.Visible.Select(exercise => exercise.Name));
+
         // Окно правки правит объект из видимого списка — так же, как это делает справочник.
-        var shown = viewModel.Visible.Single();
+        var shown = viewModel.Visible[0];
         viewModel.EditCommand.Execute(shown);
 
-        shown.Name = "Жим лёжа";
+        shown.Name = "Ящик";
 
         await windowService.RaiseExerciseSaved();
 
-        Assert.Equal("Жим лёжа", Assert.Single(viewModel.Visible).Name);
+        // «Ящик» после «Тяги»: без перестройки список остался бы в прежнем порядке.
+        Assert.Equal(["Тяга", "Ящик"], viewModel.Visible.Select(exercise => exercise.Name));
+
+        // Перестройка переставляет, а не пересоздаёт: строка переживает правку тем же объектом.
+        Assert.Same(shown, viewModel.Visible[1]);
+    }
+
+    /// <summary>
+    /// Сортировка списка — по кодам Unicode (Ordinal): блок кириллицы расположен в алфавитном
+    /// порядке, поэтому сравнение кодов даёт русский алфавит. Проверяется на модели окна:
+    /// репозиторий отдаёт справочник без порядка, сортирует именно окно.
+    /// </summary>
+    [Fact]
+    public async Task Visible_Кириллица_ПорядокПоАлфавитуИОбратно()
+    {
+        using var database = new TemporaryDatabase();
+
+        // Вставка нарочно вразнобой: порядок показа не должен зависеть от порядка чтения базы.
+        foreach (var name in new[] { "Ящик", "Болт", "Присед", "Атлант" })
+        {
+            await database.Repository.AddAsync(new Exercise { Name = name });
+        }
+
+        var viewModel = new ExercisesViewModel(database.Repository, new FakeWindowService());
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal(["Атлант", "Болт", "Присед", "Ящик"], viewModel.Visible.Select(exercise => exercise.Name));
+
+        viewModel.ToggleSortCommand.Execute(null);
+
+        Assert.Equal(["Ящик", "Присед", "Болт", "Атлант"], viewModel.Visible.Select(exercise => exercise.Name));
     }
 
     /// <summary>

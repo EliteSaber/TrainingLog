@@ -11,11 +11,13 @@ namespace TrainingLog.Tests;
 [Collection(WpfTestGroup.Name)]
 public sealed class RowSelectionTests
 {
-    /// <summary>Применение и снятие Enabled не бросает: делегат подписки типизирован событием.</summary>
+    /// <summary>Подписка выделения переживает поднятие мышиного события: делегат типизирован событием.</summary>
     /// <remarks>
     /// Регрессия ловушки №24: метод-группа в параметре AddHandler'а типа Delegate компилятор
-    /// оборачивал в natural-тип вместо MouseButtonEventHandler, и WPF рантаймом бросал
-    /// «Несоответствие типа обработчика» при каждом применении свойства.
+    /// оборачивал в natural-тип вместо MouseButtonEventHandler. WPF проверяет тип делегата
+    /// жёстким приведением при поднятии события (MouseEventArgs.InvokeEventHandler), а не при
+    /// подписке, поэтому тест обязан поднять MouseDown: одно применение свойства прошло бы
+    /// и с неверным делегатом.
     /// </remarks>
     [Fact]
     public void Enabled_ПрименениеИСнятие_НеБросает()
@@ -25,6 +27,12 @@ public sealed class RowSelectionTests
             var list = new ListBox();
 
             RowSelection.SetEnabled(list, true);
+
+            list.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
+            {
+                RoutedEvent = Mouse.MouseDownEvent,
+            });
+
             RowSelection.SetEnabled(list, false);
         });
     }

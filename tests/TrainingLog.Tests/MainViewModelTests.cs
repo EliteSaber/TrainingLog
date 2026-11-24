@@ -176,9 +176,12 @@ public sealed class MainViewModelTests : IDisposable
         Assert.False(raised);
     }
 
-    /// <summary>Отказ окна параметров — и когда файл менялся, событие не поднимается: правку не приняли.</summary>
+    /// <summary>
+    /// Файл сменился, но окно параметров только открыто: события нет — адрес сверяется по
+    /// оповещению о записи, а не при каждом открытии.
+    /// </summary>
     [Fact]
-    public async Task OpenSettingsCommand_Отменено_СобытияНеБывает()
+    public async Task OpenSettingsCommand_СменаФайлаБезЗаписи_СобытияНеБывает()
     {
         using var database = new TemporaryDatabase();
 
@@ -188,6 +191,10 @@ public sealed class MainViewModelTests : IDisposable
 
         var raised = false;
         viewModel.DatabaseAddressChanged += _ => raised = true;
+
+        // Файл сменился, пока окно параметров было открыто, но запись не подтверждена:
+        // открытие окна само по себе адрес не сверяет — сверяет только оповещение о записи.
+        _settings.Store.Save(new AppSettings { DatabaseDirectory = @"D:\базы" });
 
         viewModel.OpenSettingsCommand.Execute(null);
 
@@ -713,6 +720,95 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     /// <summary>
+    /// Индикатор — счётчик, а не флаг: перечитывание запускают несколько источников, и первое
+    /// завершившееся чтение не должно гасить кольцо, пока второе ещё в пути.
+    /// </summary>
+    [Fact]
+    public async Task Перечитывание_Пересечение_ИндикаторДержитсяДоПоследнегоОтвета()
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
+
+        var repository = new GatedSessionRepository(database.SessionRepository);
+        var windowService = new FakeWindowService();
+        var viewModel = new MainViewModel(windowService, repository, _settings.Store);
+
+        var first = viewModel.LoadCommand.ExecuteAsync(null);
+        await WaitUntilAsync(() => repository.Calls >= 1);
+
+        // Второе перечитывание — от открытого окна дня, пока первое чтение ещё в пути.
+        var second = windowService.RaiseDaySaved();
+        await WaitUntilAsync(() => repository.Calls >= 2);
+
+        // Отпускаем и дожидаемся именно второго чтения: первый ответ всё ещё в пути.
+        repository.Release(2);
+        await second;
+
+        // Второй ответ пришёл, первый ещё нет: индикатор держится, «Применить» погашена.
+        Assert.True(viewModel.IsBusy);
+        Assert.False(viewModel.ApplyCommand.CanExecute(null));
+        Assert.Equal(["День 5"], viewModel.Days.Select(day => day.PlanName));
+
+        repository.Release(1);
+        await first;
+
+        Assert.False(viewModel.IsBusy);
+        Assert.True(viewModel.ApplyCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// Ответ более раннего запроса, пришедший позже, выбрасывается: иначе журнал показал бы
+    /// данные до сохранения дня, а сводка — устаревший фильтр.
+    /// </summary>
+    [Fact]
+    public async Task Перечитывание_УстаревшийОтвет_НеТрогаетСписок()
+    {
+        using var database = new TemporaryDatabase();
+        await AddSessionAsync(database, new DateOnly(2026, 10, 5), "День 5");
+
+        var repository = new GatedSessionRepository(database.SessionRepository);
+        var windowService = new FakeWindowService();
+        var viewModel = new MainViewModel(windowService, repository, _settings.Store);
+
+        var first = viewModel.LoadCommand.ExecuteAsync(null);
+        await WaitUntilAsync(() => repository.Calls >= 1);
+
+        // Пока первое чтение в пути, день записан и запрошено второе: его ответ свежее.
+        await database.SessionRepository.AddAsync(Session(new DateOnly(2026, 10, 6), "День 6"));
+
+        var second = windowService.RaiseDaySaved();
+        await WaitUntilAsync(() => repository.Calls >= 2);
+
+        // Свежий ответ применён: второй запрос прочитал обе записи.
+        repository.Release(2);
+        await second;
+
+        Assert.Equal(["День 6", "День 5"], viewModel.Days.Select(day => day.PlanName));
+
+        // Устаревший ответ приходит после и не должен откатить список к одному дню.
+        repository.Release(1);
+        await first;
+
+        Assert.Equal(["День 6", "День 5"], viewModel.Days.Select(day => day.PlanName));
+        Assert.False(viewModel.IsBusy);
+    }
+
+    /// <remarks>
+    /// Ждать надо условия, а не времени: фиксированная пауза — гонка на загруженной машине.
+    /// </remarks>
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+
+        while (!condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "Условие не наступило");
+
+            await Task.Delay(1);
+        }
+    }
+
+    /// <summary>
     /// Перепутанные границы меняются местами при применении: запрос с «С» позже «До» вернул бы
     /// пустоту, а поля показывают исправленный диапазон.
     /// </summary>
@@ -818,7 +914,6 @@ public sealed class MainViewModelTests : IDisposable
         await windowService.RaiseDaySaved();
 
         Assert.Equal(1, windowService.AddDayCalls);
-        Assert.Equal(1, windowService.DaySavedRises);
         Assert.Equal(["День 6", "День 5"], viewModel.Days.Select(day => day.PlanName));
     }
 
@@ -846,7 +941,6 @@ public sealed class MainViewModelTests : IDisposable
         await windowService.RaiseDaySaved();
 
         Assert.Equal(2, windowService.AddDayCalls);
-        Assert.Equal(2, windowService.DaySavedRises);
         Assert.Equal(["День 6", "День 5"], viewModel.Days.Select(day => day.PlanName));
     }
 
@@ -923,12 +1017,11 @@ public sealed class MainViewModelTests : IDisposable
     [Fact]
     public void DayRowViewModel_Дата_СоСокращённымДнёмНедели()
     {
+        using var culture = CultureScope.Use("ru-RU");
+
         var row = DayRowViewModel.Create(Session(new DateOnly(2026, 10, 5)));
 
-        var abbreviated = System.Globalization.CultureInfo.CurrentCulture
-            .DateTimeFormat.GetAbbreviatedDayName(new DateOnly(2026, 10, 5).DayOfWeek);
-
-        Assert.Equal($"05 октября 2026 ({abbreviated})", row.DateText);
+        Assert.Equal("05 октября 2026 (пн)", row.DateText);
     }
 
     /// <summary>
@@ -1047,10 +1140,14 @@ public sealed class MainViewModelTests : IDisposable
     [Theory]
     [InlineData("08 октября 2026", 2026, 10, 8)]
     [InlineData("01 января 2026", 2026, 1, 1)]
+    [InlineData("08 марта 2026", 2026, 3, 8)]
+    [InlineData("01 апреля 2026", 2026, 4, 1)]
     [InlineData("05 мая 2026", 2026, 5, 5)]
     [InlineData("30 июня 2026", 2026, 6, 30)]
     [InlineData("31 июля 2026", 2026, 7, 31)]
+    [InlineData("31 августа 2026", 2026, 8, 31)]
     [InlineData("15 сентября 2026", 2026, 9, 15)]
+    [InlineData("09 ноября 2026", 2026, 11, 9)]
     [InlineData("28 февраля 2027", 2027, 2, 28)]
     [InlineData("31 декабря 2026", 2026, 12, 31)]
     public void Dates_Формат_МесяцСловом(string expected, int year, int month, int day) =>
@@ -1058,15 +1155,23 @@ public sealed class MainViewModelTests : IDisposable
 
     /// <summary>
     /// Сокращение дня недели берётся у текущей культуры — то же, что показывает строка журнала.
+    /// Ожидаемые значения — литералы двух культур: вычисление ожидания тем же API, что и в
+    /// продакшене, не поймало бы ни неверный день, ни уход от культуры машины.
     /// </summary>
     [Fact]
     public void Dates_СокращённыйДеньНедели_ПоКультуре()
     {
-        var date = new DateOnly(2026, 11, 9);
-        var abbreviated = System.Globalization.CultureInfo.CurrentCulture
-            .DateTimeFormat.GetAbbreviatedDayName(date.DayOfWeek);
+        var monday = new DateOnly(2026, 11, 9);
 
-        Assert.Equal(abbreviated, Dates.Weekday(date));
+        using (CultureScope.Use("ru-RU"))
+        {
+            Assert.Equal("пн", Dates.Weekday(monday));
+        }
+
+        using (CultureScope.Use("en-US"))
+        {
+            Assert.Equal("Mon", Dates.Weekday(monday));
+        }
     }
 
     private static TrainingSession Session(DateOnly date, string planName = "День") =>

@@ -409,15 +409,20 @@ public sealed class AppSettingsStoreTests
     }
 
     /// <summary>Пробельное имя гарнитуры — тоже «по цепочке»: срез края и пустое означают одно.</summary>
+    /// <remarks>
+    /// Ожидание — литерал, а не тот же <c>FontRules.NormalizeName</c>, которым пользуется хранилище:
+    /// иначе сломанная нормализация осталась бы незамеченной, ведь обе стороны сравнения шли бы
+    /// через неё.
+    /// </remarks>
     [Theory]
-    [InlineData("   ")]
-    [InlineData("  Fira Code  ")]
-    public void Load_ИмяШрифтаНормализуется_ПробелыСрезаются(string font)
+    [InlineData("   ", "")]
+    [InlineData("  Fira Code  ", "Fira Code")]
+    public void Load_ИмяШрифтаНормализуется_ПробелыСрезаются(string font, string expected)
     {
         using var settings = new TemporarySettings();
         settings.Write($$"""{"FontFamily": "{{font}}"}""");
 
-        Assert.Equal(FontRules.NormalizeName(font), settings.Store.Load().FontFamily);
+        Assert.Equal(expected, settings.Store.Load().FontFamily);
     }
 
     /// <summary>

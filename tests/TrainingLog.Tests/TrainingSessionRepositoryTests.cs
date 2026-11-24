@@ -311,8 +311,11 @@ public sealed class TrainingSessionRepositoryTests
             UpdateTrainingSessionOutcome.DateTaken,
             await database.SessionRepository.UpdateAsync(edit));
 
-        // Прежняя дата осталась за записью: неудачная правка ничего не переписала.
-        Assert.NotNull(await database.SessionRepository.GetByDateAsync(first.Date));
+        // Неудачная правка ничего не переписала: обе записи стоят на своих датах прежними.
+        var unchanged = await database.SessionRepository.GetByDateAsync(first.Date);
+        Assert.Equal(first.Id, unchanged!.Id);
+        Assert.Equal(first.PlanName, unchanged.PlanName);
+        Assert.Equal(second.Id, (await database.SessionRepository.GetByDateAsync(second.Date))!.Id);
     }
 
     /// <summary>
@@ -498,11 +501,21 @@ public sealed class TrainingSessionRepositoryTests
     public async Task DeleteAsync_ЗаписиНет_ВозвращаетFalse()
     {
         using var database = new TemporaryDatabase();
-        var session = await AddSessionAsync(database, new DateOnly(2026, 10, 5));
+        var squat = await AddExerciseAsync(database, "Приседание");
+
+        var session = new TrainingSession { Date = new DateOnly(2026, 10, 5), PlanName = "День" };
+        session.AddExercise(squat).AddSet(8, 60m);
+        await database.SessionRepository.AddAsync(session);
 
         Assert.True(await database.SessionRepository.DeleteAsync(session.Id));
         Assert.False(await database.SessionRepository.DeleteAsync(session.Id));
         Assert.Empty(await database.SessionRepository.GetAsync());
+
+        // Каскад от базы: упражнения и подходы удалены вместе с записью, а не осиротели
+        // в таблицах — чтение журнала осиротевшие строки не показало бы.
+        await using var context = await database.Factory.CreateDbContextAsync();
+        Assert.Equal(0, await context.ExerciseEntries.CountAsync());
+        Assert.Equal(0, await context.TrainingSets.CountAsync());
     }
 
     /// <summary>

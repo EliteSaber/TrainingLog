@@ -51,24 +51,17 @@ public sealed class ExerciseImportRulesTests
         Assert.Equal([original, "Тяга"], accepted);
     }
 
+    /// <summary>
+    /// Read не знает справочника и ничего не отбрасывает по нему: дубль от текущего справочника
+    /// виден в поле — человек сверяет список глазами, и молча выброшенная строка выглядела бы
+    /// как потерянная. Отбор уже записанных живёт в <c>PrepareForSave</c> и проверяется его тестами.
+    /// </summary>
     [Fact]
     public void Read_СохраняетПорядокФайла()
     {
         var accepted = ExerciseImportRules.Read(["Тяга", "Жим", "Приседание"]);
 
         Assert.Equal(["Тяга", "Жим", "Приседание"], accepted);
-    }
-
-    /// <summary>
-    /// Дубль от текущего справочника виден в поле: человек сверяет список глазами, и молча
-    /// выброшенная строка выглядела бы как потерянная. Пропускается он уже при записи.
-    /// </summary>
-    [Fact]
-    public void Read_ДубльОтСправочника_Оставляет()
-    {
-        var accepted = ExerciseImportRules.Read(["Жим", "Тяга"]);
-
-        Assert.Equal(["Жим", "Тяга"], accepted);
     }
 
     [Fact]

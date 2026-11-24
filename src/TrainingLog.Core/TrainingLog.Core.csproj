@@ -7,6 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Разбор отказов SQLite (SqliteConstraintErrors) проверяется тестами напрямую:
+         путь отказа по чужой таблице и колонке через публичный API не воспроизвести. -->
+    <InternalsVisibleTo Include="TrainingLog.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">

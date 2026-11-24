@@ -380,12 +380,6 @@ public sealed class EditPlanWindowTests
                     $"Полоса не сдвинулась: было {before}, стало {scroll.VerticalOffset}.");
 
                 Assert.InRange(VisibleTopOf(list, scroll, Index - 1), 0, scroll.ViewportHeight);
-
-                Assert.True(
-                    scroll.VerticalOffset < before,
-                    $"Полоса не сдвинулась: было {before}, стало {scroll.VerticalOffset}.");
-
-                Assert.InRange(VisibleTopOf(list, scroll, Index - 1), 0, scroll.ViewportHeight);
             }
             finally
             {
@@ -398,7 +392,7 @@ public sealed class EditPlanWindowTests
     /// <remarks>
     /// Наполнение окна асинхронное, и оно пересобирает состав в конце: ждать только первого
     /// упражнения нельзя — окно переписало бы состав после того, как тест отметил упражнение.
-    /// Поэтому диспетчеру отдаётся несколько порций работы подряд.
+    /// Поэтому ожидается готовый состав целиком, по счётчикам, а не фиксированным числом кадров.
     ///
     /// <paramref name="compositionSize"/> — сколько упражнений в составе: длинный состав нужен там,
     /// где важна прокрутка.
@@ -445,12 +439,17 @@ public sealed class EditPlanWindowTests
         window.Show();
         window.UpdateLayout();
 
-        for (var attempt = 0; attempt < 20; attempt++)
+        var expectedAll = 2 + compositionSize - 1;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+
+        while ((viewModel.AllExercises.Count != expectedAll
+                || viewModel.SelectedExercises.Count != compositionSize)
+            && DateTime.UtcNow < deadline)
         {
             window.Dispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));
         }
 
-        Assert.Equal(2 + compositionSize - 1, viewModel.AllExercises.Count);
+        Assert.Equal(expectedAll, viewModel.AllExercises.Count);
         Assert.Equal(compositionSize, viewModel.SelectedExercises.Count);
 
         return window;

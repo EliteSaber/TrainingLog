@@ -7,9 +7,6 @@ namespace TrainingLog.Tests;
 
 public sealed class ExerciseRepositoryTests
 {
-    private static readonly string[] AlphabeticalNames = ["Атлант", "Болт", "Присед", "Ящик"];
-    private static readonly string[] ReverseAlphabeticalNames = ["Ящик", "Присед", "Болт", "Атлант"];
-
     [Fact]
     public async Task AddAsync_НовоеУпражнение_ПрисваиваетИдентификатор()
     {
@@ -248,8 +245,10 @@ public sealed class ExerciseRepositoryTests
     }
 
     /// <summary>
-    /// Импорт одной транзакцией: частично записанный справочник после отказа хуже любого отказа,
-    /// потому что потерялись бы упражнения вместе с планами, из которых они выпали.
+    /// Дубль внутри списка отсекается разбором импорта до всякой записи: частично записанный
+    /// справочник после отказа хуже любого отказа, потому что потерялись бы упражнения вместе
+    /// с планами, из которых они выпали. Отказ на самой записи (имя занято в базе) проверяется
+    /// тестом <c>ImportAsync_БезОчистки_ИмяЗанятое</c>.
     /// </summary>
     [Fact]
     public async Task ImportAsync_ДубльВСписке_ВозвращаетInvalidNameИНеПишетНичего()
@@ -397,22 +396,6 @@ public sealed class ExerciseRepositoryTests
         await database.Repository.ImportAsync([], replaceExisting: false);
 
         Assert.Empty(changes);
-    }
-
-    /// <summary>Сортировка по кодам Unicode в SQLite совпадает с русским алфавитом.</summary>
-    [Fact]
-    public async Task Сортировка_ПоАлфавиту_РаботаетДляКириллицы()
-    {
-        using var database = new TemporaryDatabase();
-        foreach (var name in new[] { "Ящик", "Болт", "Присед", "Атлант" })
-        {
-            await database.Repository.AddAsync(new Exercise { Name = name });
-        }
-
-        var all = await database.Repository.GetAllAsync();
-
-        Assert.Equal(AlphabeticalNames, all.OrderBy(e => e.Name).Select(e => e.Name));
-        Assert.Equal(ReverseAlphabeticalNames, all.OrderByDescending(e => e.Name).Select(e => e.Name));
     }
 
     /// <summary>

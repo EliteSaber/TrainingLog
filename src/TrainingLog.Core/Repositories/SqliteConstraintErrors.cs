@@ -18,11 +18,45 @@ internal static class SqliteConstraintErrors
     private const int ConstraintErrorCode = 19;
 
     /// <summary>Совпал ли отказ с уникальностью указанной колонки указанной таблицы.</summary>
-    public static bool IsUniqueViolation(DbUpdateException exception, string table, string column) =>
-        exception.InnerException is SqliteException
+    /// <remarks>
+    /// Сравнение точное, по целой паре «таблица.колонка»: подстрочный поиск считал бы отказ по
+    /// <c>Exercises.NameKey</c> совпавшим с <c>Exercises.Name</c> — ровно тот ложный диагноз,
+    /// ради которого класс и заведён.
+    /// </remarks>
+    public static bool IsUniqueViolation(DbUpdateException exception, string table, string column)
+    {
+        if (exception.InnerException is not SqliteException
+            {
+                SqliteErrorCode: ConstraintErrorCode,
+                Message: var message,
+            })
         {
-            SqliteErrorCode: ConstraintErrorCode,
-            Message: var message,
+            return false;
         }
-        && message.Contains($"UNIQUE constraint failed: {table}.{column}", StringComparison.Ordinal);
+
+        // Формат SQLite: «UNIQUE constraint failed: Table.Column, Table.Other».
+        const string prefix = "UNIQUE constraint failed: ";
+
+        var start = message.IndexOf(prefix, StringComparison.Ordinal);
+
+        if (start < 0)
+        {
+            return false;
+        }
+
+        var failed = message[(start + prefix.Length)..];
+
+        // Сообщение Microsoft.Data.Sqlite оборачивает текст: «SQLite Error 19: '…'». Хвост
+        // после закрывающей кавычки к списку колонок не относится.
+        var end = failed.IndexOf('\'');
+
+        if (end >= 0)
+        {
+            failed = failed[..end];
+        }
+
+        return failed
+            .Split(',', StringSplitOptions.TrimEntries)
+            .Contains($"{table}.{column}", StringComparer.Ordinal);
+    }
 }

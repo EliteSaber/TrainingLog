@@ -74,6 +74,28 @@ public sealed class TrainingPlanTests
             plan.Exercises.Select(exercise => exercise.Name));
     }
 
+    /// <summary>
+    /// Место считается по последнему занятому номеру, а не по числу строк: после удаления из
+    /// середины номера идут с пропуском, и добавление по числу строк выдало бы занятый номер.
+    /// </summary>
+    [Fact]
+    public void AddExercise_ПослеУдаленияИзСередины_НомерПоПоследнемуЗанятому()
+    {
+        var plan = new TrainingPlan();
+
+        plan.AddExercise(new Exercise { Name = "Приседание" });
+        var middle = plan.AddExercise(new Exercise { Name = "Жим" });
+        plan.AddExercise(new Exercise { Name = "Тяга" });
+
+        plan.PlanExercises.Remove(middle);
+
+        var added = plan.AddExercise(new Exercise { Name = "Выпад" });
+
+        // строк две, последний занятый номер — 3: новый номер 4, а не 3.
+        Assert.Equal(4, added.Order);
+        Assert.Equal([1, 3, 4], plan.PlanExercises.Select(link => link.Order));
+    }
+
     private static List<string?> TrackNameChanges(TrainingPlan plan)
     {
         var notifications = new List<string?>();

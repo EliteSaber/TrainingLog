@@ -112,14 +112,11 @@ public sealed class AddDayWindowTests
 
                     var deadline = DateTime.UtcNow.AddSeconds(10);
 
-                    while ((viewModel.Current is null || viewModel.IsLoading) && DateTime.UtcNow < deadline)
-                    {
-                        window.Dispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));
-                    }
-
-                    // Ещё несколько кадров: перестройка после самопроизвольной записи даты
-                    // может прийти позже первого ответа.
-                    for (var attempt = 0; attempt < 20; attempt++)
+                    // Ждём самих подсказок, а не фиксированного числа кадров: перестройка после
+                    // самопроизвольной записи даты DatePicker может прийти позже первого ответа.
+                    // Наполнение идёт до снятия IsLoading, поэтому подсказки при погашенном
+                    // индикаторе — устойчивое состояние, а не мгновение между перестройками.
+                    while (!HintsReady() && DateTime.UtcNow < deadline)
                     {
                         window.Dispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));
                     }
@@ -130,6 +127,16 @@ public sealed class AddDayWindowTests
                     Assert.True(set.HasRepetitionPlaceholder);
                     Assert.Equal("60", set.WeightPlaceholder);
                     Assert.True(set.HasWeightPlaceholder);
+
+                    bool HintsReady()
+                    {
+                        var row = viewModel.Current;
+
+                        return !viewModel.IsLoading
+                            && row is { Sets.Count: > 0 }
+                            && row.Sets[0].HasRepetitionPlaceholder
+                            && row.Sets[0].HasWeightPlaceholder;
+                    }
                 }
                 finally
                 {

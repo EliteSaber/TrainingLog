@@ -56,6 +56,87 @@ public sealed class HotkeyBinderTests
         });
     }
 
+    /// <summary>
+    /// Привязка несёт именно назначенный жест: исполнитель, запущенный напрямую, проверил бы
+    /// команду, а не клавишу — неверный жест при верной команде прошёл бы незамеченным.
+    /// </summary>
+    [Fact]
+    public void Привязка_НазначениеИзФайла_ЖестСовпадает()
+    {
+        StaRunner.Run(() =>
+        {
+            var (window, _, _) = WindowWithButton();
+
+            using var settings = AssignedDayPrevious();
+            new HotkeyBinder(window, new HotkeyService(settings.Store)).Rebuild();
+
+            var binding = window.InputBindings.OfType<KeyBinding>().Single();
+
+            Assert.Equal(Key.P, binding.Key);
+            Assert.Equal(ModifierKeys.Control | ModifierKeys.Alt, binding.Modifiers);
+        });
+    }
+
+    /// <summary>
+    /// Смена назначений перестраивает привязки: новая клавиша вместо старой, и старая привязка
+    /// не остаётся в окне вторым экземпляром.
+    /// </summary>
+    [Fact]
+    public void СменаНазначений_ПерестраиваетПривязки()
+    {
+        StaRunner.Run(() =>
+        {
+            var (window, _, _) = WindowWithButton();
+
+            using var settings = AssignedDayPrevious();
+            var hotkeys = new HotkeyService(settings.Store);
+            new HotkeyBinder(window, hotkeys).Rebuild();
+
+            settings.Store.Save(new AppSettings
+            {
+                Hotkeys = new Dictionary<string, string> { ["Day.Previous"] = "Ctrl+Shift+P" },
+            });
+
+            hotkeys.NotifyChanged();
+
+            var binding = window.InputBindings.OfType<KeyBinding>().Single();
+
+            Assert.Equal(Key.P, binding.Key);
+            Assert.Equal(ModifierKeys.Control | ModifierKeys.Shift, binding.Modifiers);
+        });
+    }
+
+    /// <summary>
+    /// Закрытие окна отписывает биндер от сервиса: иначе синглтон-сервис держал бы закрытое
+    /// окно подпиской вечно, и смена назначений перестраивала бы привязки мёртвого окна.
+    /// </summary>
+    [Fact]
+    public void ЗакрытиеОкна_ОтписываетОтСервиса()
+    {
+        StaRunner.Run(() =>
+        {
+            var (window, _, _) = WindowWithButton();
+
+            using var settings = AssignedDayPrevious();
+            var hotkeys = new HotkeyService(settings.Store);
+            new HotkeyBinder(window, hotkeys).Rebuild();
+
+            window.Close();
+
+            settings.Store.Save(new AppSettings
+            {
+                Hotkeys = new Dictionary<string, string> { ["Day.Previous"] = "Ctrl+Shift+P" },
+            });
+
+            hotkeys.NotifyChanged();
+
+            // Перестройки не было: жест прежний. Оставшаяся подписка обновила бы его.
+            var binding = window.InputBindings.OfType<KeyBinding>().Single();
+
+            Assert.Equal(ModifierKeys.Control | ModifierKeys.Alt, binding.Modifiers);
+        });
+    }
+
     /// <summary>Имитация нажатия: исполнитель KeyBinding биндера, как при настоящей клавише.</summary>
     private static void Press(Window window)
     {

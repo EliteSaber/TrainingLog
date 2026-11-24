@@ -19,11 +19,12 @@ public sealed class OverflowTipTests
     /// <summary>
     /// Дробные показатели ScrollViewer у влезающего значения расходились на доли пикселя:
     /// разница в допуске — ещё не переполнение, иначе подсказка мерцала бы над каждым полем.
+    /// Граница ровно в допуске (0.5): сравнение строгое, поэтому подсказки нет.
     /// </summary>
     [Fact]
     public void Overflows_РазницаРовноВДопуске_ПодсказкиНет()
     {
-        Assert.False(OverflowTip.Overflows(120.4, 120));
+        Assert.False(OverflowTip.Overflows(120.5, 120));
     }
 
     /// <summary>Текст шире допуска — переполнение, наименьший случай.</summary>

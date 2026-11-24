@@ -233,8 +233,13 @@ public sealed class WindowServiceTests
         {
             var task = start();
 
+            // Без срока зависшая задача повесила бы весь прогон: лучше явный отказ теста.
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+
             while (!task.IsCompleted)
             {
+                Assert.True(DateTime.UtcNow < deadline, "Команда окна не завершилась за отведённое время.");
+
                 window.Dispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));
             }
 
