@@ -60,10 +60,7 @@ public sealed class SingleInstanceWindowHost<TWindow> where TWindow : Window
         {
             if (_window.IsVisible)
             {
-                if (_window.WindowState == WindowState.Minimized)
-                {
-                    _window.WindowState = WindowState.Normal;
-                }
+                WindowAttention.Restore(_window);
 
                 BringToFront(_window);
 
@@ -120,14 +117,11 @@ public sealed class SingleInstanceWindowHost<TWindow> where TWindow : Window
         // Возвращаем активацию владельцу явно: если этого не сделать, активацию забирает
         // приложение, которое было активно до нас. См. WindowService.ShowEditExercise.
         //
-        // У отдельного окна владельца нет — возвращать некому, и активацию забирает главное
-        // окно. Оно получает фокус, но остаётся свёрнутым, если журнал его свернули: журнал
-        // возвращает пользователь сам, как и у окна дня.
-        var target = owner ?? Application.Current?.MainWindow;
-
-        if (target is { IsVisible: true })
+        // У отдельного окна владельца нет — активацию получает главное окно, а если других
+        // окон не осталось, оно ещё и разворачивается (WindowReturn).
+        if (sender is Window closed)
         {
-            target.Activate();
+            WindowReturn.Activate(owner ?? Application.Current?.MainWindow, closed);
         }
     }
 }

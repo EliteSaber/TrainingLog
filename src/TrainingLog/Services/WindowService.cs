@@ -278,6 +278,8 @@ public sealed class WindowService(
     /// <remarks>
     /// У окон без владельца возвращать активацию некому: фокус забрало бы приложение, которое
     /// было активно до нас (ловушка 9). Отдаём её окну-родителю, а если его нет — журналу.
+    /// Закрытие последнего окна, кроме журнала, журнал ещё и разворачивает
+    /// (<see cref="WindowReturn"/>).
     /// </remarks>
     private void OnExercisesChildClosed(object? sender, EventArgs e)
     {
@@ -299,15 +301,17 @@ public sealed class WindowService(
             _importClosed = null;
         }
 
-        if (ExercisesOwner is { IsVisible: true } owner)
+        if (sender is Window closed)
         {
-            owner.Activate();
+            WindowReturn.Activate(ExercisesOwner, closed);
         }
     }
 
     /// <summary>Окно плана закрылось: активация возвращается списку планов.</summary>
     /// <remarks>
     /// Как и у окон справочника: у окна без владельца возвращать активацию некому (ловушка 9).
+    /// Закрытие последнего окна, кроме журнала, журнал ещё и разворачивает
+    /// (<see cref="WindowReturn"/>).
     /// </remarks>
     private void OnPlansChildClosed(object? sender, EventArgs e)
     {
@@ -321,9 +325,9 @@ public sealed class WindowService(
             _planClosed = null;
         }
 
-        if (PlansOwner is { IsVisible: true } owner)
+        if (sender is Window closed)
         {
-            owner.Activate();
+            WindowReturn.Activate(PlansOwner, closed);
         }
     }
 
@@ -400,10 +404,7 @@ public sealed class WindowService(
     /// <param name="window">Окно, которое уже открыто.</param>
     private static void ShowExisting(Window window)
     {
-        if (window.WindowState == WindowState.Minimized)
-        {
-            window.WindowState = WindowState.Normal;
-        }
+        WindowAttention.Restore(window);
 
         WindowAttention.Flash(window);
 
@@ -453,13 +454,11 @@ public sealed class WindowService(
         _dayWindow = null;
 
         // Владельца у окна нет, и Windows не знает, кому вернуть передний план, поэтому
-        // активируем главное окно явно (ловушка 9) — так же, как после ShowDialog. На
-        // IsVisible проверка: при закрытии главного окна окно дня закрывается следом за
-        // приложением, и активировать закрытое главное окно нечего.
-        if (Application.Current?.MainWindow is { IsVisible: true } main)
-        {
-            main.Activate();
-        }
+        // активируем главное окно явно (ловушка 9) — так же, как после ShowDialog. Свёрнутый
+        // журнал WindowReturn разворачивает: закрытие последнего окна не должно оставлять
+        // фокус в никуда. На IsVisible проверка: при закрытии главного окна окно дня
+        // закрывается следом за приложением, и активировать закрытое главное окно нечего.
+        WindowReturn.Activate(Application.Current?.MainWindow, window);
     }
 
     private Window? PlansOwner => _plans.Current ?? Application.Current?.MainWindow;

@@ -67,6 +67,39 @@ public static class WindowAttention
         SetForegroundWindow(handle);
     }
 
+    /// <summary>Разворачивает свёрнутое окно в то состояние, из которого его свернули.</summary>
+    /// <remarks>
+    /// Разворачиваем через Win32, а не присваиванием <c>WindowState</c>: свойство WPF — это его
+    /// собственное состояние, и оно может разойтись с настоящим (окно свернули или развернули в
+    /// обход WPF), а <c>SW_RESTORE</c> работает по факту. Система возвращает окно в прежний вид:
+    /// развёрнутое до сворачивания останется развёрнутым. Свойство WPF после этого обновится само
+    /// по <c>WM_SIZE</c>.
+    /// </remarks>
+    /// <param name="window">Окно, которое надо развернуть.</param>
+    public static void Restore(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+
+        var handle = new WindowInteropHelper(window).Handle;
+
+        // Handle нулевой у окна, которое ещё не показывали: разворачивать нечего.
+        if (handle != 0 && IsIconic(handle))
+        {
+            ShowWindow(handle, SwRestore);
+        }
+    }
+
+    /// <summary>Окно свёрнуто по данным Windows, а не по свойству WPF.</summary>
+    /// <param name="window">Проверяемое окно.</param>
+    public static bool IsMinimized(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+
+        var handle = new WindowInteropHelper(window).Handle;
+
+        return handle != 0 && IsIconic(handle);
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct FLASHWINFO
     {
@@ -80,6 +113,9 @@ public static class WindowAttention
     /// <summary>HWND_TOP: поставить окно на верх своей z-полосы.</summary>
     private const nint HwndTop = 0;
 
+    /// <summary>SW_RESTORE: развернуть окно в состояние до сворачивания.</summary>
+    private const int SwRestore = 9;
+
     /// <summary>SWP_NOSIZE и SWP_NOMOVE: положение и размер не менять, SWP_SHOWWINDOW — показать.</summary>
     private const uint SwpNoSize = 0x1;
     private const uint SwpNoMove = 0x2;
@@ -92,6 +128,14 @@ public static class WindowAttention
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool MessageBeep(uint type);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsIconic(nint handle);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(nint handle, int command);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
