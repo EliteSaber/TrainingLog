@@ -30,6 +30,19 @@ public static class DragValue
     /// </remarks>
     public const double DragThreshold = 3;
 
+    /// <summary>
+    /// Перетаскивание закончилось (отпущена левая кнопка после движения больше порога).
+    /// </summary>
+    /// <remarks>
+    /// Всплывает. Нужно тем, кто откладывает реакцию на значение до конца жеста: по ходу
+    /// перетаскивания команды идут на каждое движение мыши, а здесь — один сигнал на отпускание.
+    /// </remarks>
+    public static readonly RoutedEvent DragEndedEvent = EventManager.RegisterRoutedEvent(
+        "DragEnded",
+        RoutingStrategy.Bubble,
+        typeof(RoutedEventHandler),
+        typeof(DragValue));
+
     /// <summary>Команда, которой передаётся новое значение.</summary>
     public static readonly DependencyProperty CommandProperty = DependencyProperty.RegisterAttached(
         "Command",
@@ -222,6 +235,9 @@ public static class DragValue
         {
             element.ReleaseMouseCapture();
         }
+
+        // Сигнал конца жеста: последнее значение уже отправлено командой на движении мыши.
+        element.RaiseEvent(new RoutedEventArgs(DragEndedEvent, element));
 
         e.Handled = true;
     }

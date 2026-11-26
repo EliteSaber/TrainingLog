@@ -337,7 +337,8 @@
                                               StrokeEndLineCap="Round" />
                                     </Button>
 
-                                    <ListBox Grid.Row="1"
+                                    <ListBox x:Name="FontList"
+                                             Grid.Row="1"
                                              Margin="0,6,0,0"
                                              Height="120"
                                              ItemsSource="{Binding FilteredFonts}"

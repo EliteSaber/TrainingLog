@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using TrainingLog.Controls;
 using TrainingLog.Core.Settings;
@@ -24,6 +25,10 @@ public partial class SettingsWindow : Window
 {
     private readonly SettingsViewModel _viewModel;
     private readonly HotkeyService _hotkeys;
+    private readonly RoutedEventHandler _dragEndedHandler;
+
+    // Само окно параметров отложено до отпускания ЛКМ при перетаскивании размера.
+    private bool _applySelfWhenMouseUp;
 
     /// <summary>
     /// Настройки записаны: главное окно перечитает файл, а размеры применятся к открытым окнам.
@@ -46,6 +51,7 @@ public partial class SettingsWindow : Window
 
         _viewModel = viewModel;
         _hotkeys = hotkeys;
+        _dragEndedHandler = new RoutedEventHandler(OnDragEnded);
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         // Размеры окон применяются к открытым окнам сразу, как шрифт и тема: предпросмотр
@@ -61,6 +67,9 @@ public partial class SettingsWindow : Window
         AllowedCharsInput.AddRejectedHandler(this, OnInputRejected);
         AllowedCharsInput.AddAcceptedHandler(this, OnInputAccepted);
 
+        // Конец перетаскивания DragValue: применить отложенный размер самого окна параметров.
+        AddHandler(DragValue.DragEndedEvent, _dragEndedHandler, handledEventsToo: true);
+
         Closed += OnClosed;
         Loaded += OnLoaded;
     }
@@ -75,6 +84,24 @@ public partial class SettingsWindow : Window
 
         DaysCountBox.Focus();
         DaysCountBox.SelectAll();
+
+        // Список шрифтов — на выбранном пункте, а не с начала: выделение ставится до
+        // применения шаблона и раскладки, и автоматическая прокрутка WPF тогда молча не
+        // срабатывает; прокрутка после раскладки. Только внутри списка.
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ScrollSelectedFontIntoView));
+    }
+
+    /// <summary>Прокручивает список шрифтов к выбранному пункту.</summary>
+    private void ScrollSelectedFontIntoView()
+    {
+        if (FontList.SelectedItem is not { } selected)
+        {
+            return;
+        }
+
+        // Форсированная раскладка: ScrollIntoView до неё молча не срабатывает.
+        FontList.UpdateLayout();
+        FontList.ScrollIntoView(selected);
     }
 
     /// <summary>
@@ -142,13 +169,40 @@ public partial class SettingsWindow : Window
     /// Размер окна изменился: открытые окна подстраиваются сразу, как шрифт и тема.
     /// </summary>
     /// <remarks>
-    /// Само окно параметров исключено: оно изменило бы ширину под курсором, и поле, в котором
-    /// идёт правка, уехало бы вбок. Файл при этом не меняется — он пишется по «Сохранить».
+    /// Файл при этом не меняется — он пишется по «Сохранить».
+    ///
+    /// Прочие окна применяются сразу на каждое изменение. Само окно параметров — тоже, но
+    /// только когда правка идёт без зажатой левой кнопки мыши (клавиатура — сразу); при
+    /// перетаскивании мышью по своему полю сдвинуть себя сейчас нельзя: поле уедет из-под
+    /// курсора и сломается отсчёт перетаскивания (<see cref="DragValue"/>). Поэтому при зажатой
+    /// ЛКМ само окно откладывается и применяется один раз на отпускание — <see cref="OnDragEnded"/>.
     /// </remarks>
     private void OnWindowSizesChanged()
     {
         WindowSizes.Initialize(_viewModel.PreviewWindowSizes());
+
         WindowSizes.ApplyToOpenWindows(this);
+
+        if (Mouse.LeftButton == MouseButtonState.Pressed)
+        {
+            _applySelfWhenMouseUp = true;
+        }
+        else
+        {
+            WindowSizes.Apply(this);
+        }
+    }
+
+    /// <summary>Перетаскивание размера отпущено: применить отложенный размер самого окна.</summary>
+    private void OnDragEnded(object sender, RoutedEventArgs e)
+    {
+        if (!_applySelfWhenMouseUp)
+        {
+            return;
+        }
+
+        _applySelfWhenMouseUp = false;
+        WindowSizes.Apply(this);
     }
 
     /// <summary>Прокручивает перечень клавиш к началу.</summary>
@@ -434,5 +488,6 @@ public partial class SettingsWindow : Window
         _viewModel.WindowSizesChanged -= OnWindowSizesChanged;
         AllowedCharsInput.RemoveRejectedHandler(this, OnInputRejected);
         AllowedCharsInput.RemoveAcceptedHandler(this, OnInputAccepted);
+        RemoveHandler(DragValue.DragEndedEvent, _dragEndedHandler);
     }
 }
