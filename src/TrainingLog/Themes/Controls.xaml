@@ -1322,4 +1322,66 @@
             </Trigger>
         </Style.Triggers>
     </Style>
+
+    <!--
+      ScrollViewer: системный шаблон WPF рисует «уголок» между полосами прокрутки
+      (Rectangle в ячейке строка 1 / колонка 1) заливкой SystemColors.ControlBrushKey —
+      системным светлым цветом, который тема приложения не перекрашивает; в тёмной теме
+      при двух полосах справа снизу появлялся белый квадратик. Свой шаблон тот же,
+      но уголок прозрачный. Только Template: остальное (Margin/Padding/SnapsToDevicePixels,
+      триггер IsEnabled) остаётся от системной темы, OverridesDefaultStyle не ставится.
+      PART_*-имена и привязки обязаны совпадать, иначе ScrollViewer не подключит полосы.
+    -->
+    <Style TargetType="ScrollViewer">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollViewer">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                Grid.Row="0"
+                                                Grid.Column="0"
+                                                CanContentScroll="{TemplateBinding CanContentScroll}"
+                                                Margin="{TemplateBinding Padding}" />
+                        <ScrollBar x:Name="PART_VerticalScrollBar"
+                                   Grid.Row="0"
+                                   Grid.Column="1"
+                                   Orientation="Vertical"
+                                   Minimum="0"
+                                   Maximum="{TemplateBinding ScrollableHeight}"
+                                   ViewportSize="{TemplateBinding ViewportHeight}"
+                                   Value="{TemplateBinding VerticalOffset}"
+                                   Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                                   Cursor="Arrow" />
+                        <ScrollBar x:Name="PART_HorizontalScrollBar"
+                                   Grid.Row="1"
+                                   Grid.Column="0"
+                                   Orientation="Horizontal"
+                                   Minimum="0"
+                                   Maximum="{TemplateBinding ScrollableWidth}"
+                                   ViewportSize="{TemplateBinding ViewportWidth}"
+                                   Value="{TemplateBinding HorizontalOffset}"
+                                   Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"
+                                   Cursor="Arrow" />
+                        <Rectangle Grid.Row="1"
+                                   Grid.Column="1"
+                                   Fill="Transparent" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+      Наследник ScrollViewer не подхватывает неявный стиль по ключу {x:Type ScrollViewer}:
+      ключ ищется по точному типу, иначе снова системный шаблон со светлым «уголком».
+    -->
+    <Style TargetType="helpers:RowScrollViewer" BasedOn="{StaticResource {x:Type ScrollViewer}}" />
 </ResourceDictionary>
